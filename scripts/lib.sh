@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Shared settings and helpers for all scripts. Sourced, not run directly.
+# shellcheck disable=SC2034  # variables are used by the scripts that source this file
+
+# Repo folder = the folder above scripts/, wherever you cloned it.
+KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Generated files and downloaded apps live here (ignored by git).
+RUNTIME="$KIT/runtime"
+LIBRECHAT_DIR="$RUNTIME/LibreChat"
+SEARXNG_DIR="$RUNTIME/searxng"
+WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
+TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
+
+mkdir -p "$RUNTIME"
+
+# ---- Models ----
+# Your own choices go in config/models.env (copy config/models.env.example).
+# Anything not set there is picked automatically from the amount of RAM.
+# shellcheck source=/dev/null
+[ -f "$KIT/config/models.env" ] && source "$KIT/config/models.env"
+
+RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
+if [ -z "${MODEL_MAIN:-}" ]; then
+  if   [ "$RAM_GB" -ge 45 ]; then MODEL_MAIN="qwen3:30b-a3b"  # MoE, ~19 GB, best quality
+  elif [ "$RAM_GB" -ge 14 ]; then MODEL_MAIN="qwen3:8b"       # ~5 GB
+  else                            MODEL_MAIN="qwen3:4b"       # ~2.5 GB
+  fi
+fi
+MODEL_FAST="${MODEL_FAST:-qwen3:4b}"
+MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
+
+step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
+ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
+warn() { printf '  \033[1;33m[WARN]\033[0m %s\n' "$*"; }
+fail() { printf '  \033[1;31m[FAIL]\033[0m %s\n' "$*"; }
+next() { printf '\n\033[1mNext:\033[0m  %s\n' "$*"; }
+
+# IP address of Docker's internal bridge (containers reach the host here)
+docker_bridge_ip() {
+  ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1
+}
+
+# Copy the LibreChat config template, filling in the chosen model names.
+render_librechat_config() {
+  sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
+    "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"
+  cp "$KIT/config/librechat/docker-compose.override.yml" "$LIBRECHAT_DIR/docker-compose.override.yml"
+}

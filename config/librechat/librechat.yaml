@@ -1,0 +1,21 @@
+# LibreChat configuration - connects the chat UI to your local model and tools.
+version: 1.3.17
+cache: true
+
+endpoints:
+  custom:
+    - name: "Ollama"                 # name must start with "ollama" so models are listed automatically
+      apiKey: "ollama"
+      baseURL: "http://host.docker.internal:11434/v1/"
+      models:
+        default: ["__MODEL_MAIN__", "__MODEL_FAST__"]   # filled in by the install script
+        fetch: true
+      titleConvo: true
+      titleModel: "__MODEL_FAST__"         # small fast model writes chat titles
+      modelDisplayLabel: "Local AI"
+
+mcpServers:
+  toolbox:
+    type: streamable-http
+    url: "http://host.docker.internal:8001/mcp"
+    timeout: 300000                  # 5 min: CPU-only machines are slow

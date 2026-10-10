@@ -1,0 +1,22 @@
+# Generated at install time: LibreChat checkout, secrets, venv, SearXNG settings
+runtime/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Never commit secrets
+.env
+*.env
+
+# Your personal model choices (see config/models.env.example)
+config/models.env

@@ -1,0 +1,5 @@
+mcp>=2.2,<3
+httpx
+beautifulsoup4
+yfinance
+pandas

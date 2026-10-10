@@ -1,0 +1,9 @@
+# Your changes on top of LibreChat's own docker-compose.yml (never edit that one).
+services:
+  api:
+    volumes:
+      - ./librechat.yaml:/app/librechat.yaml
+  rag_api:
+    # lets the document-search service reach Ollama on the host for embeddings
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

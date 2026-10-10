@@ -1,0 +1,14 @@
+# SearXNG = your private search engine. It asks Google/Bing/DuckDuckGo etc. for you.
+use_default_settings: true
+
+server:
+  # replaced with a random value by scripts/03_searxng.sh
+  secret_key: "CHANGE_ME"
+  limiter: false          # only you use it, so no rate limiter needed
+  image_proxy: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json                # the agent needs JSON results

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r toolbox/requirements.txt -r requirements-dev.txt
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Unit tests
+        run: pytest -q
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck -x scripts/*.sh
+
+  configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate YAML files
+        run: |
+          python3 - <<'EOF'
+          import pathlib, yaml
+          for p in pathlib.Path("config").rglob("*.y*ml"):
+              yaml.safe_load(p.read_text())
+              print("ok", p)
+          EOF
+      - name: Build sandbox image
+        run: |
+          docker build -t agent-sandbox sandbox
+          echo 'import pandas, matplotlib; print("sandbox ok")' | \
+            docker run --rm -i --network none agent-sandbox python -
