@@ -6,7 +6,8 @@
 # It downloads the project to ~/ai-kit and runs scripts 00-06 in order: hardware check,
 # Docker + Ollama, models, private search, toolbox, LibreChat, and the Assistant agent.
 # Safe to run again: it checks each step and skips the ones already done, so it resumes
-# after a failure and continues a manual install (see scripts/status.sh).
+# after a failure and continues a manual install (see scripts/status.sh). If a step fails,
+# it stops and explains how to run and fix that step by hand in another terminal.
 #
 # Options (as environment variables in front of `bash`):
 #   INSTALL_DIR=~/ai-kit      where to put the project
@@ -70,8 +71,35 @@ main() {
       return 0
     fi
     say "$((n + 2))/8  $title"
-    $have_status && [ -n "$STATUS_REASON" ] && echo "  (reason: $STATUS_REASON)"
-    "$@"
+    if $have_status && [ -n "$STATUS_REASON" ]; then echo "  (reason: $STATUS_REASON)"; fi
+    if ! "$@"; then
+      stop_with_help "$n" "$title"
+    fi
+  }
+  # A step failed: stop here (don't carry on with a half-working setup) and explain the
+  # manual way to fix it. Re-running the installer continues from this same step.
+  stop_with_help() {
+    local n="$1" title="$2" script
+    case "$n" in
+      1) script=01_install_base.sh ;;   2) script=02_download_models.sh ;;
+      3) script=03_searxng.sh ;;        4) script=04_toolbox.sh ;;
+      5) script=05_librechat.sh ;;      6) script=06_create_agent.sh ;;
+    esac
+    printf '\n\033[1;31m=== Step %s/8 failed: %s ===\033[0m\n' "$((n + 2))" "$title" >&2
+    cat >&2 <<EOT
+The installer has stopped here so nothing is left half-done. Your earlier steps are kept.
+
+What to do:
+  1. Read the error just above this box.
+  2. Open ANOTHER terminal (Ctrl+Alt+T) and run this step by hand to see it clearly:
+       cd $dir && bash scripts/$script
+     Fix the problem it reports. Help: $dir/docs/GUIDE.md (section "Troubleshooting").
+     Useful checks:  bash scripts/status.sh   and   bash scripts/check.sh
+  3. When that step works, come back here and run the installer again:
+       bash $dir/install.sh
+     It skips everything already done and continues from this step.
+EOT
+    exit 1
   }
 
   if $have_status && [ -z "$dry" ]; then bash scripts/status.sh || true; fi
@@ -93,9 +121,7 @@ main() {
 
   create_agent() {
     if [ -n "$dry" ]; then echo "  [dry-run] bash scripts/06_create_agent.sh"; return; fi
-    bash scripts/06_create_agent.sh </dev/tty || {
-      echo "Agent creation failed. Fix the problem above, then run:  cd $dir && bash scripts/06_create_agent.sh"
-      echo "(or create it by hand: docs/GUIDE.md step 8)"; }
+    bash scripts/06_create_agent.sh </dev/tty
   }
   do_step 6 "Creating the Assistant agent" create_agent
 

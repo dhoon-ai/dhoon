@@ -44,6 +44,21 @@ warn() { printf '  \033[1;33m[WARN]\033[0m %s\n' "$*"; }
 fail() { printf '  \033[1;31m[FAIL]\033[0m %s\n' "$*"; }
 next() { printf '\n\033[1mNext:\033[0m  %s\n' "$*"; }
 
+# CPU temperature in C, from the CPU package sensor when available. Some boards expose a
+# broken first sensor (e.g. -263 C), so implausible readings are skipped. Empty if unknown.
+cpu_temp() {
+  local z type t best=""
+  for z in /sys/class/thermal/thermal_zone*; do
+    [ -r "$z/temp" ] || continue
+    t=$(( $(cat "$z/temp" 2>/dev/null || echo -999999) / 1000 ))
+    [ "$t" -gt 0 ] && [ "$t" -lt 125 ] || continue
+    type=$(cat "$z/type" 2>/dev/null)
+    if [ "$type" = "x86_pkg_temp" ] || [ "$type" = "cpu-thermal" ]; then echo "$t"; return; fi
+    [ -n "$best" ] || best="$t"
+  done
+  echo "$best"
+}
+
 # IP address of Docker's internal bridge (containers reach the host here)
 docker_bridge_ip() {
   ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1

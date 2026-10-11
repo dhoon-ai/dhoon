@@ -19,7 +19,8 @@ curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/in
 It runs the whole setup, including creating the agent, and asks only for your password
 and a login for the web app. Then open `http://localhost:3080`. Re-run the same command
 to resume: it checks each step (`scripts/status.sh`) and skips what's already done, so it
-also continues an install you started by hand.
+also continues an install you started by hand. If a step fails it stops and shows the exact
+command to run and fix that step by hand, then you re-run the installer.
 
 > **New to this?** Follow **[docs/GUIDE.md](docs/GUIDE.md)**. It's written for
 > beginners, with copy-paste commands for every step.

@@ -72,3 +72,25 @@ def test_force_reruns_everything(half_installed):
     env = {**half_installed, "INSTALL_DRY_RUN": "1", "INSTALL_DIR": str(REPO), "FORCE": "1"}
     r = subprocess.run(["bash", str(REPO / "install.sh")], env=env, capture_output=True, text=True, timeout=60)
     assert "01_install_base.sh" in r.stdout and "02_download_models.sh" in r.stdout
+
+
+def test_failed_step_stops_with_manual_instructions(half_installed, tmp_path):
+    """Steps 1-2 done, step 3 fails: the installer must stop, explain, and not run step 4+."""
+    import shutil
+
+    kit = tmp_path / "kit"
+    shutil.copytree(REPO, kit, ignore=shutil.ignore_patterns("runtime", "__pycache__", ".git"))
+    subprocess.run(["git", "init", "-q", str(kit)], check=True)
+    (kit / "scripts" / "03_searxng.sh").write_text("#!/bin/bash\necho 'boom: port 8888 in use' >&2\nexit 1\n")
+    (kit / "scripts" / "04_toolbox.sh").write_text("#!/bin/bash\necho STEP4-RAN\n")
+    bin_dir = Path(half_installed["PATH"].split(":")[0])
+    (bin_dir / "id").write_text(
+        '#!/bin/bash\ncase "$1" in -u) echo 1000;; -nG) echo "tester docker";; *) exec /usr/bin/id "$@";; esac\n'
+    )
+    env = {**half_installed, "INSTALL_DIR": str(kit)}
+    r = subprocess.run(["bash", str(kit / "install.sh")], env=env, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 1
+    assert "Step 5/8 failed: Starting the private search engine" in r.stderr
+    assert "Open ANOTHER terminal" in r.stderr and f"cd {kit} && bash scripts/03_searxng.sh" in r.stderr
+    assert "continues from this step" in r.stderr
+    assert "STEP4-RAN" not in r.stdout and "Finished" not in r.stdout

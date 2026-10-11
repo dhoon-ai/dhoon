@@ -42,8 +42,7 @@ echo
 echo "  Memory: $(free -h | awk '/Mem:/{print $3" used of "$2}')"
 echo "  Disk /: $(df -h / | awk 'NR==2{print $4" free"}')"
 mountpoint -q /data && echo "  Disk /data: $(df -h /data | awk 'NR==2{print $4" free"}')"
-[ -r /sys/class/thermal/thermal_zone0/temp ] && \
-  echo "  CPU temp: $(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 )) C"
+t=$(cpu_temp); [ -n "$t" ] && echo "  CPU temp: ${t} C"
 
 echo
 if [ "$problems" -eq 0 ]; then ok "Everything looks healthy"; else fail "$problems problem(s) found - see above"; fi

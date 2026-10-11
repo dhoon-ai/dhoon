@@ -56,10 +56,8 @@ if [ -n "$nic" ]; then
   [ "${errs:-0}" -gt 100 ] 2>/dev/null && warn "Many network errors - the cable may be damaged."
 fi
 
-if [ -r /sys/class/thermal/thermal_zone0/temp ]; then
-  t=$(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 ))
-  echo "  CPU temperature now: ${t} C"
-fi
+t=$(cpu_temp)
+[ -n "$t" ] && echo "  CPU temperature now: ${t} C"
 
 . /etc/os-release 2>/dev/null && echo "  OS: ${PRETTY_NAME:-unknown}"
 next "bash scripts/01_install_base.sh"

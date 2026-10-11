@@ -34,8 +34,15 @@ asks for your login password when it needs `sudo`, and at the end for an **email
 password for the web app** (that account is created for you). When it finishes, open
 **http://localhost:3080**, choose **Agents → Assistant**, and jump to **Step 9**.
 
-If anything fails, fix the problem it shows and run the same command again: it checks
-each step first and skips the ones already done.
+**If a step fails, the installer stops** instead of carrying on with a half-working setup.
+It shows a red box with what to do:
+
+1. Read the error just above the box.
+2. Open **another terminal** (Ctrl+Alt+T) and run the failed step by hand; the box shows
+   the exact command, e.g. `cd ~/ai-kit && bash scripts/03_searxng.sh`. Fix what it reports
+   (see "Troubleshooting" at the end of this guide, or ask for help with the error).
+3. Run the installer again. It checks each step first, skips the ones already done, and
+   continues from the step that failed.
 
 **Already started installing by hand?** You can switch to the installer at any point.
 See what's done, then let it continue:
