@@ -49,5 +49,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart ollama
 
 step "Script 01 done"
-echo "IMPORTANT: log out and log back in (or reboot) now, so Docker works without sudo."
-next "bash scripts/02_download_models.sh"
+if [ -z "${FROM_INSTALLER:-}" ]; then
+  echo "IMPORTANT: log out and log back in (or reboot) now, so Docker works without sudo."
+  next "bash scripts/02_download_models.sh"
+fi

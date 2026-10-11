@@ -21,6 +21,28 @@ To open a Terminal on Ubuntu: press **Ctrl + Alt + T**.
 
 ---
 
+## The fast way: one command
+
+If you're happy to let a script do every step for you, open a Terminal and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/install.sh | bash
+```
+
+It does Steps 0 and 2–8 below automatically (about 30–90 minutes, mostly downloads). It
+asks for your login password when it needs `sudo`, and at the end for an **email and
+password for the web app** (that account is created for you). When it finishes, open
+**http://localhost:3080**, choose **Agents → Assistant**, and jump to **Step 9**.
+
+If anything fails, fix the problem it shows and run the same command again: it resumes.
+Step 1 (optional hardware tweaks, such as a second disk for models) is not done
+automatically; do it first if you need it.
+
+The rest of this guide does the same thing step by step, so you can see and control
+each part.
+
+---
+
 ## What you need
 
 | | Minimum | Recommended |
@@ -231,8 +253,8 @@ AI can use and runs them as a background service that starts automatically on bo
 bash scripts/05_librechat.sh
 ```
 
-When it finishes it prints two addresses. Open **http://localhost:3080** in a
-browser on this computer, click **Sign up**, and create your account.
+When it finishes it prints two addresses. You can open **http://localhost:3080** and
+**Sign up** in the browser now, or let Step 8's script create the account for you.
 (The first account becomes the admin.)
 
 Check everything is healthy:
@@ -259,6 +281,20 @@ memory); later ones are faster.
 ## Step 8 — Create your general-purpose agent
 
 LibreChat calls an AI + tools combination an **Agent**.
+
+**Automatic (recommended):**
+
+```bash
+bash scripts/06_create_agent.sh
+```
+
+It asks for your web-app email and password (and offers to create the account if it
+doesn't exist yet), then creates the **Assistant** agent with the right model, all toolbox
+tools, File Search, the instructions below and a few starter prompts. Running it again
+updates the agent instead of making a second one. Reload the web page and pick
+**Agents → Assistant**.
+
+**Manual (if you prefer clicking, or the script reports a problem):**
 
 1. Open the **Agents** section (in the model selector, choose **Agents**,
    then open the **Agent Builder** panel on the right side).
@@ -549,7 +585,8 @@ bash scripts/02_download_models.sh
 bash scripts/update.sh
 ```
 
-Then pick the new model in the Agent Builder. Browse models at
+Then run `bash scripts/06_create_agent.sh` to switch the Assistant to the new model (or
+pick it in the Agent Builder). Browse models at
 [ollama.com/library](https://ollama.com/library). For agents, choose models
 that list **tools** support.
 
@@ -577,6 +614,16 @@ Everything starts automatically after a reboot.
 ---
 
 ## Troubleshooting
+
+**The one-command installer stopped**: read the red message, fix it, and run the same
+command again; finished steps are quick the second time. To see what it would do without
+doing it: put `INSTALL_DRY_RUN=1` in front of `bash`.
+
+**`06_create_agent.sh` says "not accepted" for toolbox tools**: the toolbox wasn't
+connected to LibreChat yet. Run `bash scripts/check.sh`, then
+`cd ~/ai-kit/runtime/LibreChat && docker compose restart api`, wait a minute, and run
+script 06 again. If it can't sign in, check the email/password, or sign up in the browser
+and run it again.
 
 **"permission denied … docker.sock"**: You didn't log out and back in after Step 2. Do that.
 

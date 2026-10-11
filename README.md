@@ -10,6 +10,16 @@ stocks**, and you can teach it new skills with a few lines of Python.
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
 downloads and market data your agent asks for.
 
+**Install with one command** (Ubuntu/Debian, run as your normal user):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/install.sh | bash
+```
+
+It runs the whole setup, including creating the agent, and asks only for your password
+and a login for the web app. Then open `http://localhost:3080`. Re-run the same command
+to resume or update.
+
 > **New to this?** Follow **[docs/GUIDE.md](docs/GUIDE.md)**. It's written for
 > beginners, with copy-paste commands for every step.
 
@@ -159,7 +169,7 @@ Market data comes from Yahoo Finance via yfinance.
   (GPU if supported) with CPU only and keeps the faster one. On a mini PC with Intel UHD
   integrated graphics, CPU only was about 2× faster at both reading and writing.
 
-## Quick start (if you've done this before)
+## Step-by-step install (what the one-command installer does)
 
 ```bash
 git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
@@ -170,13 +180,15 @@ bash scripts/02_download_models.sh
 bash scripts/03_searxng.sh
 bash scripts/04_toolbox.sh
 bash scripts/05_librechat.sh
+bash scripts/06_create_agent.sh        # creates the Assistant agent (asks for a login)
 bash scripts/check.sh
 bash scripts/benchmark.sh              # optional: keeps CPU-only if that's faster here
 ```
 
-Open `http://localhost:3080`, sign up, and create an agent with File Search on, the `toolbox` MCP
-server and the instructions in [`config/agent-instructions.md`](config/agent-instructions.md)
-(details: [GUIDE step 8](docs/GUIDE.md#step-8--create-your-general-purpose-agent)).
+Then open `http://localhost:3080` and pick **Agents → Assistant**. Script 06 sets the agent
+up with the main Instruct model, every toolbox tool, File Search, the instructions in
+[`config/agent-instructions.md`](config/agent-instructions.md) and some starter prompts
+([manual way](docs/GUIDE.md#step-8--create-your-general-purpose-agent)).
 
 **Documents:** either copy a file into `~/agent-workspace` and mention its name (toolbox
 `search_document`), or upload it in the Agent Builder under **File Search** and select it
@@ -185,7 +197,8 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 ## Repository layout
 
 ```
-scripts/        install (run in order 00 → 05), check, benchmark, update, uninstall
+install.sh      one-command installer (runs scripts 00 → 06)
+scripts/        install steps 00 → 06, check, benchmark, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates

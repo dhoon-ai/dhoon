@@ -61,7 +61,7 @@ for _ in $(seq 1 60); do
     echo "Open on this computer:          http://localhost:3080"
     echo "Or from another device at home: http://$IP:3080"
     echo "Click 'Sign up' to create your account (the first account becomes admin)."
-    next "bash scripts/check.sh   then follow docs/GUIDE.md step 7"
+    next "bash scripts/06_create_agent.sh   (creates the Assistant agent for you)"
     exit 0
   fi
   sleep 3
