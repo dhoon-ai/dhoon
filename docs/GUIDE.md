@@ -569,7 +569,8 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | See toolbox errors | `journalctl -u ai-toolbox -n 50` |
 | See chat website errors | `cd runtime/LibreChat && docker compose logs api --tail 50` |
 | List models | `ollama list` |
-| Remove the stack (keeps data) | `bash scripts/uninstall.sh` |
+| Remove the services (keeps data) | `bash scripts/uninstall.sh` |
+| Remove everything | see "Uninstall and start over" below |
 
 Everything starts automatically after a reboot.
 
@@ -636,6 +637,49 @@ searched without OCR.
   sandbox with no internet and no access to the rest of your computer.
 - AI makes mistakes. Check important facts, and treat stock analysis as research,
   **not financial advice**.
+
+---
+
+## Uninstall and start over
+
+`scripts/uninstall.sh` has three levels. Each one asks you to type `YES` before deleting
+anything, and `DRY_RUN=1` in front shows what it would do without doing it.
+
+| Command | Removes | Keeps |
+|---|---|---|
+| `bash scripts/uninstall.sh` | The toolbox service and the LibreChat, SearXNG and sandbox containers | Chats, uploads, models, `~/agent-workspace`, Docker, Ollama |
+| `bash scripts/uninstall.sh --everything` | All of the above, plus chats, uploads, this project's models and `~/agent-workspace` | Docker and Ollama programs |
+| `bash scripts/uninstall.sh --purge` | All of the above, plus Ollama (with **all** its models) and Docker (with **all** containers and images on this PC), and every system setting the install added | Basic tools like git and curl |
+
+**Before deleting:** copy anything you want to keep out of `~/agent-workspace` (reports,
+documents). To try it safely first:
+
+```bash
+DRY_RUN=1 bash scripts/uninstall.sh --purge
+```
+
+**Full removal, step by step:**
+
+```bash
+cd ~/ai-kit
+cp -r ~/agent-workspace ~/agent-workspace-backup   # optional backup
+bash scripts/uninstall.sh --purge                  # type YES when asked
+cd ~ && rm -rf ~/ai-kit                            # the project folder itself
+sudo reboot
+```
+
+After the reboot, check nothing is left:
+
+```bash
+systemctl status ollama ai-toolbox docker 2>&1 | grep -c "could not be found"   # should print 3
+command -v ollama docker || echo "Ollama and Docker are gone"
+```
+
+`--purge` leaves the `/data` disk from Step 1.2 alone, because other files may be on it.
+To stop using it: `sudo umount /data`, then delete the line containing ` /data ` from
+`/etc/fstab` (`sudo nano /etc/fstab`).
+
+To reinstall later, start again from Step 0.
 
 ---
 

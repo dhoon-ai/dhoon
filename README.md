@@ -219,6 +219,13 @@ pytest -q && ruff check . && shellcheck -x scripts/*.sh
 ```
 
 CI runs the same checks plus a sandbox image build on every push.
+
+## Uninstall
+
+`bash scripts/uninstall.sh` removes the services and keeps your data; `--everything` also
+deletes chats, files and models; `--purge` additionally uninstalls Ollama and Docker. Each
+asks for confirmation, and `DRY_RUN=1` previews. See
+[Uninstall and start over](docs/GUIDE.md#uninstall-and-start-over).
 To add a skill, see [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md).
 
 ## Disclaimer
