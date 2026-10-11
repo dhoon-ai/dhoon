@@ -332,6 +332,36 @@ See "Ask questions about your documents" below.
 Stock symbols use Yahoo Finance format: plain for US (`AAPL`), and a suffix for other
 exchanges, for example `.TO` (Toronto), `.L` (London), `.NS` (India NSE), `.AX` (Australia).
 
+**Level 7 — the planner handover (Instruct → Thinking → Instruct)**
+
+This one shows the two models working together (see "Deep planning" below). Paste:
+
+*Use ask_planner first: I want to back up my Linux PC. Research three open-source backup
+tools, compare them on ease of use, encryption, incremental backups and restoring files,
+score each from 1 to 10 on every point with run_python, and save the comparison table
+and a recommendation to reports/backup-plan.md.*
+
+What you should see in the chat, in this order (click a tool box to open it):
+
+| # | Tool box | Which model | What's happening |
+|---|---|---|---|
+| 1 | `ask_planner` | Instruct → Thinking | The Assistant hands the task to the planner. Takes 1–5 minutes. Open the box to read the numbered plan |
+| 2 | `web_search`, `read_webpage` (several) | Instruct | The Assistant follows the plan: researches the tools |
+| 3 | `run_python` | Instruct | Calculates the scores (models never do maths in their head here) |
+| 4 | `write_file` | Instruct | Saves `reports/backup-plan.md` |
+| 5 | (final message) | Instruct | Summary and the file name |
+
+Then open the report: `cat ~/agent-workspace/reports/backup-plan.md`
+
+The whole task takes roughly 5–15 minutes on a CPU. If there's **no `ask_planner` box**,
+the Assistant skipped planning; make sure your message starts with *"Use ask_planner
+first:"*. If the plan appears but **nothing happens after it**, reply *"Now carry out
+the plan."*
+
+A shorter one to try afterwards, combining a document with planning:
+*Use ask_planner first: using docs/alice.pdf, find the three most important lessons in the
+book with quotes and page numbers, and save them to reports/alice-lessons.md.*
+
 ---
 
 ## Deep planning (ask_planner)
@@ -356,6 +386,43 @@ flowchart TD
 (On GitHub this shows as a diagram. In short: you chat with the **Assistant**; for
 complex tasks it asks the **Planner** for a plan, then carries the plan out with its tools.)
 
+### The handover between the two models
+
+Every request starts and ends with the **Instruct** model. The **Thinking** model is only
+called in the middle, and only when needed:
+
+1. **Instruct model reads your request** (the Assistant agent). If it's simple, it uses
+   its tools straight away and answers: done. If it's complex, it hands over to step 2.
+2. **Thinking model writes a plan.** The Assistant calls the `ask_planner` tool with your
+   full request. The toolbox passes it to the Thinking model, which thinks it through and
+   returns a numbered plan that names a tool for each step. It never runs tools and never
+   talks to you; it only returns text.
+3. **Instruct model carries out the plan.** The plan comes back to the Assistant as the
+   result of `ask_planner`. The Assistant runs each step with its tools (web search,
+   Python, files…), then writes the final answer.
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant A as Assistant (Instruct model)
+    participant P as Planner (Thinking model)
+    participant T as Toolbox tools
+    You->>A: complex request
+    Note over A: 1. reads the request, decides it needs a plan
+    A->>P: ask_planner(your full request)
+    Note over P: 2. thinks, writes a numbered plan (cannot run tools)
+    P-->>A: the plan, as text
+    Note over A: 3. carries out the plan step by step
+    A->>T: web_search, read_webpage, run_python ...
+    T-->>A: results
+    A->>T: write_file(report)
+    A-->>You: final answer + file name
+```
+
+This split is deliberate: the Thinking model plans better, and the Instruct model is
+reliable at actually calling tools. Thinking models that try to call tools themselves
+often stop halfway, which is why the Thinking model is never given tools.
+
 You don't need a second agent or LibreChat's chain/handoff features. The Assistant
 decides by itself when to ask for a plan. To force it, start your message with
 *"Use ask_planner first:"*. For example:
@@ -364,7 +431,8 @@ decides by itself when to ask for a plan. To force it, start your message with
 recent news for both, and save a report to reports/compare.md."*
 
 Planning takes 1–5 minutes on a CPU (the planner thinks before writing). The first
-time, it also has to load the planner model into memory.
+time, it also has to load the planner model into memory. To see the handover in action,
+try **Level 7** in Step 9.
 
 ---
 

@@ -63,6 +63,45 @@ flowchart TD
     T --> D["search_document / read_document<br/>your PDFs, Word, text files"]
 ```
 
+### The handover between the two models
+
+Every request starts and ends with the **Instruct** model. The **Thinking** model is only
+called in the middle, and only when needed:
+
+1. **Instruct model reads your request** (the Assistant agent). If it's simple, it uses
+   its tools straight away and answers: done. If it's complex, it hands over to step 2.
+2. **Thinking model writes a plan.** The Assistant calls the `ask_planner` tool with your
+   full request. The toolbox passes it to the Thinking model, which thinks it through and
+   returns a numbered plan that names a tool for each step. It never runs tools and never
+   talks to you; it only returns text.
+3. **Instruct model carries out the plan.** The plan comes back to the Assistant as the
+   result of `ask_planner`. The Assistant runs each step with its tools (web search,
+   Python, files…), then writes the final answer.
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant A as Assistant (Instruct model)
+    participant P as Planner (Thinking model)
+    participant T as Toolbox tools
+    You->>A: complex request
+    Note over A: 1. reads the request, decides it needs a plan
+    A->>P: ask_planner(your full request)
+    Note over P: 2. thinks, writes a numbered plan (cannot run tools)
+    P-->>A: the plan, as text
+    Note over A: 3. carries out the plan step by step
+    A->>T: web_search, read_webpage, run_python ...
+    T-->>A: results
+    A->>T: write_file(report)
+    A-->>You: final answer + file name
+```
+
+This split is deliberate: the Thinking model plans better, and the Instruct model is
+reliable at actually calling tools. Thinking models that try to call tools themselves
+often stop halfway, which is why the Thinking model is never given tools.
+
+Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--practise-from-easy-to-hard).
+
 ## Architecture (components)
 
 ```
