@@ -34,6 +34,10 @@ Both are **non-thinking "Instruct" models**. Qwen3's default "thinking" models r
 at length before answering, which is slow on a CPU and often ends without the tool
 call ever being made, so the agent stalls.
 
+The thinking models are still used, safely: the `ask_planner` tool sends complex tasks
+to a Qwen3 **Thinking 2507** model, which returns a plan (text only) that the
+Instruct agent then carries out with its tools.
+
 Override any choice in `config/models.env` (copy `config/models.env.example`).
 
 ## Architecture
@@ -58,6 +62,7 @@ Override any choice in `config/models.env` (copy `config/models.env.example`).
   │                  (no network, read-only, no caps)   │
   │  stock_price_summary · stock_indicators ·           │
   │  stock_fundamentals                                 │
+  │  ask_planner ──▶ thinking model via Ollama          │
   └──────┬──────────────────────────────────────────────┘
          │
          ▼

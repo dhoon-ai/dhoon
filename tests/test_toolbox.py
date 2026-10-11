@@ -153,3 +153,41 @@ def test_stock_indicators_not_enough_data(tb, monkeypatch):
 def test_stock_unknown_symbol(tb, monkeypatch):
     monkeypatch.setattr(tb, "_history", lambda t, p: pd.DataFrame())
     assert "No data" in tb.stock_price_summary("NOPE")
+
+
+# ---------------------------------------------------------------- planner ---
+class FakePost:
+    def __init__(self, data):
+        self._data = data
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._data
+
+
+def test_ask_planner_returns_plan_without_thinking(tb, monkeypatch):
+    seen = {}
+
+    def fake_post(url, json=None, timeout=None):
+        seen["url"], seen["body"] = url, json
+        return FakePost({"message": {"thinking": "hmm...", "content": "<think>x</think>1. run_python: 2+2"}})
+
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    out = tb.ask_planner("add numbers", context="none")
+    assert out.startswith("PLAN FROM PLANNER") and "1. run_python" in out
+    assert "<think>" not in out and "hmm" not in out
+    assert seen["url"].endswith("/api/chat") and seen["body"]["think"] is True
+    assert seen["body"]["model"] == tb.PLANNER_MODEL
+
+
+def test_ask_planner_empty_and_errors(tb, monkeypatch):
+    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: FakePost({"message": {"content": ""}}))
+    assert "ran out of time" in tb.ask_planner("x")
+
+    def boom(*a, **k):
+        raise tb.httpx.ConnectError("down")
+
+    monkeypatch.setattr(tb.httpx, "post", boom)
+    assert "Planner unavailable" in tb.ask_planner("x")

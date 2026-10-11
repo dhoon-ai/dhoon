@@ -11,6 +11,7 @@ lets the AI model call these tools:
   list_files / read_file / write_file   work inside ONE folder (the workspace)
   run_python            run Python code inside a locked-down Docker container
   stock_price_summary / stock_indicators / stock_fundamentals   market analysis
+  ask_planner           ask a 'thinking' model for a step-by-step plan (no tools)
 
 To add a new skill later: write a Python function below, put @mcp.tool() above
 it, write a clear docstring (the AI reads it), and restart the service:
@@ -36,6 +37,11 @@ BIND_HOST = os.environ.get("BIND_HOST", "172.17.0.1")  # Docker bridge: reachabl
 PORT = int(os.environ.get("PORT", "8001"))
 SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "agent-sandbox")
 MAX_TEXT = 8000  # keep tool output small: the CPU reads every character
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+# A "thinking" model that plans. It never calls tools itself: thinking models are
+# good at reasoning but unreliable at tool calls, so the agent runs the plan.
+PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-thinking-2507-q4_K_M")
+PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "540"))  # seconds; CPUs are slow
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 
 mcp = MCPServer(
@@ -177,6 +183,50 @@ def run_python(code: str, timeout_seconds: int = 60) -> str:
     out = (r.stdout or "") + (("\n[stderr]\n" + r.stderr) if r.stderr else "")
     out = out.strip() or "(no output - did you forget print()?)"
     return out[:MAX_TEXT]
+
+
+# ------------------------------------------------------------------ planning ---
+PLANNER_PROMPT = """You are a planner for an AI agent. You cannot run tools.
+The agent that will carry out your plan has these tools:
+current_datetime, web_search, read_webpage, list_files, read_file, write_file,
+run_python, stock_price_summary, stock_indicators, stock_fundamentals.
+
+Think the task through, but keep your thinking brief. Then reply with ONLY:
+1. A short numbered plan. Each step names one tool and its exact input.
+2. A final line starting with "Final answer should:" describing what to deliver.
+Do not invent facts or numbers. Do not write the final answer yourself."""
+
+
+@mcp.tool()
+def ask_planner(task: str, context: str = "") -> str:
+    """Get a careful step-by-step plan from a slower 'thinking' model.
+    Use this FIRST for complex or multi-step tasks (research + analysis + writing a file,
+    comparisons, anything with several tools). Pass the user's full request as task,
+    and anything already known as context. Then carry out the returned plan yourself
+    with your tools. Do not use it for simple one-step questions. Takes 1-5 minutes."""
+    user = task if not context else f"{task}\n\nAlready known:\n{context}"
+    try:
+        r = httpx.post(
+            f"{OLLAMA_URL}/api/chat",
+            json={
+                "model": PLANNER_MODEL,
+                "messages": [{"role": "system", "content": PLANNER_PROMPT}, {"role": "user", "content": user}],
+                "think": True,
+                "stream": False,
+                "options": {"num_predict": 4096, "temperature": 0.6},
+            },
+            timeout=PLANNER_TIMEOUT,
+        )
+        r.raise_for_status()
+    except httpx.TimeoutException:
+        return "The planner took too long. Make a simple plan yourself and continue."
+    except httpx.HTTPError as e:
+        return f"Planner unavailable ({e}). Make a simple plan yourself and continue."
+    plan = (r.json().get("message", {}).get("content") or "").strip()
+    plan = re.sub(r"<think>.*?</think>", "", plan, flags=re.S).strip()  # older Ollama versions
+    if not plan:
+        return "The planner ran out of time before writing a plan. Make a simple plan yourself and continue."
+    return "PLAN FROM PLANNER (carry it out with your tools):\n" + plan[:MAX_TEXT]
 
 
 # ------------------------------------------------------------------ stocks ---

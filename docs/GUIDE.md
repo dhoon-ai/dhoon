@@ -157,7 +157,9 @@ It prints your RAM and the models it chose, then downloads:
 
 - your **main model** (see the table above),
 - `qwen3:4b-instruct-2507-q4_K_M`, a small fast model for quick questions and chat titles,
-- `nomic-embed-text` (~0.3 GB), which makes your documents searchable.
+- `nomic-embed-text` (~0.3 GB), which makes your documents searchable,
+- a **planner** model that "thinks" (19 GB with 50 GB+ RAM, otherwise 2.5 GB), used by the
+  `ask_planner` tool, see "Deep planning" below.
 
 At the end it runs a quick test and prints an `eval rate` in tokens/s.
 Write that number down: it tells you how fast your computer is. Above 10 tokens/s
@@ -238,6 +240,8 @@ LibreChat calls an AI + tools combination an **Agent**.
      ```text
      You are a helpful general-purpose assistant running privately on the user's computer.
      Rules:
+     - For complex or multi-step tasks, first call ask_planner with the full request, then
+       carry out its plan step by step with your tools. Skip it for simple questions.
      - Call current_datetime whenever today's date matters.
      - For facts you are not sure of, use web_search, then read_webpage on the best result.
        Cite the URLs you used.
@@ -247,7 +251,8 @@ LibreChat calls an AI + tools combination an **Agent**.
      - For stocks, use the stock_* tools and quote their numbers. Never give buy/sell advice.
      - If a tool fails, read the error, fix your input, and try again once.
      ```
-3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all its tools are selected.
+3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all its tools
+   (including `ask_planner`) are selected.
 4. Click **Save**.
 
 Now start a new chat and pick the **Assistant** agent.
@@ -285,6 +290,32 @@ Your files are in the `agent-workspace` folder in your Home folder.
 
 Stock symbols use Yahoo Finance format: plain for US (`AAPL`), and a suffix for other
 exchanges, for example `.TO` (Toronto), `.L` (London), `.NS` (India NSE), `.AX` (Australia).
+
+---
+
+## Deep planning (ask_planner)
+
+Thinking models reason better, but they are unreliable at calling tools: they often
+plan the tool call in their hidden thoughts and then stop. So your agent works as a team:
+
+```
+You → Assistant (instruct model, runs tools)
+          │ for complex tasks: ask_planner("the whole task")
+          ▼
+      Planner (thinking model, no tools) → returns a numbered plan
+          │
+      Assistant carries out the plan with web_search, run_python, write_file…
+```
+
+You don't need a second agent or LibreChat's chain/handoff features. The Assistant
+decides by itself when to ask for a plan. To force it, start your message with
+*"Use ask_planner first:"*. For example:
+
+*"Use ask_planner first: compare AAPL and MSFT on trend, risk and valuation, check
+recent news for both, and save a report to reports/compare.md."*
+
+Planning takes 1–5 minutes on a CPU (the planner thinks before writing). The first
+time, it also has to load the planner model into memory.
 
 ---
 

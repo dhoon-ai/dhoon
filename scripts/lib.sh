@@ -30,6 +30,13 @@ if [ -z "${MODEL_MAIN:-}" ]; then
 fi
 MODEL_FAST="${MODEL_FAST:-qwen3:4b-instruct-2507-q4_K_M}"
 MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
+# The planner "thinks" and writes plans for the agent (used by the ask_planner tool).
+# A second 19 GB model needs RAM to hold both, so smaller machines get the 4b one.
+if [ -z "${MODEL_PLANNER:-}" ]; then
+  if [ "$RAM_GB" -ge 50 ]; then MODEL_PLANNER="qwen3:30b-a3b-thinking-2507-q4_K_M"
+  else                          MODEL_PLANNER="qwen3:4b-thinking-2507-q4_K_M"
+  fi
+fi
 
 step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }

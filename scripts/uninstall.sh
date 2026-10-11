@@ -21,7 +21,7 @@ if $EVERYTHING; then
   if [ "$answer" = "YES" ]; then
     (cd "$LIBRECHAT_DIR" 2>/dev/null && docker compose down -v) || true
     rm -rf "$RUNTIME" "$WORKSPACE_DIR"
-    for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED"; do ollama rm "$m" 2>/dev/null || true; done
+    for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama rm "$m" 2>/dev/null || true; done
     ok "Everything removed (Docker and Ollama programs are still installed)"
   else
     warn "Cancelled - data kept"

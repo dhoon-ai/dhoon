@@ -35,6 +35,8 @@ Environment=BIND_HOST=$BRIDGE_IP
 Environment=PORT=$TOOLBOX_PORT
 Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=PLANNER_MODEL=$MODEL_PLANNER
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/toolbox_server.py
 Restart=on-failure
 RestartSec=5

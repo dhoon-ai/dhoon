@@ -10,7 +10,7 @@ if curl -fs http://127.0.0.1:11434/api/tags >/dev/null; then ok "Ollama is runni
 else fail "Ollama  ->  sudo systemctl restart ollama"; problems=$((problems+1)); fi
 models=$(ollama list 2>/dev/null | awk 'NR>1{print $1}' | tr '\n' ' ')
 echo "         models: ${models:-none}"
-for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED"; do
+for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER"; do
   echo " $models " | grep -q " ${m}\(:latest\)\? " || { warn "model $m missing  ->  ollama pull $m"; }
 done
 case "$MODEL_MAIN" in
