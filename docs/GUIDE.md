@@ -345,6 +345,10 @@ Everything starts automatically after a reboot.
 
 **"permission denied … docker.sock"**: You didn't log out and back in after Step 2. Do that.
 
+**LibreChat keeps restarting with "EACCES: permission denied"**: Some of its
+folders are owned by root. Fix:
+`cd ~/ai-kit/runtime/LibreChat && docker compose down && sudo chown -R $(id -u):$(id -g) logs uploads images data-node skill meili_data_* && docker compose up -d`
+
 **The agent doesn't use tools / says it can't search**: Make sure you picked the
 **Assistant** agent (not plain Ollama), that **toolbox** is added in the Agent Builder,
 and that `check.sh` shows the toolbox OK. Then run

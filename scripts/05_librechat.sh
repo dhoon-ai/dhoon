@@ -39,6 +39,15 @@ set_env OLLAMA_BASE_URL http://host.docker.internal:11434
 
 render_librechat_config
 
+# LibreChat's containers run as your user (UID/GID above). If Docker creates the
+# folders they write to, they end up owned by root and LibreChat crashes with
+# "EACCES: permission denied". So create them ourselves and make sure you own them.
+mapfile -t BIND_DIRS < <(grep -oE '^\s*- \./[A-Za-z0-9._-]+:' docker-compose.yml | sed -E 's/^\s*- \.\/(.*):$/\1/' | sort -u)
+for d in "${BIND_DIRS[@]}"; do
+  [ "$d" = ".env" ] || [ -f "$d" ] || mkdir -p "$d"
+done
+sudo chown -R "$(id -u):$(id -g)" "${BIND_DIRS[@]}" 2>/dev/null || true
+
 docker compose pull
 docker compose up -d
 
