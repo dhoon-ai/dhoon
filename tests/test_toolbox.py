@@ -92,11 +92,60 @@ def test_web_search_empty(tb, monkeypatch):
 
 
 def test_read_webpage_strips_scripts_and_marks_untrusted(tb, monkeypatch):
-    html = "<html><script>evil()</script><nav>menu</nav><p>Real text</p></html>"
-    monkeypatch.setattr(tb.httpx, "get", lambda *a, **k: FakeResponse(text=html))
+    html = b"<html><script>evil()</script><nav>menu</nav><p>Real text</p></html>"
+    monkeypatch.setattr(tb, "_fetch", lambda url: ("text/html; charset=utf-8", html))
     out = tb.read_webpage("https://example.com")
     assert out.startswith("[UNTRUSTED WEB CONTENT]")
     assert "Real text" in out and "evil" not in out and "menu" not in out
+
+
+def test_read_webpage_reads_online_pdf_and_text(tb, monkeypatch):
+    import io
+
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    c.drawString(40, 800, "Quarterly report: revenue grew 12 percent.")
+    c.showPage()
+    c.save()
+    monkeypatch.setattr(tb, "_fetch", lambda url: ("application/pdf", buf.getvalue()))
+    assert "revenue grew 12 percent" in tb.read_webpage("https://example.com/r.pdf")
+    monkeypatch.setattr(tb, "_fetch", lambda url: ("text/plain", b"plain words here"))
+    assert "plain words here" in tb.read_webpage("https://example.com/a.txt")
+    monkeypatch.setattr(tb, "_fetch", lambda url: ("image/png", b"\x89PNG"))
+    assert "not a text page" in tb.read_webpage("https://example.com/a.png")
+
+
+@pytest.mark.parametrize(
+    "url,ip",
+    [("http://localhost:3080", "127.0.0.1"), ("http://router.home/", "192.168.1.1"), ("http://x.test/", "10.0.0.5")],
+)
+def test_read_webpage_blocks_local_network(tb, monkeypatch, url, ip):
+    monkeypatch.setattr(tb.socket, "getaddrinfo", lambda host, port: [(2, 1, 6, "", (ip, 0))])
+    with pytest.raises(ValueError, match="home network"):
+        tb._check_public_url(url)
+
+
+def test_read_webpage_rejects_non_web_schemes(tb):
+    with pytest.raises(ValueError, match="http"):
+        tb._check_public_url("file:///etc/passwd")
+
+
+def test_mcp_returns_explanation_instead_of_generic_error(tb, monkeypatch):
+    """The model must see WHY a tool failed, not just 'Error executing tool'."""
+    import asyncio
+
+    def refuse(url):
+        req = tb.httpx.Request("GET", url)
+        raise tb.httpx.HTTPStatusError("403", request=req, response=tb.httpx.Response(403, request=req))
+
+    monkeypatch.setattr(tb, "_fetch", refuse)
+    result = asyncio.run(tb.mcp.call_tool("read_webpage", {"url": "https://example.com"}))
+    text = str(result)
+    assert "refuses automated readers" in text and "HTTP 403" in text and "different source" in text
+    result = asyncio.run(tb.mcp.call_tool("write_file", {"path": "../../etc/x", "content": "x"}))
+    assert "outside the workspace" in str(result)
 
 
 # ---------------------------------------------------------------- sandbox ---
