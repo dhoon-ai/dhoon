@@ -281,7 +281,9 @@ LibreChat calls an AI + tools combination an **Agent**.
      - For stocks, use the stock_* tools and quote their numbers. Never give buy/sell advice.
      ```
 3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all 13 of its tools
-   (including `ask_planner`, `search_document` and `read_document`) are selected. Leave everything else off (Web Search,
+   (including `ask_planner`, `search_document` and `read_document`) are selected.
+   Also turn on **File Search** (a checkbox under *Capabilities*, or added with *Add Tools*),
+   so you can attach documents in the chat. Leave everything else off (Web Search,
    Code Interpreter, Actions, Handoffs, other Tools): the toolbox replaces them, and
    every extra capability slows each answer down. If the model parameters show
    **Max output tokens**, set it to `4096`.
@@ -364,7 +366,20 @@ time, it also has to load the planner model into memory.
 
 ## Ask questions about your documents
 
-The simplest and most reliable way is to give the file to the agent's **toolbox**:
+There are two ways. Both run entirely on your computer and work with whole books.
+
+### Way 1: attach it in the chat (+ / 📎)
+
+1. Make sure **File Search** is turned on for the Assistant agent (Step 8).
+2. In a chat with **Assistant**, click **+** → attach the PDF, Word or text file, and wait
+   until it has finished processing.
+3. Ask your question, e.g. *"What is the lasting message of this book? Quote short passages."*
+
+The install sets LibreChat up so attachments go to File Search instead of being sent
+to the model directly (which Ollama can't accept). The file belongs to that chat only.
+You can delete uploads later under your name (bottom-left) → **My Files**.
+
+### Way 2: put it in the workspace (best for files you reuse)
 
 1. Copy the file into the `agent-workspace` folder in your Home folder. A sub-folder keeps
    things tidy, for example:
@@ -373,7 +388,7 @@ The simplest and most reliable way is to give the file to the agent's **toolbox*
    cp ~/Downloads/Alice_in_Wonderland.pdf ~/agent-workspace/docs/alice.pdf
    ```
    (Or drag it there in the Files app.)
-2. In a chat with **Assistant**, mention the file name:
+2. In any chat with **Assistant**, mention the file name:
    *"Using docs/alice.pdf, what is the lasting message of the book? Quote short passages
    and give page numbers."*
 
@@ -389,10 +404,9 @@ Supported: **PDF** (with real text, not scanned images), **Word (.docx)**, **.tx
 is indexed with `nomic-embed-text`; after that, searches take seconds. Everything stays
 on your computer.
 
-> **Why not the 📎 / + button in the chat?** LibreChat can send an attached PDF straight
-> to the model, which Ollama rejects ("400 invalid message format"), and a whole book is
-> too long for the model to read at once. Its alternative, *File Search*, works but is
-> hidden in some LibreChat versions. Putting files in the workspace avoids both problems.
+The workspace way also lets the agent combine documents with its other tools, for
+example *"Compare the refund rules in docs/policy.docx with the ones on this web page"*,
+or save a summary with `write_file`.
 
 ---
 
@@ -477,8 +491,10 @@ Start a new chat.
 engines temporarily block requests; wait a while and try again.
 
 **"400 invalid message format" after attaching a file with + / 📎**: LibreChat sent the
-file straight to Ollama, which doesn't accept that. Put the file in `~/agent-workspace`
-instead and ask about it by name (see "Ask questions about your documents").
+file straight to Ollama, which doesn't accept that. Check that `librechat.yaml` contains
+the `fileConfig` section from `config/librechat/librechat.yaml` (run `bash scripts/update.sh`
+to copy it), that **File Search** is on for the agent, and start a new chat. Or use the
+workspace instead (see "Ask questions about your documents").
 
 **search_document fails or says "No text found"**: Check `nomic-embed-text` is in
 `ollama list`. "No text found" means a scanned PDF (pictures of pages), which can't be

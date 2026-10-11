@@ -131,7 +131,7 @@ bash scripts/05_librechat.sh
 bash scripts/check.sh
 ```
 
-Open `http://localhost:3080`, sign up, and create an agent with the `toolbox` MCP
+Open `http://localhost:3080`, sign up, and create an agent with File Search on, the `toolbox` MCP
 server and the instructions in [`config/agent-instructions.md`](config/agent-instructions.md)
 (details: [GUIDE step 8](docs/GUIDE.md#step-8--create-your-general-purpose-agent)).
 

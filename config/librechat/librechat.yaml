@@ -14,6 +14,19 @@ endpoints:
       titleModel: "__MODEL_FAST__"         # small fast model writes chat titles
       modelDisplayLabel: "Local AI"
 
+# Files attached with + / the paperclip: never send them straight to the model.
+# Ollama rejects files inside messages ("400 invalid message format") and a whole book
+# would not fit anyway. With "none", an attachment goes to the agent's File Search
+# (local search with nomic-embed-text), so turn on File Search for the agent.
+fileConfig:
+  defaultLLMDeliveryPath:
+    fallback: "none"
+    overrides:
+      "application/pdf": "none"
+      "image/*": "none"
+      "audio/*": "none"
+      "video/*": "none"
+
 # LibreChat blocks internal addresses by default (SSRF protection).
 # Allow ONLY our toolbox port on the host.
 mcpSettings:
