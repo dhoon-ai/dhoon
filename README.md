@@ -135,6 +135,10 @@ Open `http://localhost:3080`, sign up, and create an agent with File Search on, 
 server and the instructions in [`config/agent-instructions.md`](config/agent-instructions.md)
 (details: [GUIDE step 8](docs/GUIDE.md#step-8--create-your-general-purpose-agent)).
 
+**Documents:** either copy a file into `~/agent-workspace` and mention its name (toolbox
+`search_document`), or upload it in the Agent Builder under **File Search** and select it
+with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#ask-questions-about-your-documents).
+
 ## Repository layout
 
 ```

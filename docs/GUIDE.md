@@ -274,6 +274,8 @@ LibreChat calls an AI + tools combination an **Agent**.
      - For questions about a document or book, use search_document on the file and answer
        from the passages it returns, citing page numbers. Use read_document to read pages
        in order (e.g. to summarise). Use list_files if you don't know the file name.
+     - If the user attached or selected a file in this chat, use the file_search tool to search
+       it and answer from the results. search_document is only for files in the workspace.
      - Never do arithmetic in your head; use run_python and print the result.
      - Save longer outputs (reports, tables) with write_file and tell the user the file name.
        Only say a file was saved after write_file has succeeded.
@@ -318,6 +320,8 @@ Your files are in the `agent-workspace` folder in your Home folder.
 **Level 5 — your documents**
 - Copy a PDF, Word or text file into `~/agent-workspace` (e.g. as `docs/alice.pdf`), then:
   *What is the lasting message of docs/alice.pdf? Quote passages with page numbers.*
+- Or upload it in the Agent Builder under **File Search**, select it with **+** in a chat,
+  and ask about it.
 
 See "Ask questions about your documents" below.
 
@@ -368,18 +372,33 @@ time, it also has to load the planner model into memory.
 
 There are two ways. Both run entirely on your computer and work with whole books.
 
-### Way 1: attach it in the chat (+ / 📎)
+| | Way 1: File Search | Way 2: workspace |
+|---|---|---|
+| How to add a file | Upload in the Agent Builder | Copy into `~/agent-workspace` |
+| How to ask | Select it with **+**, then ask | Mention the file name in your message |
+| Good for | Asking questions about a document | Also combining it with other tools (web search, Python, saving reports) |
 
-1. Make sure **File Search** is turned on for the Assistant agent (Step 8).
-2. In a chat with **Assistant**, click **+** → attach the PDF, Word or text file, and wait
-   until it has finished processing.
-3. Ask your question, e.g. *"What is the lasting message of this book? Quote short passages."*
 
-The install sets LibreChat up so attachments go to File Search instead of being sent
-to the model directly (which Ollama can't accept). The file belongs to that chat only.
-You can delete uploads later under your name (bottom-left) → **My Files**.
+### Way 1: LibreChat File Search (upload once, then pick it in any chat)
 
-### Way 2: put it in the workspace (best for files you reuse)
+1. In the **Agent Builder**, open **Assistant** and make sure **File Search** is on (Step 8).
+2. Under **File Search**, click **Upload files**, choose the PDF, Word or text file, and wait
+   until it has finished processing (a whole book takes a minute or two). Click **Save**.
+3. In a chat with **Assistant**, click **+** and **select that file** from the list of your
+   files, then ask, e.g. *"Who should read this book, and why? Quote short passages."*
+
+> **Upload it through File Search first.** In current LibreChat versions, a *new* file
+> attached directly with **+** in the chat is stored but not indexed, so the agent answers
+> that it can't see any attachment. Uploading through the agent's File Search section
+> indexes it; after that, selecting it with **+** works.
+>
+> The install also stops LibreChat from sending attachments straight to the model, which
+> Ollama rejects with "400 invalid message format".
+
+Remove files you no longer need: in the Agent Builder (trash icon under File Search, then
+**Save**), and under your name (bottom-left) → **My Files**.
+
+### Way 2: put it in the agent workspace
 
 1. Copy the file into the `agent-workspace` folder in your Home folder. A sub-folder keeps
    things tidy, for example:
@@ -491,10 +510,16 @@ Start a new chat.
 engines temporarily block requests; wait a while and try again.
 
 **"400 invalid message format" after attaching a file with + / 📎**: LibreChat sent the
-file straight to Ollama, which doesn't accept that. Check that `librechat.yaml` contains
-the `fileConfig` section from `config/librechat/librechat.yaml` (run `bash scripts/update.sh`
-to copy it), that **File Search** is on for the agent, and start a new chat. Or use the
-workspace instead (see "Ask questions about your documents").
+file straight to Ollama, which doesn't accept that. Make sure `librechat.yaml` contains the
+`fileConfig` section from `config/librechat/librechat.yaml` (`bash scripts/update.sh`
+copies it), then upload the file through the agent's File Search section (see "Ask
+questions about your documents").
+
+**The agent says it can't see the attached file**: The file was attached directly with
+**+** and never indexed. Upload it in the Agent Builder under **File Search** first, then
+select it with **+**. Check indexing with
+`cd ~/ai-kit/runtime/LibreChat && docker compose logs rag_api --since 10m | grep embed`
+(you should see `/embed` lines). Or copy it into `~/agent-workspace` and ask by name.
 
 **search_document fails or says "No text found"**: Check `nomic-embed-text` is in
 `ollama list`. "No text found" means a scanned PDF (pictures of pages), which can't be
