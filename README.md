@@ -155,6 +155,9 @@ Market data comes from Yahoo Finance via yfinance.
 - **Short tool outputs.** On a CPU, reading long prompts is the slow part, so every tool
   truncates and summarises.
 - **16k context.** A balance between memory for multi-step tasks and speed.
+- **CPU vs GPU is measured, not guessed.** `scripts/benchmark.sh` compares Ollama's default
+  (GPU if supported) with CPU only and keeps the faster one. On a mini PC with Intel UHD
+  integrated graphics, CPU only was about 2× faster at both reading and writing.
 
 ## Quick start (if you've done this before)
 
@@ -168,6 +171,7 @@ bash scripts/03_searxng.sh
 bash scripts/04_toolbox.sh
 bash scripts/05_librechat.sh
 bash scripts/check.sh
+bash scripts/benchmark.sh              # optional: keeps CPU-only if that's faster here
 ```
 
 Open `http://localhost:3080`, sign up, and create an agent with File Search on, the `toolbox` MCP
@@ -181,7 +185,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 ## Repository layout
 
 ```
-scripts/        install, check, update, uninstall (run in order 00 → 05)
+scripts/        install (run in order 00 → 05), check, benchmark, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates

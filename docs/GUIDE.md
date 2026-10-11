@@ -183,6 +183,19 @@ At the end it runs a quick test and prints an `eval rate` in tokens/s.
 Write that number down: it tells you how fast your computer is. Above 10 tokens/s
 feels quick; 3–10 is usable; below 3 feels slow.
 
+**Optional: find out whether CPU only is faster on your PC (5 min).**
+
+```bash
+bash scripts/benchmark.sh
+```
+
+It measures Ollama's speed in its default mode (which uses a supported graphics card if
+it finds one) and with the CPU only, then keeps whichever is faster. On many mini PCs and
+laptops the built-in graphics shares the computer's memory and is *slower* than the CPU.
+If CPU only wins, the script sets Ollama to CPU only for good. `--report` measures without
+changing anything, and `--reset` goes back to Ollama's default. Re-run it if you add a
+graphics card.
+
 Try the main model yourself (type `/bye` to exit). Use the model name the script printed:
 
 ```bash
@@ -500,7 +513,21 @@ or save a summary with `write_file`.
 ## How fast should it be?
 
 Without a graphics card, the processor does all the work, so the AI is slower than
-cloud services:
+cloud services. **Don't expect built-in (integrated) graphics to help.** Measured on a
+mini PC with an Intel i7-10710U and Intel UHD integrated graphics (`qwen3:4b`):
+
+| Setup | Reading a prompt | Writing the answer |
+|---|---|---|
+| **CPU only** | **54 tokens/s** | **11 tokens/s** |
+| Integrated GPU only | 26 tokens/s | 4 tokens/s |
+| Mixed CPU + integrated GPU | 15 tokens/s | 9 tokens/s |
+
+Integrated graphics shares the same memory as the CPU, so it can't read the model any
+faster, and it has less computing power. A separate NVIDIA/AMD graphics card with its own
+memory is different: it is usually many times faster. `scripts/benchmark.sh` measures this
+on your own PC and picks the faster option.
+
+
 
 - Short questions with the 4b model: a few seconds.
 - Agent tasks with the main model: **30 seconds to several minutes**, because each
