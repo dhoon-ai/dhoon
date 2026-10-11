@@ -28,25 +28,38 @@ To open a Terminal on Ubuntu: press **Ctrl + Alt + T**.
 | Operating system | Ubuntu 22.04+ or Debian 12+ (64-bit) | Ubuntu LTS |
 | Processor | 64-bit Intel/AMD with AVX2 (most CPUs from 2015 on), or ARM64 | 6+ cores |
 | Memory (RAM) | 8 GB | 32–64 GB |
-| Free disk space | 20 GB | 40 GB+ (SSD) |
+| Free disk space | 20 GB | 60 GB+ (SSD) |
 | Graphics card | Not needed | An NVIDIA/AMD card makes it much faster |
 | Network | Any internet connection | Wired connection for the big downloads |
 
 A mini PC, an old desktop, a home server or a laptop that stays plugged in all work.
 The computer should stay switched on whenever you want to use the agent.
 
-**The scripts choose the AI model from your RAM:**
+**The scripts choose and download the AI models for you, based on your RAM:**
 
-| Your RAM | Main model | Download | What to expect on a CPU |
-|---|---|---|---|
-| 28 GB or more | `qwen3:30b-a3b-instruct-2507-q4_K_M` | ~19 GB | Best quality; multi-step tasks work well |
-| 8–27 GB | `qwen3:4b-instruct-2507-q4_K_M` | ~2.5 GB | Fine for simple tasks; weaker as an agent |
+| Your RAM | Agent model (runs tools) | Planner model (thinks) | Total download | Disk to have free |
+|---|---|---|---|---|
+| **50 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:30b-a3b-thinking-2507-q4_K_M` (19 GB) | ~41 GB | 60 GB |
+| **28–49 GB** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~25 GB | 40 GB |
+| **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~6 GB | 20 GB |
 
-These are Qwen3 **Instruct** models, which answer directly. Qwen3's "thinking" models
-are avoided on purpose: on a CPU they spend minutes reasoning and often never actually
-call the tool.
+Every machine also gets two small helper models (included in the totals above):
+`qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
+`nomic-embed-text` (0.3 GB) for searching your documents.
 
-You can override this choice later (see "Choosing different models" below).
+**Why two kinds of model?** Qwen3 comes in two flavours. *Instruct* models answer
+directly and call tools reliably. *Thinking* models reason more carefully, but they often
+plan a tool call in their hidden thoughts and then stop without making it, and the long
+reasoning is slow on a CPU. So the agent you chat with uses an **Instruct** model, and it
+asks a **Thinking** model for a plan only when a task is complex (the `ask_planner` tool).
+
+| Your RAM | What to expect on a CPU |
+|---|---|
+| 50 GB or more | Best quality; complex multi-step tasks and planning work well |
+| 28–49 GB | Strong agent; plans from the small planner are simpler |
+| 8–27 GB | Fine for simple tasks; weaker as an agent |
+
+You can override these choices later (see "Choosing different models" below).
 
 ---
 
@@ -153,13 +166,18 @@ You should see "Hello from Docker!" and an Ollama version number.
 bash scripts/02_download_models.sh
 ```
 
-It prints your RAM and the models it chose, then downloads:
+It prints your RAM and the models it chose (see the table in "What you need"), then
+downloads **all four** for you:
 
-- your **main model** (see the table above),
-- `qwen3:4b-instruct-2507-q4_K_M`, a small fast model for quick questions and chat titles,
-- `nomic-embed-text` (~0.3 GB), which makes your documents searchable,
-- a **planner** model that "thinks" (19 GB with 50 GB+ RAM, otherwise 2.5 GB), used by the
-  `ask_planner` tool, see "Deep planning" below.
+| Role | Used by | Example (50 GB+ RAM) |
+|---|---|---|
+| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools | `qwen3:30b-a3b-instruct-2507-q4_K_M` |
+| **Planner** (Thinking) | the `ask_planner` tool, for complex tasks | `qwen3:30b-a3b-thinking-2507-q4_K_M` |
+| **Fast** (Instruct) | quick questions, chat titles | `qwen3:4b-instruct-2507-q4_K_M` |
+| **Embeddings** | searching documents you upload | `nomic-embed-text` |
+
+You never have to download any of them by hand. To check they're all there, run
+`ollama list`.
 
 At the end it runs a quick test and prints an `eval rate` in tokens/s.
 Write that number down: it tells you how fast your computer is. Above 10 tokens/s
@@ -309,14 +327,21 @@ exchanges, for example `.TO` (Toronto), `.L` (London), `.NS` (India NSE), `.AX` 
 Thinking models reason better, but they are unreliable at calling tools: they often
 plan the tool call in their hidden thoughts and then stop. So your agent works as a team:
 
+```mermaid
+flowchart TD
+    U["You (browser)"] --> LC["LibreChat web chat"]
+    LC --> A["Assistant agent<br/>Instruct model<br/>answers and runs tools"]
+    A -->|"simple task: calls tools directly"| T["toolbox"]
+    A -->|"complex task: ask_planner"| P["Planner<br/>Thinking model<br/>writes a plan, no tools"]
+    P -->|"numbered plan (text)"| A
+    T --> W["web_search + read_webpage<br/>via SearXNG"]
+    T --> F["read / write files<br/>~/agent-workspace"]
+    T --> PY["run_python<br/>locked-down sandbox"]
+    T --> S["stock tools"]
 ```
-You → Assistant (instruct model, runs tools)
-          │ for complex tasks: ask_planner("the whole task")
-          ▼
-      Planner (thinking model, no tools) → returns a numbered plan
-          │
-      Assistant carries out the plan with web_search, run_python, write_file…
-```
+
+(On GitHub this shows as a diagram. In short: you chat with the **Assistant**; for
+complex tasks it asks the **Planner** for a plan, then carries the plan out with its tools.)
 
 You don't need a second agent or LibreChat's chain/handoff features. The Assistant
 decides by itself when to ask for a plan. To force it, start your message with

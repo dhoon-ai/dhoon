@@ -20,27 +20,49 @@ downloads and market data your agent asks for.
 | OS | Ubuntu 22.04+ / Debian 12+ (64-bit) | Ubuntu LTS |
 | CPU | x86-64 with AVX2, or ARM64 | 6+ cores |
 | RAM | 8 GB | 32–64 GB |
-| Disk | 20 GB free | 40 GB+ SSD |
+| Disk | 20 GB free | 60 GB+ SSD |
 | GPU | Not needed | NVIDIA/AMD speeds things up; Ollama uses it automatically |
 
-The install scripts pick the main model from your RAM:
+## Models
 
-| RAM | Main model | Notes |
-|---|---|---|
-| ≥ 28 GB | `qwen3:30b-a3b-instruct-2507-q4_K_M` | MoE: 30B parameters, ~3B active per token, so it runs well on a CPU |
-| 8–27 GB | `qwen3:4b-instruct-2507-q4_K_M` | Simple tasks; weaker as an agent |
+`scripts/02_download_models.sh` picks and downloads all models automatically, based on your RAM:
 
-Both are **non-thinking "Instruct" models**. Qwen3's default "thinking" models reason
-at length before answering, which is slow on a CPU and often ends without the tool
-call ever being made, so the agent stalls.
+| Your RAM | Agent model (runs tools) | Planner model (thinks) | Total download | Disk to have free |
+|---|---|---|---|---|
+| **50 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:30b-a3b-thinking-2507-q4_K_M` (19 GB) | ~41 GB | 60 GB |
+| **28–49 GB** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~25 GB | 40 GB |
+| **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~6 GB | 20 GB |
 
-The thinking models are still used, safely: the `ask_planner` tool sends complex tasks
-to a Qwen3 **Thinking 2507** model, which returns a plan (text only) that the
-Instruct agent then carries out with its tools.
+Every machine also gets two small helper models (included in the totals above):
+`qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
+`nomic-embed-text` (0.3 GB) for searching your documents.
 
-Override any choice in `config/models.env` (copy `config/models.env.example`).
+**Why two kinds of model?** Qwen3 comes in two flavours. *Instruct* models answer
+directly and call tools reliably. *Thinking* models reason more carefully, but they often
+plan a tool call in their hidden thoughts and then stop without making it, and the long
+reasoning is slow on a CPU. So the agent you chat with uses an **Instruct** model, and it
+asks a **Thinking** model for a plan only when a task is complex (the `ask_planner` tool).
 
-## Architecture
+The 30B models are *mixture-of-experts*: 30B parameters, but only ~3B are used per token,
+so they run at usable speed on a CPU. Override any choice in `config/models.env`
+(copy `config/models.env.example`).
+
+## How a request flows
+
+```mermaid
+flowchart TD
+    U["You (browser)"] --> LC["LibreChat web chat"]
+    LC --> A["Assistant agent<br/>Instruct model<br/>answers and runs tools"]
+    A -->|"simple task: calls tools directly"| T["toolbox"]
+    A -->|"complex task: ask_planner"| P["Planner<br/>Thinking model<br/>writes a plan, no tools"]
+    P -->|"numbered plan (text)"| A
+    T --> W["web_search + read_webpage<br/>via SearXNG"]
+    T --> F["read / write files<br/>~/agent-workspace"]
+    T --> PY["run_python<br/>locked-down sandbox"]
+    T --> S["stock tools"]
+```
+
+## Architecture (components)
 
 ```
   Browser (any device at home)
@@ -48,10 +70,11 @@ Override any choice in `config/models.env` (copy `config/models.env.example`).
         ▼
   ┌──────────────┐      ┌─────────────────────────────┐
   │  LibreChat   │─────▶│  Ollama (on the host)       │
-  │  (Docker)    │      │  main + fast Qwen3 Instruct │
-  │  chat UI,    │      │  nomic-embed-text           │
-  │  agents, RAG │      └─────────────────────────────┘
-  └──────┬───────┘
+  │  (Docker)    │      │  Instruct: agent + fast     │
+  │  chat UI,    │      │  Thinking: planner          │
+  │  agents, RAG │      │  nomic-embed-text           │
+  └──────┬───────┘      └──────────────▲──────────────┘
+         │                             │
          │ MCP (streamable HTTP, Docker bridge only)
          ▼
   ┌─────────────────────────────────────────────────────┐
@@ -62,7 +85,7 @@ Override any choice in `config/models.env` (copy `config/models.env.example`).
   │                  (no network, read-only, no caps)   │
   │  stock_price_summary · stock_indicators ·           │
   │  stock_fundamentals                                 │
-  │  ask_planner ──▶ thinking model via Ollama          │
+  │  ask_planner ──▶ Thinking model in Ollama ──────────┘
   └──────┬──────────────────────────────────────────────┘
          │
          ▼
