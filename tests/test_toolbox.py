@@ -264,6 +264,8 @@ def test_ask_planner_returns_plan_when_thinking_finishes(tb, monkeypatch):
     system = seen["body"]["messages"][0]["content"]
     assert tb.dt.date.today().isoformat() in system  # planner knows today's date
     assert "current data" in system and "Next steps" in system
+    assert "Checklist:" in system and "✅" in system and "▶" in system and "⬜" in system
+    assert "Progress:" in out and "show the user the Checklist" in out
 
 
 def test_ask_planner_second_round_sends_progress_and_detects_finished(tb, monkeypatch):
@@ -277,6 +279,7 @@ def test_ask_planner_second_round_sends_progress_and_detects_finished(tb, monkey
     out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati with features")
     assert "Task: compare backup tools" in seen["user"] and "found restic, borg" in seen["user"]
     assert "ready to answer" in out and "FINISHED: a table" in out and "write the final answer" in out
+    assert "show the user the Checklist" in out  # final progress line before the answer
 
 
 def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypatch):

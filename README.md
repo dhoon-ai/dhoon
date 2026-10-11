@@ -92,7 +92,9 @@ consulted in between, in short planning rounds:
    tool). Short rounds keep each planning call quick. It never runs tools or talks to you.
 3. **Instruct model carries out those steps** with its tools, then calls `ask_planner`
    again with a short summary of the results. The planner adjusts the plan to what was
-   found and gives the next steps, or says **FINISHED** (at most 4 rounds).
+   found and gives the next steps, or says **FINISHED** (at most 4 rounds). After each
+   round the Assistant posts a one-line progress checklist in the chat, e.g.
+   `Progress: ✅ Research · ▶ Scoring · ⬜ Report`, so you can see where it's up to.
 4. **Instruct model writes the final answer.**
 
 Both models are told their own knowledge may be out of date: anything that can change
@@ -107,12 +109,14 @@ sequenceDiagram
     You->>A: complex request
     Note over A: knows today's date, decides it needs a plan
     A->>P: ask_planner(task)
-    P-->>A: outline + next 2-4 steps
+    P-->>A: checklist + next 2-4 steps
+    A-->>You: Progress: ✅ ... ▶ ... ⬜ ...
     loop until the planner says FINISHED (max 4 rounds)
         A->>T: run the steps (web_search, read_webpage, run_python ...)
         T-->>A: results (current data)
         A->>P: ask_planner(task, progress = summary of results)
-        P-->>A: next steps, or FINISHED
+        P-->>A: updated checklist + next steps, or FINISHED
+        A-->>You: updated progress line
     end
     A->>T: write_file(report)
     A-->>You: final answer + file name

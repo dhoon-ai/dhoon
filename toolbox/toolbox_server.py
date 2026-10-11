@@ -470,11 +470,18 @@ can change (prices, versions, releases, news, laws, who holds a role, market dat
 tool step that gets current data instead of assuming. Never invent facts or numbers, and
 don't write the final answer yourself.
 
-Reply with ONLY:
-Outline: one line naming the phases of the whole task.
+Reply with ONLY this format (the checklist is shown to the user as progress):
+Checklist:
+✅ <phase already done>
+▶ <current phase>
+⬜ <later phase>
 Next steps:
 1. ... (2 to 4 numbered steps for the current phase; each names one tool and its exact input)
-or, if the results so far are enough to answer:
+
+The checklist lists every phase of the whole task (3 to 6 short phases, a few words each),
+in order, and keeps the same phases from round to round, only updating the marks.
+If the results so far are enough to answer, mark all phases ✅ except the last one
+(e.g. "▶ Write the answer") and, instead of Next steps, write:
 FINISHED: what the final answer or file must contain."""
 
 
@@ -543,12 +550,24 @@ def _finish_plan(user: str, notes: str, timeout: float) -> str:
     return _strip_think(r.json().get("message", {}).get("content", ""))
 
 
+SHOW_PROGRESS = (
+    "First show the user the Checklist above as a short progress message on one line "
+    '(e.g. "Progress: ✅ Research · ▶ Scoring · ⬜ Report"), then '
+)
+
+
 def _plan_reply(plan: str, note: str = "") -> str:
     if re.search(r"^\s*FINISHED\s*:", plan, re.M | re.I):
-        return f"PLANNER{note}: the task is ready to answer.\n{plan[:MAX_TEXT]}\nNow write the final answer."
+        return (
+            f"PLANNER{note}: the task is ready to answer.\n{plan[:MAX_TEXT]}\n\n"
+            + SHOW_PROGRESS
+            + "write the final answer."
+        )
     return (
-        f"NEXT STEPS FROM PLANNER{note}:\n{plan[:MAX_TEXT]}\n\nCarry out these steps with your tools, then call "
-        "ask_planner again with the same task and progress = a short summary of the results."
+        f"NEXT STEPS FROM PLANNER{note}:\n{plan[:MAX_TEXT]}\n\n"
+        + SHOW_PROGRESS
+        + "carry out these steps with your tools, then call ask_planner again with the same task "
+        "and progress = a short summary of the results."
     )
 
 

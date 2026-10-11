@@ -14,6 +14,9 @@ How to work:
   2-4 steps. Carry them out with your tools, then call ask_planner again with the same
   task and progress = a short summary of the results (key facts, numbers, URLs, file
   names). Repeat until it says FINISHED (at most 4 rounds), then write the final answer.
+- Show progress while planning in rounds: after each ask_planner reply, first post its
+  checklist as one short line, e.g. "Progress: ✅ Research · ▶ Scoring · ⬜ Report",
+  then continue with the tools. Keep these progress lines short; no other commentary.
 - When a tool is needed, call it right away. Do not describe or plan the call in text.
 - If a tool fails, read the error, fix your input, and try again once.
 - If a web page can't be read (the site refuses automated readers, needs a login, etc.),

@@ -347,6 +347,9 @@ updates the agent instead of making a second one. Reload the web page and pick
        2-4 steps. Carry them out with your tools, then call ask_planner again with the same
        task and progress = a short summary of the results (key facts, numbers, URLs, file
        names). Repeat until it says FINISHED (at most 4 rounds), then write the final answer.
+     - Show progress while planning in rounds: after each ask_planner reply, first post its
+       checklist as one short line, e.g. "Progress: ✅ Research · ▶ Scoring · ⬜ Report",
+       then continue with the tools. Keep these progress lines short; no other commentary.
      - When a tool is needed, call it right away. Do not describe or plan the call in text.
      - If a tool fails, read the error, fix your input, and try again once.
      - If a web page can't be read (the site refuses automated readers, needs a login, etc.),
@@ -441,7 +444,11 @@ What you should see in the chat, in this order (click a tool box to open it):
 | 6 | `write_file` | Instruct | Saves `reports/backup-plan.md` |
 | 7 | (final message) | Instruct | Summary and the file name |
 
-The exact number of rounds varies with the task (at most 4).
+The exact number of rounds varies with the task (at most 4). After each `ask_planner`
+round the Assistant posts a one-line progress checklist in the chat, so you can follow
+along without opening the tool boxes, for example:
+
+> Progress: ✅ Research the tools · ▶ Score them · ⬜ Write the report
 
 Then open the report: `cat ~/agent-workspace/reports/backup-plan.md`
 
@@ -493,7 +500,9 @@ consulted in between, in short planning rounds:
    tool). Short rounds keep each planning call quick. It never runs tools or talks to you.
 3. **Instruct model carries out those steps** with its tools, then calls `ask_planner`
    again with a short summary of the results. The planner adjusts the plan to what was
-   found and gives the next steps, or says **FINISHED** (at most 4 rounds).
+   found and gives the next steps, or says **FINISHED** (at most 4 rounds). After each
+   round the Assistant posts a one-line progress checklist in the chat, e.g.
+   `Progress: ✅ Research · ▶ Scoring · ⬜ Report`, so you can see where it's up to.
 4. **Instruct model writes the final answer.**
 
 Both models are told their own knowledge may be out of date: anything that can change
@@ -508,12 +517,14 @@ sequenceDiagram
     You->>A: complex request
     Note over A: knows today's date, decides it needs a plan
     A->>P: ask_planner(task)
-    P-->>A: outline + next 2-4 steps
+    P-->>A: checklist + next 2-4 steps
+    A-->>You: Progress: ✅ ... ▶ ... ⬜ ...
     loop until the planner says FINISHED (max 4 rounds)
         A->>T: run the steps (web_search, read_webpage, run_python ...)
         T-->>A: results (current data)
         A->>P: ask_planner(task, progress = summary of results)
-        P-->>A: next steps, or FINISHED
+        P-->>A: updated checklist + next steps, or FINISHED
+        A-->>You: updated progress line
     end
     A->>T: write_file(report)
     A-->>You: final answer + file name
