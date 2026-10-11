@@ -36,6 +36,8 @@ set_secret ADMIN_PANEL_SESSION_SECRET "$(openssl rand -hex 32)"
 set_env EMBEDDINGS_PROVIDER ollama
 set_env EMBEDDINGS_MODEL "$MODEL_EMBED"
 set_env OLLAMA_BASE_URL http://host.docker.internal:11434
+# single-machine install: lets LibreChat's scheduled tasks feature start
+set_env SCHEDULES_SINGLE_PROCESS true
 
 render_librechat_config
 

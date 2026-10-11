@@ -14,6 +14,12 @@ endpoints:
       titleModel: "__MODEL_FAST__"         # small fast model writes chat titles
       modelDisplayLabel: "Local AI"
 
+# LibreChat blocks internal addresses by default (SSRF protection).
+# Allow ONLY our toolbox port on the host.
+mcpSettings:
+  allowedAddresses:
+    - "host.docker.internal:8001"
+
 mcpServers:
   toolbox:
     type: streamable-http
