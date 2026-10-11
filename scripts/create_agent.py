@@ -29,6 +29,9 @@ AGENT_NAME = "Assistant"
 PROVIDER = "Ollama"  # the custom endpoint name in config/librechat/librechat.yaml
 MCP_SERVER = "toolbox"
 MCP_DELIMITER = "_mcp_"  # LibreChat names MCP tools "<tool>_mcp_<server>"
+# LibreChat rejects requests whose User-Agent isn't a recognised browser (and counts each one
+# as a violation that can lead to a 2-hour ban), so identify as a browser.
+USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0 local-ai-agent-setup"
 STARTERS = [
     "What is today's date, and what is 17% of 2,450?",
     "Search the web for the latest Ubuntu LTS release and summarise what's new, with sources.",
@@ -70,22 +73,30 @@ class LibreChat:
             self.url + path,
             method=method,
             data=json.dumps(body).encode() if body is not None else None,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": USER_AGENT},
         )
         if self.token:
             req.add_header("Authorization", f"Bearer {self.token}")
         try:
             with self.opener.open(req, timeout=60) as r:
-                raw = r.read()
-                return r.status, (json.loads(raw) if raw else {})
+                return r.status, self._parse(r.read())
         except urllib.error.HTTPError as e:
-            raw = e.read()
-            try:
-                return e.code, json.loads(raw)
-            except ValueError:
-                return e.code, {"message": raw.decode(errors="replace")[:300]}
+            return e.code, self._parse(e.read())
         except (urllib.error.URLError, OSError) as e:
             return 0, {"message": str(e)}
+
+    @staticmethod
+    def _parse(raw: bytes) -> dict:
+        """JSON body, or an error dict for anything else (e.g. LibreChat's 'event: error' replies)."""
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else {"data": data}
+        except ValueError:
+            text = raw.decode(errors="replace")
+            m = re.search(r"^data: (.*)$", text, re.M)
+            return {"error": True, "message": (m.group(1) if m else text)[:300]}
 
     def login(self, email: str, password: str) -> bool:
         status, data = self.call("POST", "/api/auth/login", {"email": email, "password": password})
@@ -158,7 +169,10 @@ def main() -> int:
 
     payload = agent_payload(args.model)
     status, data = lc.call("GET", "/api/agents?limit=100")
-    existing = [a for a in (data.get("data") or []) if a.get("name") == AGENT_NAME] if status == 200 else []
+    if status != 200 or data.get("error"):
+        print(f"  (could not list existing agents: {data.get('message', status)} - creating a new one)")
+        data = {}
+    existing = [a for a in (data.get("data") or []) if a.get("name") == AGENT_NAME]
 
     if existing:
         agent_id = existing[0]["id"]
@@ -168,7 +182,7 @@ def main() -> int:
         status, data = lc.call("POST", "/api/agents", payload)
         agent_id = data.get("id")
         action = "Created"
-    if status not in (200, 201) or not agent_id:
+    if status not in (200, 201) or not agent_id or data.get("error"):
         sys.exit(f"Could not save the agent (status {status}): {data}")
 
     saved = set(data.get("tools") or [])

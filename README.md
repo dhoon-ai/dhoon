@@ -199,7 +199,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
-scripts/        install steps 00 → 06, status, check, benchmark, update, uninstall
+scripts/        install steps 00 → 06, status, check, benchmark, unban, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates

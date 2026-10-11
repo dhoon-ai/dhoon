@@ -22,6 +22,7 @@ class FakeLibreChat:
         self.agents = {}
         self.calls = []
         self.drop_tools = set(drop_tools)
+        self.violations = 0
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -38,6 +39,16 @@ class FakeLibreChat:
                 n = int(self.headers.get("Content-Length") or 0)
                 return json.loads(self.rfile.read(n)) if n else {}
 
+            def browser_ok(self):
+                # Like LibreChat's uaParser: non-browser User-Agents get an SSE error with status 200
+                if "Firefox" in (self.headers.get("User-Agent") or ""):
+                    return True
+                fake.violations += 1
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'event: error\ndata: "Illegal request"\n\n')
+                return False
+
             def authed(self):
                 return self.headers.get("Authorization") == "Bearer tok-123"
 
@@ -45,7 +56,7 @@ class FakeLibreChat:
                 fake.calls.append(("GET", self.path))
                 if self.path == "/api/config":
                     return self.reply(200, {})
-                if self.path.startswith("/api/agents") and self.authed():
+                if self.path.startswith("/api/agents") and self.browser_ok() and self.authed():
                     return self.reply(200, {"data": list(fake.agents.values())})
                 self.reply(401, {"message": "Unauthorized"})
 
@@ -60,7 +71,7 @@ class FakeLibreChat:
                     assert data["password"] == data["confirm_password"] and len(data["name"]) >= 3
                     fake.accounts[data["email"]] = data["password"]
                     return self.reply(200, {"message": "ok"})
-                if self.path == "/api/agents" and self.authed():
+                if self.path == "/api/agents" and self.browser_ok() and self.authed():
                     agent = {**data, "id": f"agent_{len(fake.agents) + 1}"}
                     agent["tools"] = [t for t in data["tools"] if t not in fake.drop_tools]
                     fake.agents[agent["id"]] = agent
@@ -71,7 +82,7 @@ class FakeLibreChat:
                 data = self.body()
                 fake.calls.append(("PATCH", self.path, data))
                 agent_id = self.path.rsplit("/", 1)[-1]
-                if self.authed() and agent_id in fake.agents:
+                if self.browser_ok() and self.authed() and agent_id in fake.agents:
                     fake.agents[agent_id].update(data)
                     return self.reply(200, fake.agents[agent_id])
                 self.reply(404, {"error": "Agent not found"})
@@ -116,6 +127,7 @@ def test_existing_account_creates_agent_then_updates_on_rerun():
     r = run(fake)
     assert r.returncode == 0 and "Updated the 'Assistant' agent" in r.stdout
     assert len(fake.agents) == 1  # no duplicate
+    assert fake.violations == 0  # always looked like a browser (LibreChat bans non-browsers)
 
 
 def test_missing_account_is_created_with_yes():
@@ -145,3 +157,8 @@ def test_librechat_down():
 @pytest.fixture(autouse=True)
 def _no_tty(monkeypatch):
     monkeypatch.delenv("LIBRECHAT_EMAIL", raising=False)
+
+
+def test_parse_handles_librechat_sse_error():
+    parsed = create_agent.LibreChat._parse(b'event: error\ndata: "Illegal request"\n\n')
+    assert parsed["error"] is True and "Illegal request" in parsed["message"]

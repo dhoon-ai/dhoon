@@ -615,6 +615,7 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 |---|---|
 | Check everything | `bash scripts/check.sh` |
 | Which install steps are done | `bash scripts/status.sh` |
+| Lift a LibreChat sign-in ban | `bash scripts/unban.sh` |
 | Continue / repair the install | `bash install.sh` |
 | Update everything | `bash scripts/update.sh` |
 | Restart the chat website | `cd runtime/LibreChat && docker compose restart` |
@@ -635,6 +636,10 @@ Everything starts automatically after a reboot.
 **The one-command installer stopped**: read the red message, fix it, and run the same
 command again; finished steps are quick the second time. To see what it would do without
 doing it: put `INSTALL_DRY_RUN=1` in front of `bash`.
+
+**"You have been temporarily banned" / can't sign in after running a script**: LibreChat
+bans an account and address for 2 hours when it sees requests that don't come from a web
+browser. Lift it with `bash scripts/unban.sh`, then sign in again.
 
 **`06_create_agent.sh` says "not accepted" for toolbox tools**: the toolbox wasn't
 connected to LibreChat yet. Run `bash scripts/check.sh`, then
