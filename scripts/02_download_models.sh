@@ -15,7 +15,7 @@ ollama pull "$MODEL_MAIN"     # the agent's main brain
 ollama pull "$MODEL_EMBED"    # makes your documents searchable
 
 step "Quick speed test (look for 'eval rate')"
-ollama run "$MODEL_FAST" "In one sentence: what does a CPU do? /no_think" --verbose 2>&1 | tail -n 12
+ollama run "$MODEL_FAST" "In one sentence: what does a CPU do?" --verbose 2>&1 | tail -n 12
 
 step "Script 02 done"
 next "bash scripts/03_searxng.sh"

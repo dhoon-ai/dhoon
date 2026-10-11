@@ -13,6 +13,10 @@ echo "         models: ${models:-none}"
 for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED"; do
   echo " $models " | grep -q " ${m}\(:latest\)\? " || { warn "model $m missing  ->  ollama pull $m"; }
 done
+case "$MODEL_MAIN" in
+  qwen3:*instruct*|qwen3-*instruct*) ;;
+  qwen3*) warn "$MODEL_MAIN is a Qwen3 thinking model; it often fails to call tools. Use an instruct-2507 model (docs/GUIDE.md)";;
+esac
 
 if curl -fs "http://127.0.0.1:8888/search?q=test&format=json" >/dev/null; then ok "SearXNG search works"
 else fail "SearXNG  ->  docker restart searxng ; docker logs searxng"; problems=$((problems+1)); fi

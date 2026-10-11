@@ -27,9 +27,12 @@ The install scripts pick the main model from your RAM:
 
 | RAM | Main model | Notes |
 |---|---|---|
-| ≥ 45 GB | `qwen3:30b-a3b` | MoE: 30B parameters, ~3B active per token, so it runs well on a CPU |
-| 14–44 GB | `qwen3:8b` | Good balance |
-| 8–13 GB | `qwen3:4b` | Simple tasks |
+| ≥ 28 GB | `qwen3:30b-a3b-instruct-2507-q4_K_M` | MoE: 30B parameters, ~3B active per token, so it runs well on a CPU |
+| 8–27 GB | `qwen3:4b-instruct-2507-q4_K_M` | Simple tasks; weaker as an agent |
+
+Both are **non-thinking "Instruct" models**. Qwen3's default "thinking" models reason
+at length before answering, which is slow on a CPU and often ends without the tool
+call ever being made, so the agent stalls.
 
 Override any choice in `config/models.env` (copy `config/models.env.example`).
 
@@ -41,7 +44,7 @@ Override any choice in `config/models.env` (copy `config/models.env.example`).
         ▼
   ┌──────────────┐      ┌─────────────────────────────┐
   │  LibreChat   │─────▶│  Ollama (on the host)       │
-  │  (Docker)    │      │  main model · qwen3:4b      │
+  │  (Docker)    │      │  main + fast Qwen3 Instruct │
   │  chat UI,    │      │  nomic-embed-text           │
   │  agents, RAG │      └─────────────────────────────┘
   └──────┬───────┘

@@ -18,8 +18,8 @@ else fail "These scripts need Ubuntu or Debian (apt). Other distros need manual 
 
 if [ "$RAM_GB" -lt 7 ]; then
   fail "RAM: ${RAM_GB} GB - at least 8 GB is needed"
-elif [ "$RAM_GB" -lt 14 ]; then
-  warn "RAM: ${RAM_GB} GB - works with small models only (main model: ${MODEL_MAIN})"
+elif [ "$RAM_GB" -lt 28 ]; then
+  warn "RAM: ${RAM_GB} GB - the agent will use a small model (${MODEL_MAIN}); 32 GB+ allows the much better 30B model"
 else
   ok "RAM: ${RAM_GB} GB -> main model will be ${MODEL_MAIN}"
 fi

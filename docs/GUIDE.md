@@ -39,9 +39,12 @@ The computer should stay switched on whenever you want to use the agent.
 
 | Your RAM | Main model | Download | What to expect on a CPU |
 |---|---|---|---|
-| 45 GB or more | `qwen3:30b-a3b` | ~19 GB | Best quality; multi-step tasks work well |
-| 14–44 GB | `qwen3:8b` | ~5 GB | Good; occasionally misuses tools |
-| 8–13 GB | `qwen3:4b` | ~2.5 GB | Fine for simple tasks; weaker as an agent |
+| 28 GB or more | `qwen3:30b-a3b-instruct-2507-q4_K_M` | ~19 GB | Best quality; multi-step tasks work well |
+| 8–27 GB | `qwen3:4b-instruct-2507-q4_K_M` | ~2.5 GB | Fine for simple tasks; weaker as an agent |
+
+These are Qwen3 **Instruct** models, which answer directly. Qwen3's "thinking" models
+are avoided on purpose: on a CPU they spend minutes reasoning and often never actually
+call the tool.
 
 You can override this choice later (see "Choosing different models" below).
 
@@ -55,8 +58,6 @@ git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
 cd ~/ai-kit
 bash scripts/00_check_hardware.sh
 ```
-
-(Replace `rahulkthakar` with the GitHub account that hosts this repository.)
 
 The hardware check **changes nothing**. It reports your CPU, RAM, graphics, disk and
 network, and which model you'll get. Read any **[WARN]** or **[FAIL]** lines before
@@ -155,7 +156,7 @@ bash scripts/02_download_models.sh
 It prints your RAM and the models it chose, then downloads:
 
 - your **main model** (see the table above),
-- `qwen3:4b`, a small fast model for quick questions and chat titles,
+- `qwen3:4b-instruct-2507-q4_K_M`, a small fast model for quick questions and chat titles,
 - `nomic-embed-text` (~0.3 GB), which makes your documents searchable.
 
 At the end it runs a quick test and prints an `eval rate` in tokens/s.
@@ -165,7 +166,7 @@ feels quick; 3–10 is usable; below 3 feels slow.
 Try the main model yourself (type `/bye` to exit). Use the model name the script printed:
 
 ```bash
-ollama run qwen3:8b
+ollama run qwen3:4b-instruct-2507-q4_K_M
 ```
 
 ---
@@ -214,14 +215,11 @@ All lines should say **[OK]**.
 ## Step 7 — Your first chat (no tools)
 
 1. In LibreChat, click the model selector at the top.
-2. Choose **Local AI** (Ollama) → **qwen3:4b**.
+2. Choose **Local AI** (Ollama) → **qwen3:4b-instruct-2507-q4_K_M**.
 3. Ask: *"Explain what a CPU does in three sentences."*
 
 It works if you get an answer. The first message is slow (the model loads into
 memory); later ones are faster.
-
-> Tip: Qwen3 models "think" before answering. For quick replies, add `/no_think`
-> at the end of your message.
 
 ---
 
@@ -234,7 +232,7 @@ LibreChat calls an AI + tools combination an **Agent**.
 2. Click **Create new agent** and fill in:
    - **Name:** `Assistant`
    - **Model / Provider:** `Local AI` (Ollama) → your **main model**
-     (the one `02_download_models.sh` chose, e.g. `qwen3:8b` or `qwen3:30b-a3b`)
+     (the one `02_download_models.sh` chose, e.g. `qwen3:30b-a3b-instruct-2507-q4_K_M`)
    - **Instructions:** paste this (it's also in `config/agent-instructions.md`):
 
      ```text
@@ -295,10 +293,10 @@ exchanges, for example `.TO` (Toronto), `.L` (London), `.NS` (India NSE), `.AX` 
 Without a graphics card, the processor does all the work, so the AI is slower than
 cloud services:
 
-- Short questions with `qwen3:4b`: a few seconds.
+- Short questions with the 4b model: a few seconds.
 - Agent tasks with the main model: **30 seconds to several minutes**, because each
   tool result must be read by the model before the next step.
-- If it's too slow: use `qwen3:4b` for easy tasks, ask for one thing at a time,
+- If it's too slow: use the 4b model for easy tasks, ask for one thing at a time,
   close other heavy programs, and keep the computer's vents clear (CPUs slow down
   when hot).
 
@@ -344,6 +342,13 @@ Everything starts automatically after a reboot.
 ## Troubleshooting
 
 **"permission denied … docker.sock"**: You didn't log out and back in after Step 2. Do that.
+
+**The agent "thinks" about calling a tool, then stops without answering**: Your agent
+is using a Qwen3 *thinking* model (e.g. `qwen3:30b-a3b` or `qwen3:8b`). Its tool call
+gets stuck inside the hidden reasoning, and adding `/no_think` doesn't reliably fix it.
+Run `bash scripts/update.sh` (it downloads the Instruct models), then in the Agent
+Builder switch the model to the `...-instruct-2507-q4_K_M` one and Save. Free the
+space afterwards with `ollama rm qwen3:30b-a3b`.
 
 **LibreChat keeps restarting with "EACCES: permission denied"**: Some of its
 folders are owned by root. Fix:

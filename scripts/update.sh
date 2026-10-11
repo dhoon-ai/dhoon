@@ -25,5 +25,8 @@ render_librechat_config
 step "Updating Ollama"
 curl -fsSL https://ollama.com/install.sh | sh
 
+step "Making sure the configured models are downloaded"
+for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED"; do ollama pull "$m"; done
+
 step "Update done"
 bash "$KIT/scripts/check.sh" || true

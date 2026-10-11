@@ -19,14 +19,16 @@ mkdir -p "$RUNTIME"
 # shellcheck source=/dev/null
 [ -f "$KIT/config/models.env" ] && source "$KIT/config/models.env"
 
+# We use Qwen3 "Instruct 2507" models: they answer directly instead of "thinking"
+# first. Thinking models often never emit the tool call (it gets stuck inside the
+# hidden reasoning), and the long reasoning is very slow on a CPU.
 RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
 if [ -z "${MODEL_MAIN:-}" ]; then
-  if   [ "$RAM_GB" -ge 45 ]; then MODEL_MAIN="qwen3:30b-a3b"  # MoE, ~19 GB, best quality
-  elif [ "$RAM_GB" -ge 14 ]; then MODEL_MAIN="qwen3:8b"       # ~5 GB
-  else                            MODEL_MAIN="qwen3:4b"       # ~2.5 GB
+  if [ "$RAM_GB" -ge 28 ]; then MODEL_MAIN="qwen3:30b-a3b-instruct-2507-q4_K_M"   # MoE, ~19 GB, ~3B active: best
+  else                          MODEL_MAIN="qwen3:4b-instruct-2507-q4_K_M"        # ~2.5 GB
   fi
 fi
-MODEL_FAST="${MODEL_FAST:-qwen3:4b}"
+MODEL_FAST="${MODEL_FAST:-qwen3:4b-instruct-2507-q4_K_M}"
 MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
 
 step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }

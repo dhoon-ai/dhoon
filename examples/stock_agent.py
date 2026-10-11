@@ -23,7 +23,7 @@ from openai import OpenAI
 
 # Ollama exposes an OpenAI-compatible API locally. No data leaves the box
 # except the price download from Yahoo Finance.
-MODEL = "qwen3:30b-a3b"  # change to whatever you pulled with `ollama pull`
+MODEL = "qwen3:30b-a3b-instruct-2507-q4_K_M"  # change to whatever you pulled with `ollama pull`
 client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
 
