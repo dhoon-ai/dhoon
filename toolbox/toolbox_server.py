@@ -52,7 +52,7 @@ PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-thinking-2507-q4_
 PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "540"))  # seconds, hard limit (LibreChat waits 600)
 # How long the planner may think. If it is still thinking after this, its notes are handed
 # to the fast Instruct model, which writes the final plan from them (a plan is always returned).
-PLANNER_THINK_SECONDS = int(os.environ.get("PLANNER_THINK_SECONDS", "240"))
+PLANNER_THINK_SECONDS = int(os.environ.get("PLANNER_THINK_SECONDS", "150"))  # per planning round
 PLANNER_FALLBACK_MODEL = os.environ.get("PLANNER_FALLBACK_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
 # Embedding model for document search (small and fast, runs in Ollama)
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
@@ -459,15 +459,27 @@ def read_document(path: str, start_page: int = 1, max_pages: int = 3) -> str:
 
 # ------------------------------------------------------------------ planning ---
 PLANNER_PROMPT = """You are a planner for an AI agent. You cannot run tools.
-The agent that will carry out your plan has these tools:
+Today is {today}. The agent that carries out your plan has these tools:
 current_datetime, web_search, read_webpage, list_files, read_file, write_file,
 run_python, search_document, read_document, stock_price_summary, stock_indicators,
 stock_fundamentals.
 
-Think the task through, but keep your thinking brief. Then reply with ONLY:
-1. A short numbered plan. Each step names one tool and its exact input.
-2. A final line starting with "Final answer should:" describing what to deliver.
-Do not invent facts or numbers. Do not write the final answer yourself."""
+Plan in short rounds: the agent does a few steps, reports back, and you plan the next ones.
+Keep your thinking brief. Facts may have changed since you were trained: for anything that
+can change (prices, versions, releases, news, laws, who holds a role, market data), plan a
+tool step that gets current data instead of assuming. Never invent facts or numbers, and
+don't write the final answer yourself.
+
+Reply with ONLY:
+Outline: one line naming the phases of the whole task.
+Next steps:
+1. ... (2 to 4 numbered steps for the current phase; each names one tool and its exact input)
+or, if the results so far are enough to answer:
+FINISHED: what the final answer or file must contain."""
+
+
+def _planner_system() -> str:
+    return PLANNER_PROMPT.format(today=dt.datetime.now().astimezone().strftime("%A %Y-%m-%d"))
 
 
 def _strip_think(text: str) -> str:
@@ -479,11 +491,11 @@ def _planner_stream(user: str, think_deadline: float, hard_deadline: float) -> t
     Returns (plan_text, thinking_notes)."""
     body = {
         "model": PLANNER_MODEL,
-        "messages": [{"role": "system", "content": PLANNER_PROMPT}, {"role": "user", "content": user}],
+        "messages": [{"role": "system", "content": _planner_system()}, {"role": "user", "content": user}],
         "think": True,
         "stream": True,
         "keep_alive": "30m",
-        "options": {"num_predict": 4096, "temperature": 0.6},
+        "options": {"num_predict": 2048, "temperature": 0.6},
     }
     thinking, content = "", ""
     # read timeout covers loading the model from disk before the first token arrives
@@ -514,7 +526,7 @@ def _finish_plan(user: str, notes: str, timeout: float) -> str:
         json={
             "model": PLANNER_FALLBACK_MODEL,
             "messages": [
-                {"role": "system", "content": PLANNER_PROMPT},
+                {"role": "system", "content": _planner_system()},
                 {
                     "role": "user",
                     "content": f"{user}\n\nA colleague's unfinished planning notes (use the good ideas):\n"
@@ -531,14 +543,31 @@ def _finish_plan(user: str, notes: str, timeout: float) -> str:
     return _strip_think(r.json().get("message", {}).get("content", ""))
 
 
+def _plan_reply(plan: str, note: str = "") -> str:
+    if re.search(r"^\s*FINISHED\s*:", plan, re.M | re.I):
+        return f"PLANNER{note}: the task is ready to answer.\n{plan[:MAX_TEXT]}\nNow write the final answer."
+    return (
+        f"NEXT STEPS FROM PLANNER{note}:\n{plan[:MAX_TEXT]}\n\nCarry out these steps with your tools, then call "
+        "ask_planner again with the same task and progress = a short summary of the results."
+    )
+
+
 @mcp.tool()
-def ask_planner(task: str, context: str = "") -> str:
-    """Get a careful step-by-step plan from a slower 'thinking' model.
-    Use this FIRST for complex or multi-step tasks (research + analysis + writing a file,
-    comparisons, anything with several tools). Pass the user's full request as task,
-    and anything already known as context. Then carry out the returned plan yourself
-    with your tools. Do not use it for simple one-step questions. Takes 1-5 minutes."""
-    user = task if not context else f"{task}\n\nAlready known:\n{context}"
+def ask_planner(task: str, progress: str = "", context: str = "") -> str:
+    """Get the next steps for a complex task from a slower 'thinking' model, in short rounds.
+    Call it only when the task needs 3 or more tool calls, several sources, a comparison,
+    calculations on gathered data or a saved report, or when the user asks you to plan.
+    For 1-2 tool calls, just use the tools directly: planning would only slow it down.
+    Round 1: pass the user's full request as task. It returns an outline and the next
+    2-4 steps. Carry those out with your tools, then call ask_planner AGAIN with the same
+    task and progress = a short summary of what you did and found (key facts, numbers,
+    URLs, file names). Repeat until it answers FINISHED, then write the final answer.
+    Use at most 4 rounds. Each round takes about 1-3 minutes."""
+    user = f"Task: {task}"
+    if context:
+        user += f"\n\nAlready known:\n{context}"
+    if progress:
+        user += f"\n\nDone so far and results:\n{progress[-6000:]}\n\nPlan the next steps, or say FINISHED."
     start = time.monotonic()
     hard_deadline = start + PLANNER_TIMEOUT - 60  # leave time for the fallback
     plan, notes = "", ""
@@ -551,14 +580,14 @@ def ask_planner(task: str, context: str = "") -> str:
     except httpx.HTTPStatusError:
         pass  # e.g. the planner model isn't downloaded: the fast model writes the plan below
     if plan:
-        return "PLAN FROM PLANNER (carry it out with your tools):\n" + plan[:MAX_TEXT]
+        return _plan_reply(plan)
     remaining = PLANNER_TIMEOUT - (time.monotonic() - start)
     try:
         plan = _finish_plan(user, notes or "(no notes)", remaining)
     except httpx.HTTPError:
         plan = ""
     if plan:
-        return "PLAN (planner ran out of thinking time; finished by the fast model):\n" + plan[:MAX_TEXT]
+        return _plan_reply(plan, note=" (the planner ran out of thinking time; finished by the fast model)")
     return "The planner took too long. Make a simple plan yourself and continue."
 
 

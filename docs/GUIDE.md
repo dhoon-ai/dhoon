@@ -332,12 +332,21 @@ updates the agent instead of making a second one. Reload the web page and pick
 
      ```text
      You are a helpful general-purpose assistant running privately on the user's computer.
+     Current date and time: {{current_datetime}}.
 
      How to work:
-     - For complex or multi-step tasks (research plus analysis, comparisons, reports,
-       anything needing several tools), first call ask_planner with the user's full
-       request, then carry out its plan step by step with your tools.
-       Skip ask_planner for simple questions.
+     - First decide how to handle the request, like a query optimizer choosing the cheapest
+       plan that still gets it right:
+       * Direct: if it needs about 1-2 tool calls (a date, a calculation, one search or page,
+         one document question), just do it. Planning would only slow it down.
+       * Plan in rounds: if it needs 3 or more tool calls, several sources, a comparison,
+         calculations on gathered data, or a saved report.
+       * The user decides when they say so: "plan this" / "use ask_planner" means plan;
+         "quick" / "no planning" means direct.
+     - Planning in rounds: call ask_planner with the user's full request; it returns the next
+       2-4 steps. Carry them out with your tools, then call ask_planner again with the same
+       task and progress = a short summary of the results (key facts, numbers, URLs, file
+       names). Repeat until it says FINISHED (at most 4 rounds), then write the final answer.
      - When a tool is needed, call it right away. Do not describe or plan the call in text.
      - If a tool fails, read the error, fix your input, and try again once.
      - If a web page can't be read (the site refuses automated readers, needs a login, etc.),
@@ -345,7 +354,9 @@ updates the agent instead of making a second one. Reload the web page and pick
        saying which sites couldn't be read and which sources you used instead.
 
      Rules:
-     - Call current_datetime whenever today's date matters.
+     - Your own knowledge may be out of date. For anything that can change (prices, versions,
+       releases, news, laws, who holds a role, market data), get current data with your tools
+       before answering, and say how recent it is. Never present remembered facts as current.
      - For facts you are not sure of, use web_search, then read_webpage on the best result.
        Cite the URLs you used.
      - For questions about a document or book, use search_document on the file and answer
@@ -422,11 +433,15 @@ What you should see in the chat, in this order (click a tool box to open it):
 
 | # | Tool box | Which model | What's happening |
 |---|---|---|---|
-| 1 | `ask_planner` | Instruct → Thinking | The Assistant hands the task to the planner. Takes 1–5 minutes. Open the box to read the numbered plan |
-| 2 | `web_search`, `read_webpage` (several) | Instruct | The Assistant follows the plan: researches the tools |
-| 3 | `run_python` | Instruct | Calculates the scores (models never do maths in their head here) |
-| 4 | `write_file` | Instruct | Saves `reports/backup-plan.md` |
-| 5 | (final message) | Instruct | Summary and the file name |
+| 1 | `ask_planner` | Instruct → Thinking | Round 1: the planner returns an outline and the first 2–4 steps (1–3 minutes). Open the box to read them |
+| 2 | `web_search`, `read_webpage` | Instruct | The Assistant carries out those steps: researches the tools |
+| 3 | `ask_planner` again | Instruct → Thinking | Round 2: the Assistant reports what it found; the planner gives the next steps |
+| 4 | `run_python` | Instruct | Calculates the scores (models never do maths in their head here) |
+| 5 | `ask_planner` again | Instruct → Thinking | The planner answers FINISHED with what the report must contain |
+| 6 | `write_file` | Instruct | Saves `reports/backup-plan.md` |
+| 7 | (final message) | Instruct | Summary and the file name |
+
+The exact number of rounds varies with the task (at most 4).
 
 Then open the report: `cat ~/agent-workspace/reports/backup-plan.md`
 
@@ -466,17 +481,23 @@ complex tasks it asks the **Planner** for a plan, then carries the plan out with
 ### The handover between the two models
 
 Every request starts and ends with the **Instruct** model. The **Thinking** model is only
-called in the middle, and only when needed:
+consulted in between, in short planning rounds:
 
-1. **Instruct model reads your request** (the Assistant agent). If it's simple, it uses
-   its tools straight away and answers: done. If it's complex, it hands over to step 2.
-2. **Thinking model writes a plan.** The Assistant calls the `ask_planner` tool with your
-   full request. The toolbox passes it to the Thinking model, which thinks it through and
-   returns a numbered plan that names a tool for each step. It never runs tools and never
-   talks to you; it only returns text.
-3. **Instruct model carries out the plan.** The plan comes back to the Assistant as the
-   result of `ask_planner`. The Assistant runs each step with its tools (web search,
-   Python, files…), then writes the final answer.
+1. **Instruct model reads your request and decides** (the Assistant agent), like a database
+   query optimizer picking the cheapest plan: if it needs only 1–2 tool calls, it does them
+   straight away and answers. If it needs 3 or more, several sources, a comparison or a
+   report, it plans in rounds. You can override it: say *"plan this"* to force planning,
+   or *"quick, no planning"* to skip it. It always knows today's date.
+2. **Thinking model plans the next few steps.** The Assistant calls `ask_planner`. The
+   Thinking model returns a one-line outline and only the next 2–4 steps (each naming a
+   tool). Short rounds keep each planning call quick. It never runs tools or talks to you.
+3. **Instruct model carries out those steps** with its tools, then calls `ask_planner`
+   again with a short summary of the results. The planner adjusts the plan to what was
+   found and gives the next steps, or says **FINISHED** (at most 4 rounds).
+4. **Instruct model writes the final answer.**
+
+Both models are told their own knowledge may be out of date: anything that can change
+(prices, versions, news, laws, market data) is checked with tools, not taken from memory.
 
 ```mermaid
 sequenceDiagram
@@ -485,13 +506,15 @@ sequenceDiagram
     participant P as Planner (Thinking model)
     participant T as Toolbox tools
     You->>A: complex request
-    Note over A: 1. reads the request, decides it needs a plan
-    A->>P: ask_planner(your full request)
-    Note over P: 2. thinks, writes a numbered plan (cannot run tools)
-    P-->>A: the plan, as text
-    Note over A: 3. carries out the plan step by step
-    A->>T: web_search, read_webpage, run_python ...
-    T-->>A: results
+    Note over A: knows today's date, decides it needs a plan
+    A->>P: ask_planner(task)
+    P-->>A: outline + next 2-4 steps
+    loop until the planner says FINISHED (max 4 rounds)
+        A->>T: run the steps (web_search, read_webpage, run_python ...)
+        T-->>A: results (current data)
+        A->>P: ask_planner(task, progress = summary of results)
+        P-->>A: next steps, or FINISHED
+    end
     A->>T: write_file(report)
     A-->>You: final answer + file name
 ```
@@ -501,16 +524,17 @@ reliable at actually calling tools. Thinking models that try to call tools thems
 often stop halfway, which is why the Thinking model is never given tools.
 
 You don't need a second agent or LibreChat's chain/handoff features. The Assistant
-decides by itself when to ask for a plan. To force it, start your message with
-*"Use ask_planner first:"*. For example:
+decides by itself when a plan is worth it (3 or more tool calls, several sources, a
+comparison or a report). To force it, start your message with *"Use ask_planner first:"*
+or *"plan this:"*; to skip it, say *"quick, no planning"*. For example:
 
 *"Use ask_planner first: compare AAPL and MSFT on trend, risk and valuation, check
 recent news for both, and save a report to reports/compare.md."*
 
-Planning takes 1–5 minutes on a CPU (the planner thinks before writing). The first
-time, it also has to load the planner model into memory. The planner has a thinking
-budget (4 minutes by default): if it's still thinking after that, the fast Instruct model
-turns its notes into the plan, so you always get one. Change the budget with
+Each planning round takes about 1–3 minutes on a CPU (the planner thinks before writing);
+the first one also loads the planner model into memory. Each round has a thinking budget
+(2.5 minutes by default): if the planner is still thinking after that, the fast Instruct
+model turns its notes into the next steps, so a round always returns something. Change the budget with
 `PLANNER_THINK_SECONDS` in the toolbox service (`scripts/04_toolbox.sh`). To see the handover in action,
 try **Level 7** in Step 9.
 

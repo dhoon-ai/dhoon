@@ -80,17 +80,23 @@ flowchart TD
 ### The handover between the two models
 
 Every request starts and ends with the **Instruct** model. The **Thinking** model is only
-called in the middle, and only when needed:
+consulted in between, in short planning rounds:
 
-1. **Instruct model reads your request** (the Assistant agent). If it's simple, it uses
-   its tools straight away and answers: done. If it's complex, it hands over to step 2.
-2. **Thinking model writes a plan.** The Assistant calls the `ask_planner` tool with your
-   full request. The toolbox passes it to the Thinking model, which thinks it through and
-   returns a numbered plan that names a tool for each step. It never runs tools and never
-   talks to you; it only returns text.
-3. **Instruct model carries out the plan.** The plan comes back to the Assistant as the
-   result of `ask_planner`. The Assistant runs each step with its tools (web search,
-   Python, files…), then writes the final answer.
+1. **Instruct model reads your request and decides** (the Assistant agent), like a database
+   query optimizer picking the cheapest plan: if it needs only 1–2 tool calls, it does them
+   straight away and answers. If it needs 3 or more, several sources, a comparison or a
+   report, it plans in rounds. You can override it: say *"plan this"* to force planning,
+   or *"quick, no planning"* to skip it. It always knows today's date.
+2. **Thinking model plans the next few steps.** The Assistant calls `ask_planner`. The
+   Thinking model returns a one-line outline and only the next 2–4 steps (each naming a
+   tool). Short rounds keep each planning call quick. It never runs tools or talks to you.
+3. **Instruct model carries out those steps** with its tools, then calls `ask_planner`
+   again with a short summary of the results. The planner adjusts the plan to what was
+   found and gives the next steps, or says **FINISHED** (at most 4 rounds).
+4. **Instruct model writes the final answer.**
+
+Both models are told their own knowledge may be out of date: anything that can change
+(prices, versions, news, laws, market data) is checked with tools, not taken from memory.
 
 ```mermaid
 sequenceDiagram
@@ -99,13 +105,15 @@ sequenceDiagram
     participant P as Planner (Thinking model)
     participant T as Toolbox tools
     You->>A: complex request
-    Note over A: 1. reads the request, decides it needs a plan
-    A->>P: ask_planner(your full request)
-    Note over P: 2. thinks, writes a numbered plan (cannot run tools)
-    P-->>A: the plan, as text
-    Note over A: 3. carries out the plan step by step
-    A->>T: web_search, read_webpage, run_python ...
-    T-->>A: results
+    Note over A: knows today's date, decides it needs a plan
+    A->>P: ask_planner(task)
+    P-->>A: outline + next 2-4 steps
+    loop until the planner says FINISHED (max 4 rounds)
+        A->>T: run the steps (web_search, read_webpage, run_python ...)
+        T-->>A: results (current data)
+        A->>P: ask_planner(task, progress = summary of results)
+        P-->>A: next steps, or FINISHED
+    end
     A->>T: write_file(report)
     A-->>You: final answer + file name
 ```

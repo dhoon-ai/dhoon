@@ -257,9 +257,26 @@ def test_ask_planner_returns_plan_when_thinking_finishes(tb, monkeypatch):
     monkeypatch.setattr(tb.httpx, "stream", fake_stream)
     monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: pytest.fail("fallback must not run"))
     out = tb.ask_planner("add numbers", context="none")
-    assert out.startswith("PLAN FROM PLANNER") and "1. run_python" in out and "<think>" not in out
+    assert out.startswith("NEXT STEPS FROM PLANNER") and "1. run_python" in out and "<think>" not in out
+    assert "call ask_planner again" in out and "progress" in out
     assert seen["body"]["think"] is True and seen["body"]["stream"] is True
     assert seen["body"]["model"] == tb.PLANNER_MODEL
+    system = seen["body"]["messages"][0]["content"]
+    assert tb.dt.date.today().isoformat() in system  # planner knows today's date
+    assert "current data" in system and "Next steps" in system
+
+
+def test_ask_planner_second_round_sends_progress_and_detects_finished(tb, monkeypatch):
+    seen = {}
+
+    def fake_stream(method, url, json=None, timeout=None):
+        seen["user"] = json["messages"][1]["content"]
+        return FakeStream([_chunk(content="FINISHED: a table comparing the three tools"), _chunk(done=True)])
+
+    monkeypatch.setattr(tb.httpx, "stream", fake_stream)
+    out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati with features")
+    assert "Task: compare backup tools" in seen["user"] and "found restic, borg" in seen["user"]
+    assert "ready to answer" in out and "FINISHED: a table" in out and "write the final answer" in out
 
 
 def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypatch):
@@ -267,7 +284,7 @@ def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypa
     monkeypatch.setattr(tb.time, "monotonic", lambda: clock["t"])
 
     def advance(i):
-        clock["t"] += 100  # each chunk "takes" 100 s, so the 240 s thinking budget runs out
+        clock["t"] += 100  # each chunk "takes" 100 s, so the 150 s thinking budget runs out
 
     chunks = [_chunk(thinking=f"idea {i}: search, then score with python. ") for i in range(10)]
     monkeypatch.setattr(tb.httpx, "stream", lambda *a, **k: FakeStream(chunks, on_chunk=advance))
@@ -279,10 +296,10 @@ def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypa
 
     monkeypatch.setattr(tb.httpx, "post", fake_post)
     out = tb.ask_planner("compare backup tools")
-    assert out.startswith("PLAN (planner ran out of thinking time") and "1. web_search" in out
+    assert out.startswith("NEXT STEPS FROM PLANNER (the planner ran out of thinking time") and "1. web_search" in out
     assert seen["body"]["model"] == tb.PLANNER_FALLBACK_MODEL
     notes = seen["body"]["messages"][1]["content"]
-    assert "idea 0" in notes and "idea 3" not in notes  # stopped after the budget, notes handed over
+    assert "idea 0" in notes and "idea 2" not in notes  # stopped after the budget, notes handed over
 
 
 def test_ask_planner_slow_load_timeout_still_gives_plan(tb, monkeypatch):
