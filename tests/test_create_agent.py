@@ -23,6 +23,7 @@ class FakeLibreChat:
         self.calls = []
         self.drop_tools = set(drop_tools)
         self.violations = 0
+        self.avatar_uploads = 0
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -61,6 +62,8 @@ class FakeLibreChat:
                 self.reply(401, {"message": "Unauthorized"})
 
             def do_POST(self):
+                if self.path.startswith("/api/files/images/agents/"):
+                    return self.avatar_upload()
                 data = self.body()
                 fake.calls.append(("POST", self.path, data))
                 if self.path == "/api/auth/login":
@@ -77,6 +80,25 @@ class FakeLibreChat:
                     fake.agents[agent["id"]] = agent
                     return self.reply(201, agent)
                 self.reply(401, {"message": "Unauthorized"})
+
+            def avatar_upload(self):
+                agent_id = self.path.split("/")[-2]
+                n = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(n)
+                ctype = self.headers.get("Content-Type", "")
+                ok = (
+                    self.browser_ok()
+                    and self.authed()
+                    and ctype.startswith("multipart/form-data; boundary=")
+                    and b'name="file"' in raw
+                    and b"\x89PNG" in raw
+                    and agent_id in fake.agents
+                )
+                if not ok:
+                    return self.reply(400, {"message": "bad upload"})
+                fake.avatar_uploads += 1
+                fake.agents[agent_id]["avatar"] = {"filepath": "/images/a.png", "source": "local"}
+                return self.reply(201, fake.agents[agent_id])
 
             def do_PATCH(self):
                 data = self.body()
@@ -128,6 +150,8 @@ def test_existing_account_creates_agent_then_updates_on_rerun():
     assert r.returncode == 0 and "Updated the 'Assistant' agent" in r.stdout
     assert len(fake.agents) == 1  # no duplicate
     assert fake.violations == 0  # always looked like a browser (LibreChat bans non-browsers)
+    assert fake.avatar_uploads == 1  # picture added once, not again on the re-run
+    assert "Added the Assistant's picture" in r.stdout or fake.agents["agent_1"]["avatar"]
 
 
 def test_missing_account_is_created_with_yes():

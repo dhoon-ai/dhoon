@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/assistant-avatar.png" alt="local-ai-agent" width="160"></p>
+
 # local-ai-agent
 
 A **100% self-hosted, open-source AI agent** for an ordinary home computer: a mini PC,
@@ -200,6 +202,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
+assets/         the Assistant's picture and the script that draws it
 scripts/        install steps 00 → 06, status, check, benchmark, unban, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox

@@ -314,7 +314,8 @@ bash scripts/06_create_agent.sh
 
 It asks for your web-app email and password (and offers to create the account if it
 doesn't exist yet), lifts any LibreChat sign-in ban left by an earlier attempt, then creates the **Assistant** agent with the right model, all toolbox
-tools, File Search, the instructions below and a few starter prompts. Running it again
+tools, File Search, the instructions below, a few starter prompts and its picture
+(`assets/assistant-avatar.png`; swap in your own image to change it). Running it again
 updates the agent instead of making a second one. Reload the web page and pick
 **Agents → Assistant**.
 

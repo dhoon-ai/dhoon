@@ -21,11 +21,13 @@ import re
 import sys
 import urllib.error
 import urllib.request
+import uuid
 from http.cookiejar import CookieJar
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
 AGENT_NAME = "Assistant"
+AVATAR = KIT / "assets" / "assistant-avatar.png"
 PROVIDER = "Ollama"  # the custom endpoint name in config/librechat/librechat.yaml
 MCP_SERVER = "toolbox"
 MCP_DELIMITER = "_mcp_"  # LibreChat names MCP tools "<tool>_mcp_<server>"
@@ -97,6 +99,37 @@ class LibreChat:
             text = raw.decode(errors="replace")
             m = re.search(r"^data: (.*)$", text, re.M)
             return {"error": True, "message": (m.group(1) if m else text)[:300]}
+
+    def upload_avatar(self, agent_id: str, image: Path) -> tuple[int, dict]:
+        """multipart/form-data upload of the agent's picture (field name 'file')."""
+        boundary = uuid.uuid4().hex
+        body = (
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="file"; filename="{image.name}"\r\n'
+                "Content-Type: image/png\r\n\r\n"
+            ).encode()
+            + image.read_bytes()
+            + f"\r\n--{boundary}--\r\n".encode()
+        )
+        req = urllib.request.Request(
+            f"{self.url}/api/files/images/agents/{agent_id}/avatar",
+            method="POST",
+            data=body,
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Accept": "application/json",
+                "User-Agent": USER_AGENT,
+                "Authorization": f"Bearer {self.token}",
+            },
+        )
+        try:
+            with self.opener.open(req, timeout=60) as r:
+                return r.status, self._parse(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, self._parse(e.read())
+        except (urllib.error.URLError, OSError) as e:
+            return 0, {"message": str(e)}
 
     def login(self, email: str, password: str) -> bool:
         status, data = self.call("POST", "/api/auth/login", {"email": email, "password": password})
@@ -184,6 +217,13 @@ def main() -> int:
         action = "Created"
     if status not in (200, 201) or not agent_id or data.get("error"):
         sys.exit(f"Could not save the agent (status {status}): {data}")
+
+    if AVATAR.exists() and not data.get("avatar"):
+        a_status, a_data = lc.upload_avatar(agent_id, AVATAR)
+        if a_status in (200, 201) and not a_data.get("error"):
+            print("  Added the Assistant's picture.")
+        else:
+            print(f"  (could not add the picture: {a_data.get('message', a_status)} - not important)")
 
     saved = set(data.get("tools") or [])
     missing = [t for t in payload["tools"] if t.endswith(f"{MCP_DELIMITER}{MCP_SERVER}") and t not in saved]
