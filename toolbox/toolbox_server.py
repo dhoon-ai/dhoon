@@ -79,7 +79,15 @@ def _explain(tool: str, e: Exception) -> str:
             410: "the page was removed",
             429: "the site is rate-limiting requests",
         }.get(code, "the site returned a server error" if code >= 500 else "the site rejected the request")
-        return f"{tool} failed: {why} (HTTP {code}). Try a different source instead of retrying this one."
+        tried = (
+            " even after retrying with an honest identity"
+            if tool == "read_webpage" and code in (401, 403, 406, 429)
+            else ""
+        )
+        return (
+            f"{tool} failed: {why} (HTTP {code}){tried}. Don't retry this site: use a different search result, "
+            "finish the task, and tell the user this site could not be read."
+        )
     if isinstance(e, httpx.TimeoutException):
         return f"{tool} failed: the site took too long to answer. Try a different source."
     if isinstance(e, httpx.RequestError):

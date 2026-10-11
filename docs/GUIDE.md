@@ -340,6 +340,9 @@ updates the agent instead of making a second one. Reload the web page and pick
        Skip ask_planner for simple questions.
      - When a tool is needed, call it right away. Do not describe or plan the call in text.
      - If a tool fails, read the error, fix your input, and try again once.
+     - If a web page can't be read (the site refuses automated readers, needs a login, etc.),
+       don't stop: use another search result and finish the task. At the end, add one line
+       saying which sites couldn't be read and which sources you used instead.
 
      Rules:
      - Call current_datetime whenever today's date matters.

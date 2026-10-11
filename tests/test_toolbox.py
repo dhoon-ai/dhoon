@@ -143,7 +143,8 @@ def test_mcp_returns_explanation_instead_of_generic_error(tb, monkeypatch):
     monkeypatch.setattr(tb, "_fetch", refuse)
     result = asyncio.run(tb.mcp.call_tool("read_webpage", {"url": "https://example.com"}))
     text = str(result)
-    assert "refuses automated readers" in text and "HTTP 403" in text and "different source" in text
+    assert "refuses automated readers" in text and "HTTP 403" in text
+    assert "honest identity" in text and "different search result" in text and "tell the user" in text
     result = asyncio.run(tb.mcp.call_tool("write_file", {"path": "../../etc/x", "content": "x"}))
     assert "outside the workspace" in str(result)
 
