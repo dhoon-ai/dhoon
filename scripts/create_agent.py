@@ -63,6 +63,7 @@ def agent_payload(model: str) -> dict:
         "model": model,
         "tools": tools,
         "model_parameters": {"max_tokens": 4096},
+        "recursion_limit": 50,  # max steps per run (librechat.yaml allows up to 100)
         "conversation_starters": STARTERS,
     }
 

@@ -26,27 +26,7 @@ if ! command -v ollama >/dev/null 2>&1; then
   curl -fsSL https://ollama.com/install.sh | sh
 fi
 
-# Ollama settings:
-#  - listen on all interfaces so Docker containers can reach it
-#    (never forward port 11434 on your router)
-#  - 16k context window: enough for agent work, not too slow on CPU
-#  - keep the model in memory for 30 minutes between requests
-#  - store models on /data if that disk exists (docs/GUIDE.md step 1.2)
-sudo mkdir -p /etc/systemd/system/ollama.service.d
-{
-  echo "[Service]"
-  echo 'Environment="OLLAMA_HOST=0.0.0.0:11434"'
-  echo 'Environment="OLLAMA_CONTEXT_LENGTH=16384"'
-  echo 'Environment="OLLAMA_KEEP_ALIVE=30m"'
-  echo 'Environment="OLLAMA_NUM_PARALLEL=1"'
-  if mountpoint -q /data; then
-    sudo mkdir -p /data/ollama
-    sudo chown -R ollama:ollama /data/ollama 2>/dev/null || true
-    echo 'Environment="OLLAMA_MODELS=/data/ollama"'
-  fi
-} | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
-sudo systemctl daemon-reload
-sudo systemctl restart ollama
+bash "$KIT/scripts/ollama_settings.sh"
 
 step "Script 01 done"
 if [ -z "${FROM_INSTALLER:-}" ]; then

@@ -162,7 +162,7 @@ def test_run_python_uses_locked_down_docker(tb, monkeypatch):
     cmd = " ".join(seen["cmd"])
     for flag in ("--network none", "--read-only", "--cap-drop ALL", "no-new-privileges"):
         assert flag in cmd
-    assert seen["input"] == "print(6*7)"
+    assert seen["input"].endswith("print(6*7)") and "import pandas as pd" in seen["input"]
 
 
 def test_run_python_timeout(tb, monkeypatch):
@@ -459,3 +459,37 @@ def test_research_default_uses_searxng_usual_engines_once(tb, monkeypatch):
     monkeypatch.setattr(tb.httpx, "get", fake_get)
     tb._research("how to plan a garden")
     assert len(searched) == 1 and "engines" not in searched[0]  # no engine filter, no duplicate retry
+
+
+def test_run_python_explains_missing_internet_and_modules(tb, monkeypatch):
+    err = "Traceback...\nModuleNotFoundError: No module named 'yfinance'"
+    monkeypatch.setattr(tb.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", err))
+    out = tb.run_python("import yfinance")
+    assert "No module named 'yfinance'" in out and "no internet" in out and "stock_save_history" in out
+    doc = tb.run_python.__doc__
+    assert "simulated" in doc and "NO internet" in doc
+
+
+def test_stock_save_history_writes_csv_for_run_python(tb, monkeypatch):
+    monkeypatch.setattr(tb, "_history", lambda t, p: pd.DataFrame() if t == "NOPE" else _fake_prices(days=20))
+    out = tb.stock_save_history("googl, msft,NOPE", "1mo")
+    assert "data/GOOGL_MSFT_1mo.csv" in out and "No data for: NOPE" in out
+    df = pd.read_csv(tb.WORKSPACE / "data/GOOGL_MSFT_1mo.csv", parse_dates=["Date"], index_col="Date")
+    assert list(df.columns) == ["GOOGL", "MSFT"] and len(df) == 20
+    assert "No data" in tb.stock_save_history("NOPE")
+
+
+def test_every_tool_call_is_logged(tb, monkeypatch, tmp_path):
+    import asyncio
+    import logging
+
+    logfile = tmp_path / "toolbox.log"
+    handler = logging.FileHandler(logfile)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    tb.log.addHandler(handler)
+    asyncio.run(tb.mcp.call_tool("current_datetime", {}))
+    asyncio.run(tb.mcp.call_tool("write_file", {"path": "../../etc/x", "content": "x"}))
+    handler.flush()
+    text = logfile.read_text()
+    assert "CALL  current_datetime" in text and "DONE  current_datetime" in text
+    assert "CALL  write_file" in text and "ERROR write_file" in text and "outside the workspace" in text

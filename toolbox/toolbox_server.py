@@ -11,6 +11,7 @@ lets the AI model call these tools:
   list_files / read_file / write_file   work inside ONE folder (the workspace)
   run_python            run Python code inside a locked-down Docker container
   stock_price_summary / stock_indicators / stock_fundamentals   market analysis
+  stock_save_history    save daily prices to a CSV file (for charts with run_python)
   ask_planner           plan a big task in short rounds (optionally researches on the web
                         how to approach it first, with personal details removed)
   search_document / read_document   question-answering over PDFs, Word and text files
@@ -26,10 +27,13 @@ import hashlib
 import io
 import ipaddress
 import json
+import logging
+import logging.handlers
 import os
 import re
 import socket
 import subprocess
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -57,6 +61,27 @@ RESEARCH_ENGINES = os.environ.get("RESEARCH_ENGINES", "").strip()
 # Embedding model for document search (small and fast, runs in Ollama)
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 WORKSPACE.mkdir(parents=True, exist_ok=True)
+
+# ------------------------------------------------------------------ logging ---
+# Every tool call is logged (tool, inputs, time taken, result size or error), so you can see
+# where a long task got stuck: bash scripts/logs.sh. Logs stay on this computer.
+log = logging.getLogger("toolbox")
+log.setLevel(logging.INFO)
+if not log.handlers:
+    _console = logging.StreamHandler()  # -> journalctl -u ai-toolbox
+    _console.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(_console)
+    if os.environ.get("TOOLBOX_LOG"):
+        Path(os.environ["TOOLBOX_LOG"]).parent.mkdir(parents=True, exist_ok=True)
+        _file = logging.handlers.RotatingFileHandler(os.environ["TOOLBOX_LOG"], maxBytes=5_000_000, backupCount=3)
+        _file.setFormatter(logging.Formatter("%(asctime)s %(message)s", "%Y-%m-%d %H:%M:%S"))
+        log.addHandler(_file)
+
+
+def _short(value, limit: int = 300) -> str:
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[:limit] + "..."
+
 
 mcp = MCPServer(
     name="toolbox",
@@ -113,10 +138,16 @@ def _tool_with_friendly_errors(*args, **kwargs):
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*a, **kw):
+            name, start = fn.__name__, time.monotonic()
+            log.info("CALL  %s %s", name, _short(json.dumps(kw, default=str) if kw else a))
             try:
-                return fn(*a, **kw)
+                result = fn(*a, **kw)
             except Exception as e:  # noqa: BLE001 - turned into a message for the model
-                return _explain(fn.__name__, e)
+                log.warning("ERROR %s after %.1fs: %s: %s", name, time.monotonic() - start, type(e).__name__, _short(e))
+                return _explain(name, e)
+            text = str(result)
+            log.info("DONE  %s in %.1fs, %d chars: %s", name, time.monotonic() - start, len(text), _short(text, 150))
+            return result
 
         register(wrapper)
         return fn
@@ -300,10 +331,19 @@ def write_file(path: str, content: str) -> str:
 
 
 # ------------------------------------------------------------------ code ---
+# Imported for every run (one line, so error line numbers are off by just 1), because
+# models often forget "import pandas as pd".
+PY_PREAMBLE = "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
+
+
 @mcp.tool()
 def run_python(code: str, timeout_seconds: int = 60) -> str:
     """Run Python 3 code in an isolated sandbox and return what it prints.
-    pandas, numpy and matplotlib are installed. The sandbox has NO internet.
+    Only pandas, numpy and matplotlib are installed, and the sandbox has NO internet: it
+    cannot download anything (no yfinance, no requests). Get data with the other tools
+    first (e.g. stock_save_history writes prices to a CSV file), then read it here.
+    Never use made-up, random or "simulated" numbers in place of real data.
+    pd (pandas), np (numpy) and plt (matplotlib.pyplot) are already imported.
     The workspace folder is available as the current directory, so files you
     read/write with relative paths (e.g. 'data.csv', 'chart.png') live there.
     Always print() the results you want to see."""
@@ -344,12 +384,24 @@ def run_python(code: str, timeout_seconds: int = 60) -> str:
         "-",
     ]
     try:
-        r = subprocess.run(cmd, input=code, capture_output=True, text=True, timeout=max(5, min(timeout_seconds, 300)))
+        r = subprocess.run(
+            cmd, input=PY_PREAMBLE + code, capture_output=True, text=True, timeout=max(5, min(timeout_seconds, 300))
+        )
     except subprocess.TimeoutExpired:
         return "Error: the code took too long and was stopped."
     out = (r.stdout or "") + (("\n[stderr]\n" + r.stderr) if r.stderr else "")
     out = out.strip() or "(no output - did you forget print()?)"
-    return out[:MAX_TEXT]
+    if re.search(
+        r"ModuleNotFoundError|No module named|NameResolutionError|Temporary failure in name resolution"
+        r"|Network is unreachable|getaddrinfo failed",
+        out,
+    ):
+        out += (
+            "\n\nHINT: the sandbox has no internet and only pandas, numpy and matplotlib. Don't download "
+            "here: get the data with another tool first (stock_save_history for stock prices, "
+            "read_webpage for pages), save it with write_file if needed, then read the file here."
+        )
+    return out[-MAX_TEXT:] if len(out) > MAX_TEXT else out
 
 
 # ------------------------------------------------------------------ documents ---
@@ -461,14 +513,14 @@ def read_document(path: str, start_page: int = 1, max_pages: int = 3) -> str:
 PLANNER_PROMPT = """You are a planner for an AI agent. You cannot run tools.
 Today is {today}. The agent that carries out your plan has these tools:
 current_datetime, web_search, read_webpage, list_files, read_file, write_file,
-run_python, search_document, read_document, stock_price_summary, stock_indicators,
-stock_fundamentals.
+run_python (no internet), search_document, read_document, stock_price_summary,
+stock_indicators, stock_fundamentals, stock_save_history (prices to CSV for run_python charts).
 
 Plan in short rounds: the agent does a few steps, reports back, and you plan the next ones.
 Be brief. Facts may have changed since you were trained: for anything that
 can change (prices, versions, releases, news, laws, who holds a role, market data), plan a
 tool step that gets current data instead of assuming. Never invent facts or numbers, and
-don't write the final answer yourself.
+don't write the final answer yourself. Never plan simulated or made-up data.
 
 Reply with ONLY this format (the checklist is shown to the user as progress):
 Checklist:
@@ -713,6 +765,41 @@ def stock_fundamentals(ticker: str) -> str:
     ]
     out = {k: info[k] for k in keys if info.get(k) is not None}
     return json.dumps(out) if out else f"No fundamentals available for {ticker}."
+
+
+@mcp.tool()
+def stock_save_history(tickers: str, period: str = "1y") -> str:
+    """Save daily closing prices of one or more stocks to a CSV file in the workspace, so
+    run_python can chart or analyse them (run_python itself has no internet).
+    tickers: comma-separated Yahoo symbols, e.g. "GOOGL,MSFT". period: 1mo, 3mo, 6mo, 1y,
+    2y, 5y or ytd. Returns the file name and its columns."""
+    import pandas as pd
+
+    names = [t.strip().upper() for t in tickers.split(",") if t.strip()][:5]
+    if not names:
+        return "Give at least one ticker, e.g. GOOGL,MSFT."
+    closes, missing = {}, []
+    for t in names:
+        df = _history(t, period)
+        if df.empty:
+            missing.append(t)
+        else:
+            closes[t] = df["Close"].round(2)
+    if not closes:
+        return f"No data for {', '.join(missing)}. Check the symbols."
+    table = pd.DataFrame(closes)
+    table.index = pd.to_datetime(table.index).date
+    table.index.name = "Date"
+    rel = f"data/{'_'.join(closes)}_{period}.csv"
+    path = _safe_path(rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table.to_csv(path)
+    note = f" No data for: {', '.join(missing)}." if missing else ""
+    return (
+        f"Saved {len(table)} days of closing prices to {rel} (columns: Date, {', '.join(closes)}).{note}\n"
+        f"In run_python: df = pd.read_csv('{rel}', parse_dates=['Date'], index_col='Date')\n"
+        f"Last rows:\n{table.tail(3).to_string()}"
+    )
 
 
 # ------------------------------------------------------------------ start ---

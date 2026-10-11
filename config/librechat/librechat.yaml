@@ -3,6 +3,11 @@ version: 1.3.17
 cache: true
 
 endpoints:
+  # An agent run stops after this many steps (each tool call uses about 2). The default 25
+  # is too few for a planned task with research, stock data and a report.
+  agents:
+    recursionLimit: 50
+    maxRecursionLimit: 100
   custom:
     - name: "Ollama"                 # name must start with "ollama" so models are listed automatically
       apiKey: "ollama"

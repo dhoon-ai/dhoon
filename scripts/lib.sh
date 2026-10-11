@@ -32,6 +32,12 @@ MODEL_FAST="${MODEL_FAST:-qwen3:4b-instruct-2507-q4_K_M}"
 MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
 # The ask_planner tool uses the main Instruct model by default (fast, no separate download).
 MODEL_PLANNER="${MODEL_PLANNER:-$MODEL_MAIN}"
+# How much text the model can keep in mind at once (tokens). A big task (several web pages,
+# stock data, a report) needs ~20k; when it doesn't fit, Ollama silently drops the start of
+# the chat, including your request, and the agent loses track. 32k uses ~3 GB extra RAM.
+if [ -z "${CONTEXT_LENGTH:-}" ]; then
+  if [ "$RAM_GB" -ge 28 ]; then CONTEXT_LENGTH=32768; else CONTEXT_LENGTH=16384; fi
+fi
 
 step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
@@ -85,6 +91,8 @@ step_done() {
       command -v docker >/dev/null 2>&1 || { STATUS_REASON="Docker not installed"; return 1; }
       command -v ollama >/dev/null 2>&1 || { STATUS_REASON="Ollama not installed"; return 1; }
       [ -f "$SYSTEMD_ROOT/ollama.service.d/override.conf" ] || { STATUS_REASON="Ollama not configured"; return 1; }
+      grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
+        || { STATUS_REASON="Ollama settings out of date (context length)"; return 1; }
       getent group docker | grep -qw "$USER" || { STATUS_REASON="$USER not in the docker group"; return 1; }
       ;;
     2)
@@ -103,7 +111,8 @@ step_done() {
       grep -q "^ExecStart=.*$KIT/toolbox/toolbox_server.py" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
         || { STATUS_REASON="toolbox service points to another folder"; return 1; }
       if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
-        || ! grep -q "^Environment=RESEARCH_ENGINES=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
+        || ! grep -q "^Environment=RESEARCH_ENGINES=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || ! grep -q "^Environment=TOOLBOX_LOG=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
         STATUS_REASON="toolbox settings out of date"; return 1
       fi
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \

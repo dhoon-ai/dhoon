@@ -52,6 +52,7 @@ sudo chown -R "$(id -u):$(id -g)" "${BIND_DIRS[@]}" 2>/dev/null || true
 
 docker compose pull
 docker compose up -d
+docker compose restart api >/dev/null   # pick up librechat.yaml changes on re-runs
 
 IP=$(hostname -I | awk '{print $1}')
 echo "Waiting for LibreChat (first start can take 1-2 minutes)..."

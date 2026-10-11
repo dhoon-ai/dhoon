@@ -37,6 +37,8 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
+# every tool call is logged here (see: bash scripts/logs.sh)
+Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
 # ask_planner can research on the web how a hard task is usually done (generic question
 # only, personal details removed). Empty = your SearXNG's usual engines. Choose your own in
 # config/models.env, e.g. RESEARCH_ENGINES="startpage,duckduckgo,brave"

@@ -188,7 +188,7 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │  run_python ──▶ agent-sandbox container             │
   │                  (no network, read-only, no caps)   │
   │  stock_price_summary · stock_indicators ·           │
-  │  stock_fundamentals                                 │
+  │  stock_fundamentals · stock_save_history (CSV)      │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
   │  ask_planner ──▶ Instruct model in Ollama ──────────┘
@@ -209,6 +209,18 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
 
 The models are *open-weight* (free to download and use; training data not public).
 Market data comes from Yahoo Finance via yfinance.
+
+## Logs: finding out why a chat stopped
+
+```bash
+bash scripts/logs.sh            # last 60 minutes, from every part, with a diagnosis
+bash scripts/logs.sh --follow   # watch live while you chat
+```
+
+Every tool call is logged with its inputs, time taken and result or error
+(`runtime/logs/toolbox.log`). The script adds the warnings from Ollama (for example when
+a chat outgrew the context window), LibreChat and SearXNG, and says what they mean.
+Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 
 ## Design choices for modest hardware
 
@@ -253,7 +265,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Assistant's picture and the script that draws it
-scripts/        install steps 00 → 06, status, check, benchmark, unban, update, uninstall
+scripts/        install steps 00 → 06, status, check, logs, benchmark, unban, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates

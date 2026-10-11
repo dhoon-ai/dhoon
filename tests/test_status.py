@@ -30,7 +30,7 @@ def half_installed(tmp_path):
         f.chmod(0o755)
     root = tmp_path / "systemd"
     (root / "ollama.service.d").mkdir(parents=True)
-    (root / "ollama.service.d" / "override.conf").write_text("[Service]\n")
+    (root / "ollama.service.d" / "override.conf").write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\n')
     return {
         **os.environ,
         **MODELS,
@@ -38,6 +38,7 @@ def half_installed(tmp_path):
         "SYSTEMD_ROOT": str(root),
         "RUNTIME_DIR": str(tmp_path / "runtime"),
         "USER": "tester",
+        "CONTEXT_LENGTH": "32768",
     }
 
 
@@ -94,3 +95,10 @@ def test_failed_step_stops_with_manual_instructions(half_installed, tmp_path):
     assert "Open ANOTHER terminal" in r.stderr and f"cd {kit} && bash scripts/03_searxng.sh" in r.stderr
     assert "continues from this step" in r.stderr
     assert "STEP4-RAN" not in r.stdout and "Finished" not in r.stdout
+
+
+def test_old_context_length_means_step_1_is_redone(half_installed, tmp_path):
+    conf = Path(half_installed["SYSTEMD_ROOT"]) / "ollama.service.d" / "override.conf"
+    conf.write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=16384"\n')
+    r = subprocess.run(["bash", str(REPO / "scripts/status.sh")], env=half_installed, capture_output=True, text=True)
+    assert "context length" in r.stdout and "continues from step 1" in r.stdout

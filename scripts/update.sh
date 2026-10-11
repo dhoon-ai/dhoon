@@ -12,7 +12,8 @@ step "Updating toolbox"
 "$RUNTIME/venv/bin/pip" install --upgrade -r "$KIT/toolbox/requirements.txt"
 # make sure the service file has the current settings (e.g. PLANNER_MODEL)
 if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
-   || ! grep -q "^Environment=RESEARCH_ENGINES=" /etc/systemd/system/ai-toolbox.service 2>/dev/null; then
+   || ! grep -q "^Environment=RESEARCH_ENGINES=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
+   || ! grep -q "^Environment=TOOLBOX_LOG=" /etc/systemd/system/ai-toolbox.service 2>/dev/null; then
   warn "Toolbox service settings are outdated - re-running script 04"
   bash "$KIT/scripts/04_toolbox.sh"
 fi
@@ -30,6 +31,9 @@ render_librechat_config
 
 step "Updating Ollama"
 curl -fsSL https://ollama.com/install.sh | sh
+
+grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
+  || bash "$KIT/scripts/ollama_settings.sh"
 
 step "Making sure the configured models are downloaded"
 for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama pull "$m"; done
