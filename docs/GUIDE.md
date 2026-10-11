@@ -51,12 +51,12 @@ You can override this choice later (see "Choosing different models" below).
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/YOUR-GITHUB-NAME/local-ai-agent.git ~/ai-kit
+git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
 cd ~/ai-kit
 bash scripts/00_check_hardware.sh
 ```
 
-(Replace `YOUR-GITHUB-NAME` with the GitHub account that hosts this repository.)
+(Replace `rahulkthakar` with the GitHub account that hosts this repository.)
 
 The hardware check **changes nothing**. It reports your CPU, RAM, graphics, disk and
 network, and which model you'll get. Read any **[WARN]** or **[FAIL]** lines before

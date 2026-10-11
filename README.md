@@ -86,7 +86,7 @@ Market data comes from Yahoo Finance via yfinance.
 ## Quick start (if you've done this before)
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-NAME/local-ai-agent.git ~/ai-kit
+git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
 cd ~/ai-kit
 bash scripts/00_check_hardware.sh      # read-only
 bash scripts/01_install_base.sh        # then log out and back in
