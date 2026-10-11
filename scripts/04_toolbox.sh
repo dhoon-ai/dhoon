@@ -37,6 +37,7 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
+Environment=PLANNER_FALLBACK_MODEL=$MODEL_MAIN
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/toolbox_server.py
 Restart=on-failure
 RestartSec=5

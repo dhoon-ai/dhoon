@@ -218,30 +218,92 @@ class FakePost:
         return self._data
 
 
-def test_ask_planner_returns_plan_without_thinking(tb, monkeypatch):
+class FakeStream:
+    """Stands in for httpx.stream(): yields Ollama's streamed chat chunks (JSON lines)."""
+
+    def __init__(self, chunks, on_chunk=None):
+        self.chunks, self.on_chunk, self.closed_early = chunks, on_chunk, False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        pass
+
+    def iter_lines(self):
+        for i, c in enumerate(self.chunks):
+            if self.on_chunk:
+                self.on_chunk(i)
+            yield json.dumps(c)
+        self.closed_early = False
+
+
+def _chunk(thinking="", content="", done=False):
+    return {"message": {"thinking": thinking, "content": content}, "done": done}
+
+
+def test_ask_planner_returns_plan_when_thinking_finishes(tb, monkeypatch):
     seen = {}
 
-    def fake_post(url, json=None, timeout=None):
-        seen["url"], seen["body"] = url, json
-        return FakePost({"message": {"thinking": "hmm...", "content": "<think>x</think>1. run_python: 2+2"}})
+    def fake_stream(method, url, json=None, timeout=None):
+        seen["body"] = json
+        return FakeStream(
+            [_chunk(thinking="hmm"), _chunk(content="<think>x</think>1. run_python: 2+2"), _chunk(done=True)]
+        )
 
-    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    monkeypatch.setattr(tb.httpx, "stream", fake_stream)
+    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: pytest.fail("fallback must not run"))
     out = tb.ask_planner("add numbers", context="none")
-    assert out.startswith("PLAN FROM PLANNER") and "1. run_python" in out
-    assert "<think>" not in out and "hmm" not in out
-    assert seen["url"].endswith("/api/chat") and seen["body"]["think"] is True
+    assert out.startswith("PLAN FROM PLANNER") and "1. run_python" in out and "<think>" not in out
+    assert seen["body"]["think"] is True and seen["body"]["stream"] is True
     assert seen["body"]["model"] == tb.PLANNER_MODEL
 
 
-def test_ask_planner_empty_and_errors(tb, monkeypatch):
-    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: FakePost({"message": {"content": ""}}))
-    assert "ran out of time" in tb.ask_planner("x")
+def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypatch):
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(tb.time, "monotonic", lambda: clock["t"])
 
-    def boom(*a, **k):
+    def advance(i):
+        clock["t"] += 100  # each chunk "takes" 100 s, so the 240 s thinking budget runs out
+
+    chunks = [_chunk(thinking=f"idea {i}: search, then score with python. ") for i in range(10)]
+    monkeypatch.setattr(tb.httpx, "stream", lambda *a, **k: FakeStream(chunks, on_chunk=advance))
+    seen = {}
+
+    def fake_post(url, json=None, timeout=None):
+        seen["body"] = json
+        return FakePost({"message": {"content": "1. web_search: backup tools\nFinal answer should: compare"}})
+
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    out = tb.ask_planner("compare backup tools")
+    assert out.startswith("PLAN (planner ran out of thinking time") and "1. web_search" in out
+    assert seen["body"]["model"] == tb.PLANNER_FALLBACK_MODEL
+    notes = seen["body"]["messages"][1]["content"]
+    assert "idea 0" in notes and "idea 3" not in notes  # stopped after the budget, notes handed over
+
+
+def test_ask_planner_slow_load_timeout_still_gives_plan(tb, monkeypatch):
+    def slow(*a, **k):
+        raise tb.httpx.ReadTimeout("loading model")
+
+    monkeypatch.setattr(tb.httpx, "stream", slow)
+    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: FakePost({"message": {"content": "1. current_datetime"}}))
+    assert "1. current_datetime" in tb.ask_planner("x")
+
+
+def test_ask_planner_ollama_down_and_total_failure(tb, monkeypatch):
+    def down(*a, **k):
         raise tb.httpx.ConnectError("down")
 
-    monkeypatch.setattr(tb.httpx, "post", boom)
+    monkeypatch.setattr(tb.httpx, "stream", down)
     assert "Planner unavailable" in tb.ask_planner("x")
+
+    monkeypatch.setattr(tb.httpx, "stream", lambda *a, **k: FakeStream([_chunk(done=True)]))
+    monkeypatch.setattr(tb.httpx, "post", down)
+    assert "Make a simple plan yourself" in tb.ask_planner("x")
 
 
 # ---------------------------------------------------------------- documents ---

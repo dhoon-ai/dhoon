@@ -107,8 +107,10 @@ step_done() {
       systemctl is-active --quiet ai-toolbox 2>/dev/null || { STATUS_REASON="toolbox service not running"; return 1; }
       grep -q "^ExecStart=.*$KIT/toolbox/toolbox_server.py" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
         || { STATUS_REASON="toolbox service points to another folder"; return 1; }
-      grep -q "PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
-        || { STATUS_REASON="toolbox settings out of date"; return 1; }
+      if ! grep -q "PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || ! grep -q "PLANNER_FALLBACK_MODEL=$MODEL_MAIN" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
+        STATUS_REASON="toolbox settings out of date"; return 1
+      fi
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \
         || { STATUS_REASON="toolbox Python packages missing or outdated"; return 1; }
       ;;

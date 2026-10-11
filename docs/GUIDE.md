@@ -508,7 +508,10 @@ decides by itself when to ask for a plan. To force it, start your message with
 recent news for both, and save a report to reports/compare.md."*
 
 Planning takes 1–5 minutes on a CPU (the planner thinks before writing). The first
-time, it also has to load the planner model into memory. To see the handover in action,
+time, it also has to load the planner model into memory. The planner has a thinking
+budget (4 minutes by default): if it's still thinking after that, the fast Instruct model
+turns its notes into the plan, so you always get one. Change the budget with
+`PLANNER_THINK_SECONDS` in the toolbox service (`scripts/04_toolbox.sh`). To see the handover in action,
 try **Level 7** in Step 9.
 
 ---

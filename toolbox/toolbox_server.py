@@ -29,6 +29,7 @@ import os
 import re
 import socket
 import subprocess
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -48,7 +49,11 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 # A "thinking" model that plans. It never calls tools itself: thinking models are
 # good at reasoning but unreliable at tool calls, so the agent runs the plan.
 PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-thinking-2507-q4_K_M")
-PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "540"))  # seconds; CPUs are slow
+PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "540"))  # seconds, hard limit (LibreChat waits 600)
+# How long the planner may think. If it is still thinking after this, its notes are handed
+# to the fast Instruct model, which writes the final plan from them (a plan is always returned).
+PLANNER_THINK_SECONDS = int(os.environ.get("PLANNER_THINK_SECONDS", "240"))
+PLANNER_FALLBACK_MODEL = os.environ.get("PLANNER_FALLBACK_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
 # Embedding model for document search (small and fast, runs in Ollama)
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 WORKSPACE.mkdir(parents=True, exist_ok=True)
@@ -465,6 +470,67 @@ Think the task through, but keep your thinking brief. Then reply with ONLY:
 Do not invent facts or numbers. Do not write the final answer yourself."""
 
 
+def _strip_think(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()  # older Ollama versions
+
+
+def _planner_stream(user: str, think_deadline: float, hard_deadline: float) -> tuple[str, str]:
+    """Stream the thinking model's answer; stop early if it is still thinking at think_deadline.
+    Returns (plan_text, thinking_notes)."""
+    body = {
+        "model": PLANNER_MODEL,
+        "messages": [{"role": "system", "content": PLANNER_PROMPT}, {"role": "user", "content": user}],
+        "think": True,
+        "stream": True,
+        "keep_alive": "30m",
+        "options": {"num_predict": 4096, "temperature": 0.6},
+    }
+    thinking, content = "", ""
+    # read timeout covers loading the model from disk before the first token arrives
+    timeout = httpx.Timeout(PLANNER_TIMEOUT, connect=10, read=300)
+    with httpx.stream("POST", f"{OLLAMA_URL}/api/chat", json=body, timeout=timeout) as r:
+        r.raise_for_status()
+        for line in r.iter_lines():
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            msg = chunk.get("message") or {}
+            thinking += msg.get("thinking") or ""
+            content += msg.get("content") or ""
+            if chunk.get("done"):
+                break
+            now = time.monotonic()
+            if not _strip_think(content) and now > think_deadline:
+                break  # still thinking: stop and let the fast model finish the plan
+            if now > hard_deadline:
+                break
+    return _strip_think(content), thinking
+
+
+def _finish_plan(user: str, notes: str, timeout: float) -> str:
+    """Fast Instruct model turns the planner's unfinished notes into the final plan."""
+    r = httpx.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={
+            "model": PLANNER_FALLBACK_MODEL,
+            "messages": [
+                {"role": "system", "content": PLANNER_PROMPT},
+                {
+                    "role": "user",
+                    "content": f"{user}\n\nA colleague's unfinished planning notes (use the good ideas):\n"
+                    f"{notes[-6000:]}\n\nNow write the final plan in the required format.",
+                },
+            ],
+            "stream": False,
+            "keep_alive": "30m",
+            "options": {"num_predict": 1024, "temperature": 0.3},
+        },
+        timeout=max(30.0, timeout),
+    )
+    r.raise_for_status()
+    return _strip_think(r.json().get("message", {}).get("content", ""))
+
+
 @mcp.tool()
 def ask_planner(task: str, context: str = "") -> str:
     """Get a careful step-by-step plan from a slower 'thinking' model.
@@ -473,28 +539,27 @@ def ask_planner(task: str, context: str = "") -> str:
     and anything already known as context. Then carry out the returned plan yourself
     with your tools. Do not use it for simple one-step questions. Takes 1-5 minutes."""
     user = task if not context else f"{task}\n\nAlready known:\n{context}"
+    start = time.monotonic()
+    hard_deadline = start + PLANNER_TIMEOUT - 60  # leave time for the fallback
+    plan, notes = "", ""
     try:
-        r = httpx.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": PLANNER_MODEL,
-                "messages": [{"role": "system", "content": PLANNER_PROMPT}, {"role": "user", "content": user}],
-                "think": True,
-                "stream": False,
-                "options": {"num_predict": 4096, "temperature": 0.6},
-            },
-            timeout=PLANNER_TIMEOUT,
-        )
-        r.raise_for_status()
+        plan, notes = _planner_stream(user, start + PLANNER_THINK_SECONDS, hard_deadline)
     except httpx.TimeoutException:
-        return "The planner took too long. Make a simple plan yourself and continue."
-    except httpx.HTTPError as e:
+        pass  # e.g. the model took too long to load: the fast model writes the plan below
+    except httpx.RequestError as e:
         return f"Planner unavailable ({e}). Make a simple plan yourself and continue."
-    plan = (r.json().get("message", {}).get("content") or "").strip()
-    plan = re.sub(r"<think>.*?</think>", "", plan, flags=re.S).strip()  # older Ollama versions
-    if not plan:
-        return "The planner ran out of time before writing a plan. Make a simple plan yourself and continue."
-    return "PLAN FROM PLANNER (carry it out with your tools):\n" + plan[:MAX_TEXT]
+    except httpx.HTTPStatusError:
+        pass  # e.g. the planner model isn't downloaded: the fast model writes the plan below
+    if plan:
+        return "PLAN FROM PLANNER (carry it out with your tools):\n" + plan[:MAX_TEXT]
+    remaining = PLANNER_TIMEOUT - (time.monotonic() - start)
+    try:
+        plan = _finish_plan(user, notes or "(no notes)", remaining)
+    except httpx.HTTPError:
+        plan = ""
+    if plan:
+        return "PLAN (planner ran out of thinking time; finished by the fast model):\n" + plan[:MAX_TEXT]
+    return "The planner took too long. Make a simple plan yourself and continue."
 
 
 # ------------------------------------------------------------------ stocks ---
