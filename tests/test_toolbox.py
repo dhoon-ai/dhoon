@@ -93,7 +93,7 @@ def test_web_search_empty(tb, monkeypatch):
 
 def test_read_webpage_strips_scripts_and_marks_untrusted(tb, monkeypatch):
     html = b"<html><script>evil()</script><nav>menu</nav><p>Real text</p></html>"
-    monkeypatch.setattr(tb, "_fetch", lambda url: ("text/html; charset=utf-8", html))
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("text/html; charset=utf-8", html))
     out = tb.read_webpage("https://example.com")
     assert out.startswith("[UNTRUSTED WEB CONTENT]")
     assert "Real text" in out and "evil" not in out and "menu" not in out
@@ -109,11 +109,11 @@ def test_read_webpage_reads_online_pdf_and_text(tb, monkeypatch):
     c.drawString(40, 800, "Quarterly report: revenue grew 12 percent.")
     c.showPage()
     c.save()
-    monkeypatch.setattr(tb, "_fetch", lambda url: ("application/pdf", buf.getvalue()))
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("application/pdf", buf.getvalue()))
     assert "revenue grew 12 percent" in tb.read_webpage("https://example.com/r.pdf")
-    monkeypatch.setattr(tb, "_fetch", lambda url: ("text/plain", b"plain words here"))
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("text/plain", b"plain words here"))
     assert "plain words here" in tb.read_webpage("https://example.com/a.txt")
-    monkeypatch.setattr(tb, "_fetch", lambda url: ("image/png", b"\x89PNG"))
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("image/png", b"\x89PNG"))
     assert "not a text page" in tb.read_webpage("https://example.com/a.png")
 
 
@@ -136,7 +136,7 @@ def test_mcp_returns_explanation_instead_of_generic_error(tb, monkeypatch):
     """The model must see WHY a tool failed, not just 'Error executing tool'."""
     import asyncio
 
-    def refuse(url):
+    def refuse(url, headers=None):
         req = tb.httpx.Request("GET", url)
         raise tb.httpx.HTTPStatusError("403", request=req, response=tb.httpx.Response(403, request=req))
 
@@ -321,3 +321,40 @@ def test_document_errors(tb, fake_embed):
     assert "No text found" in tb.search_document("blank.pdf", "x")
     with pytest.raises(ValueError):
         tb.read_document("../outside.pdf")
+
+
+def test_wikipedia_links_use_the_official_api_with_honest_identity(tb, monkeypatch):
+    seen = {}
+
+    def fake_fetch(url, headers=None):
+        seen["url"], seen["headers"] = url, headers
+        body = {"query": {"pages": [{"title": "Rsync", "extract": "rsync is a utility for transferring files."}]}}
+        return "application/json", json.dumps(body).encode()
+
+    monkeypatch.setattr(tb, "_fetch", fake_fetch)
+    out = tb.read_webpage("https://en.m.wikipedia.org/wiki/Rsync#History")
+    assert "rsync is a utility" in out and out.startswith("[UNTRUSTED WEB CONTENT]")
+    assert seen["url"].startswith("https://en.wikipedia.org/w/api.php?") and "titles=Rsync" in seen["url"]
+    assert "local-ai-agent" in seen["headers"]["User-Agent"]
+
+
+def test_wikipedia_missing_article(tb, monkeypatch):
+    body = {"query": {"pages": [{"title": "Nope", "missing": True}]}}
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("application/json", json.dumps(body).encode()))
+    with pytest.raises(ValueError, match="no article"):
+        tb.read_webpage("https://de.wikipedia.org/wiki/Nope")
+
+
+def test_refused_page_is_retried_once_with_honest_identity(tb, monkeypatch):
+    calls = []
+
+    def fetch(url, headers=None):
+        calls.append(headers)
+        if headers is None:
+            req = tb.httpx.Request("GET", url)
+            raise tb.httpx.HTTPStatusError("403", request=req, response=tb.httpx.Response(403, request=req))
+        return "text/html", b"<p>Welcome, honest bot</p>"
+
+    monkeypatch.setattr(tb, "_fetch", fetch)
+    assert "Welcome, honest bot" in tb.read_webpage("https://example.org/page")
+    assert len(calls) == 2 and "local-ai-agent" in calls[1]["User-Agent"]
