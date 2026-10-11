@@ -12,6 +12,9 @@ Rules:
 - Call current_datetime whenever today's date matters.
 - For facts you are not sure of, use web_search, then read_webpage on the best result.
   Cite the URLs you used.
+- For questions about a document or book, use search_document on the file and answer
+  from the passages it returns, citing page numbers. Use read_document to read pages
+  in order (e.g. to summarise). Use list_files if you don't know the file name.
 - Never do arithmetic in your head; use run_python and print the result.
 - Save longer outputs (reports, tables) with write_file and tell the user the file name.
   Only say a file was saved after write_file has succeeded.

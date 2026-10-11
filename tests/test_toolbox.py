@@ -5,6 +5,7 @@ Run:  pip install -r toolbox/requirements.txt -r requirements-dev.txt && pytest
 
 import importlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -191,3 +192,83 @@ def test_ask_planner_empty_and_errors(tb, monkeypatch):
 
     monkeypatch.setattr(tb.httpx, "post", boom)
     assert "Planner unavailable" in tb.ask_planner("x")
+
+
+# ---------------------------------------------------------------- documents ---
+def _bag_of_words(text, dims=64):
+    """Stand-in for the embedding model: hashed word counts (similar text -> similar vector)."""
+    import hashlib
+
+    vec = [0.0] * dims
+    for word in re.findall(r"[a-z]+", text.lower().split(":", 1)[-1]):
+        vec[int(hashlib.md5(word.encode()).hexdigest(), 16) % dims] += 1.0
+    return vec
+
+
+@pytest.fixture()
+def fake_embed(tb, monkeypatch):
+    calls = []
+
+    def fake_post(url, json=None, timeout=None):
+        assert url.endswith("/api/embed") and json["model"] == tb.EMBED_MODEL
+        calls.append(len(json["input"]))
+        return FakePost({"embeddings": [_bag_of_words(t) for t in json["input"]]})
+
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    return calls
+
+
+def _make_pdf(path, pages):
+    from reportlab.pdfgen import canvas
+
+    c = canvas.Canvas(str(path))
+    for text in pages:
+        y = 800
+        for line in text.split("\n"):
+            c.drawString(40, y, line)
+            y -= 14
+        c.showPage()
+    c.save()
+
+
+def test_search_document_pdf_finds_right_page_and_caches(tb, fake_embed):
+    pages = [
+        "Alice was beginning to get very tired of sitting by her sister on the bank.",
+        "The Cheshire Cat grinned and slowly vanished, leaving only the grin behind.",
+        "The Queen of Hearts shouted off with her head at the croquet game.",
+    ]
+    _make_pdf(tb.WORKSPACE / "alice.pdf", pages)
+    out = tb.search_document("alice.pdf", "the cat that vanished with a grin", top_k=1)
+    assert "[page 2" in out and "Cheshire" in out
+    first_calls = len(fake_embed)
+    tb.search_document("alice.pdf", "queen croquet", top_k=1)
+    assert len(fake_embed) == first_calls + 1  # index cached: only the query is embedded
+    assert ".index" not in tb.list_files(".")  # cache folder is hidden
+
+
+def test_read_document_pages_and_total(tb):
+    _make_pdf(tb.WORKSPACE / "book.pdf", ["first page text", "second page text", "third page text"])
+    out = tb.read_document("book.pdf", start_page=2, max_pages=1)
+    assert "3 pages in total" in out and "second page" in out and "third page" not in out
+
+
+def test_search_document_docx_and_txt(tb, fake_embed):
+    import docx
+
+    d = docx.Document()
+    d.add_paragraph("Invoices are due within thirty days of delivery.")
+    d.add_paragraph("Refunds require the original receipt and the product packaging.")
+    d.save(tb.WORKSPACE / "policy.docx")
+    assert "Refunds" in tb.search_document("policy.docx", "what do I need for a refund receipt", top_k=1)
+    (tb.WORKSPACE / "notes.txt").write_text("Backup the server every Sunday night.\n" * 3)
+    assert "Sunday" in tb.search_document("notes.txt", "when is the backup", top_k=1)
+
+
+def test_document_errors(tb, fake_embed):
+    assert "File not found" in tb.search_document("missing.pdf", "x")
+    (tb.WORKSPACE / "photo.png").write_bytes(b"\x89PNG")
+    assert "Unsupported file type" in tb.search_document("photo.png", "x")
+    _make_pdf(tb.WORKSPACE / "blank.pdf", [""])
+    assert "No text found" in tb.search_document("blank.pdf", "x")
+    with pytest.raises(ValueError):
+        tb.read_document("../outside.pdf")

@@ -4,7 +4,7 @@ A **100% self-hosted, open-source AI agent** for an ordinary home computer: a mi
 an old desktop, a home server or a laptop. **No graphics card required.**
 
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
-work with files, run Python in a sandbox, chat with your documents, and analyse
+work with files, run Python in a sandbox, answer questions about your PDFs and documents, and analyse
 stocks**, and you can teach it new skills with a few lines of Python.
 
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
@@ -35,7 +35,7 @@ downloads and market data your agent asks for.
 
 Every machine also gets two small helper models (included in the totals above):
 `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
-`nomic-embed-text` (0.3 GB) for searching your documents.
+`nomic-embed-text` (0.3 GB) for searching your documents (`search_document`).
 
 **Why two kinds of model?** Qwen3 comes in two flavours. *Instruct* models answer
 directly and call tools reliably. *Thinking* models reason more carefully, but they often
@@ -60,6 +60,7 @@ flowchart TD
     T --> F["read / write files<br/>~/agent-workspace"]
     T --> PY["run_python<br/>locked-down sandbox"]
     T --> S["stock tools"]
+    T --> D["search_document / read_document<br/>your PDFs, Word, text files"]
 ```
 
 ## Architecture (components)
@@ -85,6 +86,8 @@ flowchart TD
   │                  (no network, read-only, no caps)   │
   │  stock_price_summary · stock_indicators ·           │
   │  stock_fundamentals                                 │
+  │  search_document · read_document (PDF/Word/text,    │
+  │    embedded with nomic-embed-text in Ollama)        │
   │  ask_planner ──▶ Thinking model in Ollama ──────────┘
   └──────┬──────────────────────────────────────────────┘
          │
