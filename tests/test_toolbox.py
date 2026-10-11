@@ -234,6 +234,7 @@ def test_ask_planner_uses_local_instruct_model_once(tb, monkeypatch):
     out = tb.ask_planner("add numbers", context="none")
     assert len(seen) == 1 and seen[0]["think"] is False and seen[0]["stream"] is False
     assert seen[0]["model"] == tb.PLANNER_MODEL and "thinking" not in tb.PLANNER_MODEL
+    assert "keep_alive" not in seen[0]  # server setting decides (a value here would un-pin the model)
     assert out.startswith("NEXT STEPS FROM PLANNER") and "1. run_python" in out and "<think>" not in out
     assert "call ask_planner again" in out and "progress" in out
     system = seen[0]["messages"][0]["content"]

@@ -38,6 +38,12 @@ MODEL_PLANNER="${MODEL_PLANNER:-$MODEL_MAIN}"
 if [ -z "${CONTEXT_LENGTH:-}" ]; then
   if [ "$RAM_GB" -ge 28 ]; then CONTEXT_LENGTH=32768; else CONTEXT_LENGTH=16384; fi
 fi
+# How long Ollama keeps a model in memory after its last use. -1 = forever (pinned), so the
+# agent never waits for the 19 GB model to load again. Machines with less RAM free it after
+# 30 minutes so other programs get the memory back.
+if [ -z "${KEEP_ALIVE:-}" ]; then
+  if [ "$RAM_GB" -ge 28 ]; then KEEP_ALIVE=-1; else KEEP_ALIVE=30m; fi
+fi
 
 step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
@@ -93,6 +99,8 @@ step_done() {
       [ -f "$SYSTEMD_ROOT/ollama.service.d/override.conf" ] || { STATUS_REASON="Ollama not configured"; return 1; }
       grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (context length)"; return 1; }
+      grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
+        || { STATUS_REASON="Ollama settings out of date (keep-alive)"; return 1; }
       getent group docker | grep -qw "$USER" || { STATUS_REASON="$USER not in the docker group"; return 1; }
       ;;
     2)

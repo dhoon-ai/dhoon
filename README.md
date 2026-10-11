@@ -224,13 +224,17 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 
 ## Design choices for modest hardware
 
+- **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
+  `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait
+  for the 19 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
 - **Model sized to RAM**, preferring a mixture-of-experts model when memory allows:
   it has the knowledge of a large model at the speed of a small one.
 - **Tools do the maths.** Small local models make arithmetic mistakes, so tools return
   computed numbers and the model only reasons about them.
 - **Short tool outputs.** On a CPU, reading long prompts is the slow part, so every tool
   truncates and summarises.
-- **16k context.** A balance between memory for multi-step tasks and speed.
+- **32k context with 28+ GB RAM (16k otherwise).** Big tasks (web pages, stock data, a
+  report) need ~20k tokens; when the chat doesn't fit, the model loses your request.
 - **CPU vs GPU is measured, not guessed.** `scripts/benchmark.sh` compares Ollama's default
   (GPU if supported) with CPU only and keeps the faster one. On a mini PC with Intel UHD
   integrated graphics, CPU only was about 2× faster at both reading and writing.

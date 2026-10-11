@@ -18,6 +18,12 @@ case "$MODEL_MAIN" in
   qwen3*) warn "$MODEL_MAIN is a Qwen3 thinking model; it often fails to call tools. Use an instruct-2507 model (docs/GUIDE.md)";;
 esac
 
+loaded=$(ollama ps 2>/dev/null | awk 'NR>1{u="?"; if ($0 ~ /Forever/) u="Forever"; else if (match($0, /[^ ]+ [^ ]+ from now/)) u=substr($0, RSTART, RLENGTH); print $1" (until: "u")"}' \
+  | paste -sd ',' - | sed 's/,/, /g')
+echo "         loaded in memory now: ${loaded:-none}   (keep-alive setting: $KEEP_ALIVE)"
+if [ -z "$loaded" ] && [ "$KEEP_ALIVE" = "-1" ]; then
+  warn "main model not loaded  ->  bash scripts/preload_model.sh"
+fi
 if [ -f /etc/systemd/system/ollama.service.d/cpu-only.conf ]; then
   echo "         Ollama mode: CPU only (set by scripts/benchmark.sh; undo with --reset)"
 else

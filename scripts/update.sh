@@ -32,8 +32,11 @@ render_librechat_config
 step "Updating Ollama"
 curl -fsSL https://ollama.com/install.sh | sh
 
-grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
-  || bash "$KIT/scripts/ollama_settings.sh"
+if ! grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
+   || ! grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
+   || [ ! -f /etc/systemd/system/ai-model-preload.service ]; then
+  bash "$KIT/scripts/ollama_settings.sh"
+fi
 
 step "Making sure the configured models are downloaded"
 for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama pull "$m"; done

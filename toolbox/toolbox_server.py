@@ -604,7 +604,6 @@ def _plan(user: str) -> str:
             "messages": [{"role": "system", "content": _planner_system()}, {"role": "user", "content": user}],
             "think": False,
             "stream": False,
-            "keep_alive": "30m",
             "options": {"num_predict": 1024, "temperature": 0.3},
         },
         timeout=httpx.Timeout(PLANNER_TIMEOUT, connect=10),

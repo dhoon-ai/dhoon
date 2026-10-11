@@ -53,8 +53,8 @@ esac
 
 # ---------------------------------------------------------------- level 1: services ---
 step "Stopping and removing services"
-run sudo systemctl disable --now ai-toolbox
-run sudo rm -f /etc/systemd/system/ai-toolbox.service
+run sudo systemctl disable --now ai-toolbox ai-model-preload
+run sudo rm -f /etc/systemd/system/ai-toolbox.service /etc/systemd/system/ai-model-preload.service
 run sudo systemctl daemon-reload
 if command -v docker >/dev/null 2>&1; then
   run docker rm -f searxng

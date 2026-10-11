@@ -30,7 +30,9 @@ def half_installed(tmp_path):
         f.chmod(0o755)
     root = tmp_path / "systemd"
     (root / "ollama.service.d").mkdir(parents=True)
-    (root / "ollama.service.d" / "override.conf").write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\n')
+    (root / "ollama.service.d" / "override.conf").write_text(
+        '[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\nEnvironment="OLLAMA_KEEP_ALIVE=-1"\n'
+    )
     return {
         **os.environ,
         **MODELS,
@@ -39,6 +41,7 @@ def half_installed(tmp_path):
         "RUNTIME_DIR": str(tmp_path / "runtime"),
         "USER": "tester",
         "CONTEXT_LENGTH": "32768",
+        "KEEP_ALIVE": "-1",
     }
 
 
@@ -99,6 +102,13 @@ def test_failed_step_stops_with_manual_instructions(half_installed, tmp_path):
 
 def test_old_context_length_means_step_1_is_redone(half_installed, tmp_path):
     conf = Path(half_installed["SYSTEMD_ROOT"]) / "ollama.service.d" / "override.conf"
-    conf.write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=16384"\n')
+    conf.write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=16384"\nEnvironment="OLLAMA_KEEP_ALIVE=-1"\n')
     r = subprocess.run(["bash", str(REPO / "scripts/status.sh")], env=half_installed, capture_output=True, text=True)
     assert "context length" in r.stdout and "continues from step 1" in r.stdout
+
+
+def test_old_keep_alive_means_step_1_is_redone(half_installed):
+    conf = Path(half_installed["SYSTEMD_ROOT"]) / "ollama.service.d" / "override.conf"
+    conf.write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\nEnvironment="OLLAMA_KEEP_ALIVE=30m"\n')
+    r = subprocess.run(["bash", str(REPO / "scripts/status.sh")], env=half_installed, capture_output=True, text=True)
+    assert "keep-alive" in r.stdout and "continues from step 1" in r.stdout

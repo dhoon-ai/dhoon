@@ -702,6 +702,8 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | Every tool call the agent made | `less runtime/logs/toolbox.log` |
 | See chat website errors | `cd runtime/LibreChat && docker compose logs api --tail 50` |
 | List models | `ollama list` |
+| Which models are in memory now | `ollama ps` (UNTIL "Forever" = pinned) |
+| Load the main model now | `bash scripts/preload_model.sh` |
 | Remove the services (keeps data) | `bash scripts/uninstall.sh` |
 | Remove everything | see "Uninstall and start over" below |
 
@@ -726,6 +728,15 @@ To watch a task live, run `bash scripts/logs.sh --follow` in a second terminal a
 again. Where each log is: tool calls `runtime/logs/toolbox.log`; the model
 `journalctl -u ollama`; the chat app `docker logs LibreChat` and
 `runtime/LibreChat/logs/`; web search `docker logs searxng`.
+
+**The model keeps being unloaded from memory** (the first answer after a break is slow):
+Ollama unloads models it hasn't used for a while. With 28+ GB RAM the main model is now
+pinned: `OLLAMA_KEEP_ALIVE=-1` keeps it loaded, and the `ai-model-preload` service loads
+it again whenever Ollama starts (e.g. after a reboot). Apply it with
+`bash scripts/ollama_settings.sh`, then check with `ollama ps`: UNTIL should say
+**Forever**. On a smaller machine, or to change it, set `KEEP_ALIVE` in
+`config/models.env` (e.g. `-1` or `2h`) and run the script again. A pinned 30B model
+uses about 20 GB of RAM all the time; free it with `ollama stop <model>`.
 
 **`run_python` says "No module named yfinance" (or another download fails)**: by design
 the Python sandbox has no internet. The agent should first save the data with a tool
