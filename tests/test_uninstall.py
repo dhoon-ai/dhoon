@@ -31,6 +31,7 @@ def env(tmp_path):
         **os.environ,
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "WORKSPACE_DIR": str(workspace),
+        "RUNTIME_DIR": str(tmp_path / "runtime"),
         "MODEL_EMBED": "nomic-embed-text:latest",
         "_WS": str(workspace),
     }

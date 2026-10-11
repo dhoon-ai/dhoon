@@ -34,7 +34,22 @@ asks for your login password when it needs `sudo`, and at the end for an **email
 password for the web app** (that account is created for you). When it finishes, open
 **http://localhost:3080**, choose **Agents → Assistant**, and jump to **Step 9**.
 
-If anything fails, fix the problem it shows and run the same command again: it resumes.
+If anything fails, fix the problem it shows and run the same command again: it checks
+each step first and skips the ones already done.
+
+**Already started installing by hand?** You can switch to the installer at any point.
+See what's done, then let it continue:
+
+```bash
+cd ~/ai-kit
+git pull                 # get the latest scripts
+bash scripts/status.sh   # shows [OK] / [TODO] for each step, changes nothing
+bash install.sh          # skips the [OK] steps and continues from the first [TODO]
+```
+
+Don't run it while one of the scripts is still running in another window (for example a
+model download): wait for it to finish, or stop it with Ctrl+C. Downloads resume where
+they left off. `FORCE=1 bash install.sh` re-runs every step.
 Step 1 (optional hardware tweaks, such as a second disk for models) is not done
 automatically; do it first if you need it.
 
@@ -599,6 +614,8 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | What | Command |
 |---|---|
 | Check everything | `bash scripts/check.sh` |
+| Which install steps are done | `bash scripts/status.sh` |
+| Continue / repair the install | `bash install.sh` |
 | Update everything | `bash scripts/update.sh` |
 | Restart the chat website | `cd runtime/LibreChat && docker compose restart` |
 | Restart the toolbox | `sudo systemctl restart ai-toolbox` |

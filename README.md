@@ -18,7 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/in
 
 It runs the whole setup, including creating the agent, and asks only for your password
 and a login for the web app. Then open `http://localhost:3080`. Re-run the same command
-to resume or update.
+to resume: it checks each step (`scripts/status.sh`) and skips what's already done, so it
+also continues an install you started by hand.
 
 > **New to this?** Follow **[docs/GUIDE.md](docs/GUIDE.md)**. It's written for
 > beginners, with copy-paste commands for every step.
@@ -198,7 +199,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
-scripts/        install steps 00 → 06, check, benchmark, update, uninstall
+scripts/        install steps 00 → 06, status, check, benchmark, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates

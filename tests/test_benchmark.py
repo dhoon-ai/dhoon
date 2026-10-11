@@ -65,6 +65,7 @@ def env(tmp_path):
         "SYSTEMD_DIR": str(dropin_dir),
         "NO_RESTART": "1",
         "MODEL_FAST": MODEL,
+        "RUNTIME_DIR": str(tmp_path / "runtime"),
         "_DROPIN": str(dropin_dir / "cpu-only.conf"),
     }
 

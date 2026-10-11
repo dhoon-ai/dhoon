@@ -5,7 +5,8 @@
 #
 # It downloads the project to ~/ai-kit and runs scripts 00-06 in order: hardware check,
 # Docker + Ollama, models, private search, toolbox, LibreChat, and the Assistant agent.
-# Safe to run again: finished steps are skipped or refreshed, so it also resumes.
+# Safe to run again: it checks each step and skips the ones already done, so it resumes
+# after a failure and continues a manual install (see scripts/status.sh).
 #
 # Options (as environment variables in front of `bash`):
 #   INSTALL_DIR=~/ai-kit      where to put the project
@@ -13,6 +14,7 @@
 #   LIBRECHAT_EMAIL / LIBRECHAT_PASSWORD   account for the web app (otherwise asked)
 #   SKIP_MODELS=1             skip downloading models (if you manage them yourself)
 #   INSTALL_DRY_RUN=1         only print the steps
+#   FORCE=1                   re-run every step even if it looks done
 #
 # Everything is wrapped in main(), so bash reads the whole file before running anything;
 # that keeps `curl | bash` safe even if the download is cut off.
@@ -53,34 +55,49 @@ main() {
   fi
   [ -n "$dry" ] || cd "$dir"
 
+  # Load the per-step status checks (also used by scripts/status.sh).
+  have_status=false
+  if [ -f "$dir/scripts/lib.sh" ]; then
+    # shellcheck source=scripts/lib.sh
+    source "$dir/scripts/lib.sh"
+    have_status=true
+  fi
+  # do_step N "title" command...: skip if step N is already done (unless FORCE=1).
+  do_step() {
+    local n="$1" title="$2"; shift 2
+    if [ -z "${FORCE:-}" ] && $have_status && step_done "$n"; then
+      say "$((n + 2))/8  $title - already done, skipping"
+      return 0
+    fi
+    say "$((n + 2))/8  $title"
+    $have_status && [ -n "$STATUS_REASON" ] && echo "  (reason: $STATUS_REASON)"
+    "$@"
+  }
+
+  if $have_status && [ -z "$dry" ]; then bash scripts/status.sh || true; fi
+
   say "2/8  Checking the hardware (changes nothing)"
   run bash scripts/00_check_hardware.sh
 
-  say "3/8  Installing Docker and Ollama"
-  run bash scripts/01_install_base.sh
+  do_step 1 "Installing Docker and Ollama" run bash scripts/01_install_base.sh
 
   if [ -n "${SKIP_MODELS:-}" ]; then
     say "4/8  Skipping model downloads (SKIP_MODELS is set)"
   else
-    say "4/8  Downloading the AI models (the long part)"
-    as_docker scripts/02_download_models.sh
+    do_step 2 "Downloading the AI models (the long part)" as_docker scripts/02_download_models.sh
   fi
 
-  say "5/8  Starting the private search engine"
-  as_docker scripts/03_searxng.sh
+  do_step 3 "Starting the private search engine" as_docker scripts/03_searxng.sh
+  do_step 4 "Starting the agent toolbox" as_docker scripts/04_toolbox.sh
+  do_step 5 "Installing the LibreChat web app" as_docker scripts/05_librechat.sh
 
-  say "6/8  Starting the agent toolbox"
-  as_docker scripts/04_toolbox.sh
-
-  say "7/8  Installing the LibreChat web app"
-  as_docker scripts/05_librechat.sh
-
-  say "8/8  Creating the Assistant agent"
-  if [ -n "$dry" ]; then echo "  [dry-run] bash scripts/06_create_agent.sh"
-  else bash scripts/06_create_agent.sh </dev/tty || {
-    echo "Agent creation failed. Fix the problem above, then run:  cd $dir && bash scripts/06_create_agent.sh"
-    echo "(or create it by hand: docs/GUIDE.md step 8)"; }
-  fi
+  create_agent() {
+    if [ -n "$dry" ]; then echo "  [dry-run] bash scripts/06_create_agent.sh"; return; fi
+    bash scripts/06_create_agent.sh </dev/tty || {
+      echo "Agent creation failed. Fix the problem above, then run:  cd $dir && bash scripts/06_create_agent.sh"
+      echo "(or create it by hand: docs/GUIDE.md step 8)"; }
+  }
+  do_step 6 "Creating the Assistant agent" create_agent
 
   say "Finished"
   [ -n "$dry" ] || bash scripts/check.sh || true

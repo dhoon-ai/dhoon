@@ -180,6 +180,9 @@ def main() -> int:
         print(f"  WARNING: {len(missing)} toolbox tools were not accepted: {', '.join(missing)}")
         print("  Is the toolbox running? Check: bash scripts/check.sh, then re-run this script.")
         return 1
+    marker = Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-created"  # read by status.sh
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(args.model)
     print(f"Open {args.url}, choose Agents -> {AGENT_NAME}, and start chatting.")
     return 0
 

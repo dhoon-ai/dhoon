@@ -5,7 +5,7 @@
 # Repo folder = the folder above scripts/, wherever you cloned it.
 KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Generated files and downloaded apps live here (ignored by git).
-RUNTIME="$KIT/runtime"
+RUNTIME="${RUNTIME_DIR:-$KIT/runtime}"
 LIBRECHAT_DIR="$RUNTIME/LibreChat"
 SEARXNG_DIR="$RUNTIME/searxng"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
@@ -54,4 +54,61 @@ render_librechat_config() {
   sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
     "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"
   cp "$KIT/config/librechat/docker-compose.override.yml" "$LIBRECHAT_DIR/docker-compose.override.yml"
+}
+
+# ---------------------------------------------------------------- install status ---
+# step_done N  -> exit 0 if install step N (1-6) is already complete, else 1.
+# Each check looks at the real system, so it works whether the step was done by the
+# installer, by hand, or by an older version of these scripts. STATUS_REASON says why not.
+STATUS_REASON=""
+SYSTEMD_ROOT="${SYSTEMD_ROOT:-/etc/systemd/system}"
+STEP_NAMES=("" "Docker + Ollama" "AI models" "Private search (SearXNG)" "Agent toolbox" "LibreChat web app" "Assistant agent")
+
+_model_present() {  # model name as in `ollama list` (with or without :latest)
+  ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qxE "$(printf '%s' "$1" | sed 's/[.[\*^$]/\\&/g')(:latest)?"
+}
+
+step_done() {
+  STATUS_REASON=""
+  case "$1" in
+    1)
+      command -v docker >/dev/null 2>&1 || { STATUS_REASON="Docker not installed"; return 1; }
+      command -v ollama >/dev/null 2>&1 || { STATUS_REASON="Ollama not installed"; return 1; }
+      [ -f "$SYSTEMD_ROOT/ollama.service.d/override.conf" ] || { STATUS_REASON="Ollama not configured"; return 1; }
+      getent group docker | grep -qw "$USER" || { STATUS_REASON="$USER not in the docker group"; return 1; }
+      ;;
+    2)
+      curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || { STATUS_REASON="Ollama not running"; return 1; }
+      local m
+      for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER"; do
+        _model_present "$m" || { STATUS_REASON="model $m not downloaded"; return 1; }
+      done
+      ;;
+    3)
+      curl -fs "http://127.0.0.1:8888/search?q=test&format=json" >/dev/null 2>&1 \
+        || { STATUS_REASON="SearXNG not answering"; return 1; }
+      ;;
+    4)
+      systemctl is-active --quiet ai-toolbox 2>/dev/null || { STATUS_REASON="toolbox service not running"; return 1; }
+      grep -q "^ExecStart=.*$KIT/toolbox/toolbox_server.py" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || { STATUS_REASON="toolbox service points to another folder"; return 1; }
+      grep -q "PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || { STATUS_REASON="toolbox settings out of date"; return 1; }
+      "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \
+        || { STATUS_REASON="toolbox Python packages missing or outdated"; return 1; }
+      ;;
+    5)
+      curl -fs http://localhost:3080 >/dev/null 2>&1 || { STATUS_REASON="LibreChat not answering"; return 1; }
+      [ -f "$LIBRECHAT_DIR/librechat.yaml" ] || { STATUS_REASON="LibreChat not installed in $LIBRECHAT_DIR"; return 1; }
+      if ! grep -q "allowedAddresses" "$LIBRECHAT_DIR/librechat.yaml" || ! grep -q "fileConfig" "$LIBRECHAT_DIR/librechat.yaml"; then
+        STATUS_REASON="LibreChat settings out of date"; return 1
+      fi
+      ;;
+    6)
+      [ "$(cat "$RUNTIME/.agent-created" 2>/dev/null)" = "$MODEL_MAIN" ] \
+        || { STATUS_REASON="agent not created yet (or uses another model)"; return 1; }
+      ;;
+    *) return 1 ;;
+  esac
+  return 0
 }

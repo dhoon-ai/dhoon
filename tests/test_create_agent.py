@@ -79,10 +79,13 @@ class FakeLibreChat:
         self.server = HTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_port}"
+        import tempfile
+
+        self.runtime = tempfile.mkdtemp()
 
 
 def run(fake, *extra, email="me@example.com", password="secret123"):
-    env = {**os.environ, "LIBRECHAT_EMAIL": email, "LIBRECHAT_PASSWORD": password}
+    env = {**os.environ, "LIBRECHAT_EMAIL": email, "LIBRECHAT_PASSWORD": password, "RUNTIME_DIR": fake.runtime}
     return subprocess.run(
         [sys.executable, str(REPO / "scripts/create_agent.py"), "--url", fake.url, "--model", "m:instruct", *extra],
         env=env,
@@ -109,6 +112,7 @@ def test_existing_account_creates_agent_then_updates_on_rerun():
     r = run(fake)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Created the 'Assistant' agent" in r.stdout and len(fake.agents) == 1
+    assert Path(fake.runtime, ".agent-created").read_text() == "m:instruct"
     r = run(fake)
     assert r.returncode == 0 and "Updated the 'Assistant' agent" in r.stdout
     assert len(fake.agents) == 1  # no duplicate
