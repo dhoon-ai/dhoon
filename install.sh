@@ -14,6 +14,7 @@
 #   REPO_URL=...              git URL to install from (e.g. your fork)
 #   LIBRECHAT_EMAIL / LIBRECHAT_PASSWORD   account for the web app (otherwise asked)
 #   SKIP_MODELS=1             skip downloading models (if you manage them yourself)
+#   RUN_BENCHMARK=yes|no      answer the speed-test question in advance
 #   INSTALL_DRY_RUN=1         only print the steps
 #   FORCE=1                   re-run every step even if it looks done
 #
@@ -121,9 +122,28 @@ EOT
 
   create_agent() {
     if [ -n "$dry" ]; then echo "  [dry-run] bash scripts/06_create_agent.sh"; return; fi
-    bash scripts/06_create_agent.sh </dev/tty
+    as_docker scripts/06_create_agent.sh </dev/tty
   }
   do_step 6 "Creating the Assistant agent" create_agent
+
+  # Optional speed test: Ollama's default (GPU if supported) vs CPU only; keeps the faster.
+  say "Optional: speed test (about 5 minutes)"
+  echo "  Checks whether running the AI on the CPU only is faster on this PC than Ollama's"
+  echo "  default (e.g. on mini PCs with built-in graphics), and switches if it is."
+  local answer="${RUN_BENCHMARK:-}"
+  if [ -n "$dry" ]; then
+    echo "  [dry-run] ask, then: bash scripts/benchmark.sh"
+  else
+    if [ -z "$answer" ]; then
+      if [ -r /dev/tty ]; then read -r -p "  Run the speed test now? [y/N] " answer </dev/tty || answer=""
+      else answer="no"; fi
+    fi
+    case "$answer" in
+      y|Y|yes|YES|1)
+        bash scripts/benchmark.sh || echo "  The speed test did not finish; run it later: bash $dir/scripts/benchmark.sh" ;;
+      *) echo "  Skipped. Run it any time: bash $dir/scripts/benchmark.sh" ;;
+    esac
+  fi
 
   say "Finished"
   [ -n "$dry" ] || bash scripts/check.sh || true
@@ -132,7 +152,6 @@ EOT
   echo
   echo "Open the web app:  http://localhost:3080   (other devices at home: http://${ip:-<this-pc>}:3080)"
   echo "Choose  Agents -> Assistant  and try one of the suggested starters."
-  echo "Optional: bash $dir/scripts/benchmark.sh  (checks whether CPU-only is faster on this PC)"
   echo "Log out and back in once, so 'docker' works in new terminals without sudo."
   echo "Guide: $dir/docs/GUIDE.md"
 }

@@ -30,8 +30,10 @@ curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/in
 ```
 
 It does Steps 0 and 2–8 below automatically (about 30–90 minutes, mostly downloads). It
-asks for your login password when it needs `sudo`, and at the end for an **email and
-password for the web app** (that account is created for you). When it finishes, open
+asks for your login password when it needs `sudo`, at the end for an **email and
+password for the web app** (that account is created for you), and finally whether to run
+the optional **speed test** (`scripts/benchmark.sh`, about 5 minutes), which switches
+Ollama to CPU only if that turns out faster on your PC. When it finishes, open
 **http://localhost:3080**, choose **Agents → Assistant**, and jump to **Step 9**.
 
 **If a step fails, the installer stops** instead of carrying on with a half-working setup.
@@ -311,7 +313,7 @@ bash scripts/06_create_agent.sh
 ```
 
 It asks for your web-app email and password (and offers to create the account if it
-doesn't exist yet), then creates the **Assistant** agent with the right model, all toolbox
+doesn't exist yet), lifts any LibreChat sign-in ban left by an earlier attempt, then creates the **Assistant** agent with the right model, all toolbox
 tools, File Search, the instructions below and a few starter prompts. Running it again
 updates the agent instead of making a second one. Reload the web page and pick
 **Agents → Assistant**.

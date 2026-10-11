@@ -32,6 +32,7 @@ def test_installer_runs_all_steps_in_order(tmp_path):
         "04_toolbox.sh",
         "05_librechat.sh",
         "06_create_agent.sh",
+        "bash scripts/benchmark.sh",
     ]
     positions = [r.stdout.index(s) for s in steps]
     assert positions == sorted(positions)
