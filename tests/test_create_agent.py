@@ -136,7 +136,7 @@ def test_payload_has_every_toolbox_tool_file_search_and_instructions():
     for t in tools:
         assert f"{t}_mcp_toolbox" in payload["tools"]
     assert "file_search" in payload["tools"]
-    assert payload["provider"] == "Ollama" and payload["model"] == "m:instruct"
+    assert payload["provider"] == "ollama" and payload["model"] == "m:instruct"  # LibreChat lowercases "Ollama"
     assert "ask_planner" in payload["instructions"]
 
 

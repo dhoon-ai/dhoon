@@ -28,7 +28,10 @@ from pathlib import Path
 KIT = Path(__file__).resolve().parents[1]
 AGENT_NAME = "Assistant"
 AVATAR = KIT / "assets" / "assistant-avatar.png"
-PROVIDER = "Ollama"  # the custom endpoint name in config/librechat/librechat.yaml
+# The custom endpoint is named "Ollama" in librechat.yaml, but LibreChat normalises that name
+# to lowercase "ollama" for its model lists, so agents must use the lowercase id. Using
+# "Ollama" makes chats fail with "Models for Ollama could not be loaded".
+PROVIDER = "ollama"
 MCP_SERVER = "toolbox"
 MCP_DELIMITER = "_mcp_"  # LibreChat names MCP tools "<tool>_mcp_<server>"
 # LibreChat rejects requests whose User-Agent isn't a recognised browser (and counts each one
