@@ -53,8 +53,8 @@ Every machine also gets two small helper models (included in the totals above):
 **Only *Instruct* models.** Qwen3 also comes as *Thinking* models, but on a CPU their long
 hidden reasoning is slow, and they often plan a tool call in their thoughts and then stop
 without making it. So everything here (chatting, running tools and planning big tasks)
-uses the fast **Instruct** model. For really hard tasks, the planner can look up on
-Google how such a task is usually done (see below), which helps more than slow thinking.
+uses the fast **Instruct** model. For really hard tasks, the planner can look up on the
+web how such a task is usually done (see below), which helps more than slow thinking.
 
 The 30B models are *mixture-of-experts*: 30B parameters, but only ~3B are used per token,
 so they run at usable speed on a CPU. Override any choice in `config/models.env`
@@ -68,7 +68,7 @@ flowchart TD
     LC --> A["Assistant agent<br/>Instruct model<br/>answers and runs tools"]
     A -->|"simple task: calls tools directly"| T["toolbox"]
     A -->|"big task: ask_planner"| P["Planner<br/>same Instruct model<br/>next steps, no tools"]
-    P -.->|"hard task only: generic how-to question,<br/>personal details removed"| G["Google<br/>via your SearXNG"]
+    P -.->|"hard task only: generic how-to question,<br/>personal details removed"| G["Web search<br/>via your SearXNG"]
     P -->|"checklist + next steps"| A
     T --> W["web_search + read_webpage<br/>via SearXNG"]
     T --> F["read / write files<br/>~/agent-workspace"]
@@ -98,11 +98,11 @@ same local Instruct model:
 Anything that can change (prices, versions, news, laws, market data) is checked with
 tools, not taken from the model's memory.
 
-### Really hard tasks: ask Google how to approach it
+### Really hard tasks: research how to approach it
 
 For a really hard or unfamiliar task (or when you say *"research how to do this first"*),
-round 1 of `ask_planner` first searches **Google** (through your own SearXNG) for how
-such a task is usually done, and plans with those ideas. Privacy:
+round 1 of `ask_planner` first searches the web, through your own SearXNG, for how such a
+task is usually done, and plans with those ideas. Privacy:
 
 - Only a short, **generic** how-to question is sent, written by the Assistant, e.g.
   *"how to compare open source backup tools for linux"*. Your request, files and chat
@@ -111,20 +111,42 @@ such a task is usually done, and plans with those ideas. Privacy:
   computer: e-mail addresses, links, IP addresses, file paths and names, money amounts,
   phone and account numbers, and your computer's user and host names.
 - The Assistant tells you the exact query that was searched.
-- Google sees that question and your internet address, like any search you make, but no
-  cookies, account or chat history. Use another engine with `RESEARCH_ENGINES` in
-  `scripts/04_toolbox.sh` (e.g. `duckduckgo`).
+- The search engines see that question and your internet address, like any search you
+  make, but no cookies, account or chat history.
+
+**Choosing the search engines.** By default it uses the engines your SearXNG normally
+uses. To choose your own, add a line to `config/models.env`, then run
+`bash scripts/04_toolbox.sh`:
+
+```bash
+RESEARCH_ENGINES="startpage,duckduckgo,brave"
+```
+
+All of these are free and need no account:
+
+| Engine | Name | Good for |
+|---|---|---|
+| Startpage | `startpage` | Google's results without Google seeing you directly |
+| DuckDuckGo | `duckduckgo` | Private, no tracking |
+| Brave Search | `brave` | Own index, private |
+| Mojeek | `mojeek` | Small independent index, no tracking |
+| Google / Bing | `google`, `bing` | Biggest indexes (Google sometimes blocks automated searches) |
+| Wikipedia | `wikipedia` | Background on a topic |
+| Stack Overflow / Ask Ubuntu | `stackoverflow`, `askubuntu` | Technical how-to tasks |
+
+Use several: their results are merged, and if one blocks you the others still answer.
+If the chosen engines find nothing, the toolbox retries once with all engines.
 
 ```mermaid
 sequenceDiagram
     participant You
     participant A as Assistant (Instruct model)
     participant P as ask_planner (same model)
-    participant G as Google via SearXNG
+    participant G as Web search via SearXNG
     participant T as Toolbox tools
     You->>A: big request
     Note over A: knows today's date, decides it needs a plan
-    A->>P: ask_planner(task, google_query only if really hard)
+    A->>P: ask_planner(task, research_query only if really hard)
     opt really hard task
         P->>G: generic how-to question, personal details removed
         G-->>P: how others approach it

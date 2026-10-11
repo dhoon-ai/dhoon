@@ -12,3 +12,15 @@ search:
   formats:
     - html
     - json                # the agent needs JSON results
+
+# Make sure the free, account-free engines listed in the guide can be chosen
+# (e.g. RESEARCH_ENGINES="startpage,duckduckgo,brave" in config/models.env).
+engines:
+  - name: startpage
+    disabled: false
+  - name: duckduckgo
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: mojeek
+    disabled: false

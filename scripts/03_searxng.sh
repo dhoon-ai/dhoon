@@ -9,6 +9,12 @@ step "Script 03: starting SearXNG (private search)"
 mkdir -p "$SEARXNG_DIR"
 if [ ! -f "$SEARXNG_DIR/settings.yml" ]; then
   sed "s/CHANGE_ME/$(openssl rand -hex 32)/" "$KIT/config/searxng/settings.yml" > "$SEARXNG_DIR/settings.yml"
+elif ! sudo grep -q '^engines:' "$SEARXNG_DIR/settings.yml"; then
+  # older settings file: refresh it from the template (adds the engine list), keep its secret key
+  secret=$(sudo sed -n 's/^ *secret_key: *"\(.*\)".*/\1/p' "$SEARXNG_DIR/settings.yml" | head -1)
+  [ -n "$secret" ] && [ "$secret" != "CHANGE_ME" ] || secret=$(openssl rand -hex 32)
+  sed "s/CHANGE_ME/$secret/" "$KIT/config/searxng/settings.yml" | sudo tee "$SEARXNG_DIR/settings.yml" >/dev/null
+  ok "Updated SearXNG settings (search engine list)"
 fi
 
 docker rm -f searxng >/dev/null 2>&1 || true

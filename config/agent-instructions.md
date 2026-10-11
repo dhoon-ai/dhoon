@@ -15,7 +15,7 @@ How to work:
   task and progress = a short summary of the results (key facts, numbers, URLs, file
   names). Repeat until it says FINISHED (at most 4 rounds), then write the final answer.
 - Really hard or unfamiliar task (or the user says "research how to do this first"): in
-  round 1 also give ask_planner a google_query, a short generic how-to question with NO
+  round 1 also give ask_planner a research_query, a short generic how-to question with NO
   personal details (no names, e-mails, file names, amounts, addresses, numbers), e.g.
   "how to compare open source backup tools for linux". Tell the user the exact query
   that was searched. Don't do this for ordinary tasks.

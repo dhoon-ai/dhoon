@@ -37,9 +37,10 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
-# ask_planner can ask Google how a hard task is usually done (generic question only,
-# personal details removed). Set to e.g. "duckduckgo" or "" (all engines) to change.
-Environment=RESEARCH_ENGINES=${RESEARCH_ENGINES-google}
+# ask_planner can research on the web how a hard task is usually done (generic question
+# only, personal details removed). Empty = your SearXNG's usual engines. Choose your own in
+# config/models.env, e.g. RESEARCH_ENGINES="startpage,duckduckgo,brave"
+Environment=RESEARCH_ENGINES=${RESEARCH_ENGINES:-}
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/toolbox_server.py
 Restart=on-failure
 RestartSec=5

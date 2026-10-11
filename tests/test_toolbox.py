@@ -252,7 +252,7 @@ def test_ask_planner_second_round_sends_progress_and_detects_finished(tb, monkey
 
     monkeypatch.setattr(tb.httpx, "post", fake_post)
     monkeypatch.setattr(tb.httpx, "get", lambda *a, **k: pytest.fail("research is for round 1 only"))
-    out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati", google_query="how to x")
+    out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati", research_query="how to x")
     assert "Task: compare backup tools" in seen["user"] and "found restic, borg" in seen["user"]
     assert "ready to answer" in out and "FINISHED: a table" in out and "write the final answer" in out
     assert "show the user the Checklist" in out  # final progress line before the answer
@@ -294,7 +294,7 @@ def test_redact_keeps_generic_questions_and_removes_user_name(tb, monkeypatch):
     assert len(tb._redact("word " * 100)) <= 150
 
 
-def test_ask_planner_google_research_is_redacted_and_reported(tb, monkeypatch):
+def test_ask_planner_web_research_is_redacted_and_reported(tb, monkeypatch):
     searched, planned = [], {}
 
     def fake_get(url, params=None, timeout=None):
@@ -307,11 +307,12 @@ def test_ask_planner_google_research_is_redacted_and_reported(tb, monkeypatch):
 
     monkeypatch.setattr(tb.httpx, "get", fake_get)
     monkeypatch.setattr(tb.httpx, "post", fake_post)
-    out = tb.ask_planner("back up my files", google_query="how to back up /home/rahul for me@x.com")
-    assert len(searched) == 1 and searched[0]["engines"] == "google"
+    monkeypatch.setattr(tb, "RESEARCH_ENGINES", "startpage,duckduckgo")
+    out = tb.ask_planner("back up my files", research_query="how to back up /home/rahul for me@x.com")
+    assert len(searched) == 1 and searched[0]["engines"] == "startpage,duckduckgo"
     assert "/home/rahul" not in searched[0]["q"] and "me@x.com" not in searched[0]["q"]
     assert "Step A" in planned["user"] and "untrusted" in planned["user"]
-    assert out.startswith('Searched Google for: "how to back up [path] for [email]"')
+    assert out.startswith('Searched the web for: "how to back up [path] for [email]"')
     assert "NEXT STEPS FROM PLANNER" in out
 
 
@@ -324,8 +325,9 @@ def test_research_falls_back_to_all_engines_then_plans_without(tb, monkeypatch):
 
     monkeypatch.setattr(tb.httpx, "get", fake_get)
     monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: _ollama("1. web_search: x"))
-    out = tb.ask_planner("task", google_query="how to plan a garden")
-    assert [p.get("engines") for p in searched] == ["google", None]
+    monkeypatch.setattr(tb, "RESEARCH_ENGINES", "mojeek")
+    out = tb.ask_planner("task", research_query="how to plan a garden")
+    assert [p.get("engines") for p in searched] == ["mojeek", None]
     assert "found nothing useful" in out and "1. web_search" in out
 
 
@@ -444,3 +446,16 @@ def test_refused_page_is_retried_once_with_honest_identity(tb, monkeypatch):
     monkeypatch.setattr(tb, "_fetch", fetch)
     assert "Welcome, honest bot" in tb.read_webpage("https://example.org/page")
     assert len(calls) == 2 and "local-ai-agent" in calls[1]["User-Agent"]
+
+
+def test_research_default_uses_searxng_usual_engines_once(tb, monkeypatch):
+    searched = []
+
+    def fake_get(url, params=None, timeout=None):
+        searched.append(params)
+        return FakeResponse(data={"results": []})
+
+    monkeypatch.setattr(tb, "RESEARCH_ENGINES", "")
+    monkeypatch.setattr(tb.httpx, "get", fake_get)
+    tb._research("how to plan a garden")
+    assert len(searched) == 1 and "engines" not in searched[0]  # no engine filter, no duplicate retry

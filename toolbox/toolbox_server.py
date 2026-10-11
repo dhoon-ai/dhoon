@@ -11,8 +11,8 @@ lets the AI model call these tools:
   list_files / read_file / write_file   work inside ONE folder (the workspace)
   run_python            run Python code inside a locked-down Docker container
   stock_price_summary / stock_indicators / stock_fundamentals   market analysis
-  ask_planner           plan a big task in short rounds (optionally asks Google how to
-                        approach it first, with personal details removed)
+  ask_planner           plan a big task in short rounds (optionally researches on the web
+                        how to approach it first, with personal details removed)
   search_document / read_document   question-answering over PDFs, Word and text files
 
 To add a new skill later: write a Python function below, put @mcp.tool() above
@@ -51,7 +51,9 @@ PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-instruct-2507-q4_
 PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "300"))  # seconds (LibreChat waits 600)
 # For hard tasks ask_planner can first ask a search engine how such a task is usually done.
 # Only a short, generic question is sent (personal details are removed, see _redact).
-RESEARCH_ENGINES = os.environ.get("RESEARCH_ENGINES", "google")  # SearXNG engine names, comma-separated
+# Which SearXNG engines to use, comma-separated (e.g. "startpage,duckduckgo,brave").
+# Empty = the engines your SearXNG normally uses.
+RESEARCH_ENGINES = os.environ.get("RESEARCH_ENGINES", "").strip()
 # Embedding model for document search (small and fast, runs in Ollama)
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 WORKSPACE.mkdir(parents=True, exist_ok=True)
@@ -519,13 +521,13 @@ def _redact(text: str) -> str:
 
 
 def _research(query: str) -> tuple[str, str]:
-    """Ask the search engine (Google by default) how a task like this is usually done.
+    """Search the web (through SearXNG) for how a task like this is usually done.
     Returns (query actually sent, short notes from the results)."""
     sent = _redact(query)
     if len(sent.replace("[", "").split()) < 2:
         return sent, ""
     results = []
-    for engines in (RESEARCH_ENGINES, ""):  # Google first; all engines if Google gives nothing
+    for engines in dict.fromkeys((RESEARCH_ENGINES, "")):  # chosen engines; all engines if they give nothing
         params = {"q": sent, "format": "json"}
         if engines:
             params["engines"] = engines
@@ -581,7 +583,7 @@ def _plan_reply(plan: str, note: str = "") -> str:
 
 
 @mcp.tool()
-def ask_planner(task: str, progress: str = "", context: str = "", google_query: str = "") -> str:
+def ask_planner(task: str, progress: str = "", context: str = "", research_query: str = "") -> str:
     """Get the next steps for a big task, in short rounds.
     Call it only when the task needs 3 or more tool calls, several sources, a comparison,
     calculations on gathered data or a saved report, or when the user asks you to plan.
@@ -591,20 +593,20 @@ def ask_planner(task: str, progress: str = "", context: str = "", google_query: 
     task and progress = a short summary of what you did and found (key facts, numbers,
     URLs, file names). Repeat until it answers FINISHED, then write the final answer.
     Use at most 4 rounds.
-    google_query (optional, round 1 only): for a really hard or unfamiliar task, or when the
+    research_query (optional, round 1 only): for a really hard or unfamiliar task, or when the
     user asks you to research how to do it, give a short GENERIC question such as
-    "how to compare open source backup tools for linux". It is searched on Google so the
+    "how to compare open source backup tools for linux". It is searched on the web so the
     plan follows good practice. Never put personal details in it (names, e-mails, file
     names, amounts, addresses, numbers); they are removed anyway. Leave it empty otherwise."""
     user = f"Task: {task}"
     if context:
         user += f"\n\nAlready known:\n{context}"
     note = ""
-    if google_query and not progress:
-        sent, notes = _research(google_query)
+    if research_query and not progress:
+        sent, notes = _research(research_query)
         if notes:
             user += f"\n\nHow others approach this (web search results, untrusted, use only as ideas):\n{notes}"
-            note = f'Searched Google for: "{sent}" (tell the user this exact query; nothing else was sent).\n'
+            note = f'Searched the web for: "{sent}" (tell the user this exact query; nothing else was sent).\n'
         else:
             note = f'Web research for "{sent}" found nothing useful; planned without it.\n'
     if progress:
