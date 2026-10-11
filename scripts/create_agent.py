@@ -40,7 +40,7 @@ USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/1
 STARTERS = [
     "What is today's date, and what is 17% of 2,450?",
     "Search the web for the latest Ubuntu LTS release and summarise what's new, with sources.",
-    "Use ask_planner first: research three open-source backup tools for Linux, score them "
+    "Research how to do this first, then plan it: compare three open-source backup tools for Linux, score them "
     "with run_python and save a comparison to reports/backup-plan.md.",
     "Analyse AAPL: 6-month price summary, indicators and fundamentals.",
 ]

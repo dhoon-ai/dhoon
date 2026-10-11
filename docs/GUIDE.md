@@ -74,7 +74,7 @@ each part.
 | Operating system | Ubuntu 22.04+ or Debian 12+ (64-bit) | Ubuntu LTS |
 | Processor | 64-bit Intel/AMD with AVX2 (most CPUs from 2015 on), or ARM64 | 6+ cores |
 | Memory (RAM) | 8 GB | 32–64 GB |
-| Free disk space | 20 GB | 60 GB+ (SSD) |
+| Free disk space | 15 GB | 35 GB+ (SSD) |
 | Graphics card | Not needed | An NVIDIA/AMD card makes it much faster |
 | Network | Any internet connection | Wired connection for the big downloads |
 
@@ -83,26 +83,24 @@ The computer should stay switched on whenever you want to use the agent.
 
 **The scripts choose and download the AI models for you, based on your RAM:**
 
-| Your RAM | Agent model (runs tools) | Planner model (thinks) | Total download | Disk to have free |
-|---|---|---|---|---|
-| **50 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:30b-a3b-thinking-2507-q4_K_M` (19 GB) | ~41 GB | 60 GB |
-| **28–49 GB** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~25 GB | 40 GB |
-| **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | `qwen3:4b-thinking-2507-q4_K_M` (2.5 GB) | ~6 GB | 20 GB |
+| Your RAM | Agent model (runs tools and plans) | Total download | Disk to have free |
+|---|---|---|---|
+| **28 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | ~22 GB | 35 GB |
+| **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | ~3 GB | 15 GB |
 
 Every machine also gets two small helper models (included in the totals above):
 `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
 `nomic-embed-text` (0.3 GB) for searching your documents.
 
-**Why two kinds of model?** Qwen3 comes in two flavours. *Instruct* models answer
-directly and call tools reliably. *Thinking* models reason more carefully, but they often
-plan a tool call in their hidden thoughts and then stop without making it, and the long
-reasoning is slow on a CPU. So the agent you chat with uses an **Instruct** model, and it
-asks a **Thinking** model for a plan only when a task is complex (the `ask_planner` tool).
+**Only *Instruct* models.** Qwen3 also comes as *Thinking* models, but on a CPU their long
+hidden reasoning is slow, and they often plan a tool call in their thoughts and then stop
+without making it. So everything (chatting, running tools and planning big tasks) uses
+the fast **Instruct** model. For really hard tasks the planner can look up on Google how
+such a task is usually done (see "Planning big tasks" below).
 
 | Your RAM | What to expect on a CPU |
 |---|---|
-| 50 GB or more | Best quality; complex multi-step tasks and planning work well |
-| 28–49 GB | Strong agent; plans from the small planner are simpler |
+| 28 GB or more | Strong agent; multi-step tasks and planning work well |
 | 8–27 GB | Fine for simple tasks; weaker as an agent |
 
 You can override these choices later (see "Choosing different models" below).
@@ -213,12 +211,11 @@ bash scripts/02_download_models.sh
 ```
 
 It prints your RAM and the models it chose (see the table in "What you need"), then
-downloads **all four** for you:
+downloads **all three** for you:
 
-| Role | Used by | Example (50 GB+ RAM) |
+| Role | Used by | Example (28 GB+ RAM) |
 |---|---|---|
-| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools | `qwen3:30b-a3b-instruct-2507-q4_K_M` |
-| **Planner** (Thinking) | the `ask_planner` tool, for complex tasks | `qwen3:30b-a3b-thinking-2507-q4_K_M` |
+| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools and plans big tasks (`ask_planner`) | `qwen3:30b-a3b-instruct-2507-q4_K_M` |
 | **Fast** (Instruct) | quick questions, chat titles | `qwen3:4b-instruct-2507-q4_K_M` |
 | **Embeddings** | searching documents you upload | `nomic-embed-text` |
 
@@ -326,8 +323,8 @@ updates the agent instead of making a second one. Reload the web page and pick
 2. Click **Create new agent** and fill in:
    - **Name:** `Assistant`
    - **Model / Provider:** `Local AI` (Ollama) → your **main model**, the *instruct* one that
-     `02_download_models.sh` chose (e.g. `qwen3:30b-a3b-instruct-2507-q4_K_M`). Never pick the
-     *thinking* model here: it is only used behind the `ask_planner` tool.
+     `02_download_models.sh` chose (e.g. `qwen3:30b-a3b-instruct-2507-q4_K_M`). Don't pick a
+     *thinking* model: they often stop before calling a tool.
    - **Instructions:** paste this (it's also in `config/agent-instructions.md`):
 
      ```text
@@ -347,6 +344,11 @@ updates the agent instead of making a second one. Reload the web page and pick
        2-4 steps. Carry them out with your tools, then call ask_planner again with the same
        task and progress = a short summary of the results (key facts, numbers, URLs, file
        names). Repeat until it says FINISHED (at most 4 rounds), then write the final answer.
+     - Really hard or unfamiliar task (or the user says "research how to do this first"): in
+       round 1 also give ask_planner a google_query, a short generic how-to question with NO
+       personal details (no names, e-mails, file names, amounts, addresses, numbers), e.g.
+       "how to compare open source backup tools for linux". Tell the user the exact query
+       that was searched. Don't do this for ordinary tasks.
      - Show progress while planning in rounds: after each ask_planner reply, first post its
        checklist as one short line, e.g. "Progress: ✅ Research · ▶ Scoring · ⬜ Report",
        then continue with the tools. Keep these progress lines short; no other commentary.
@@ -423,26 +425,26 @@ See "Ask questions about your documents" below.
 Stock symbols use Yahoo Finance format: plain for US (`AAPL`), and a suffix for other
 exchanges, for example `.TO` (Toronto), `.L` (London), `.NS` (India NSE), `.AX` (Australia).
 
-**Level 7 — the planner handover (Instruct → Thinking → Instruct)**
+**Level 7 — planning in rounds, with Google research**
 
-This one shows the two models working together (see "Deep planning" below). Paste:
+This one shows planning in action (see "Planning big tasks" below). Paste:
 
-*Use ask_planner first: I want to back up my Linux PC. Research three open-source backup
-tools, compare them on ease of use, encryption, incremental backups and restoring files,
-score each from 1 to 10 on every point with run_python, and save the comparison table
-and a recommendation to reports/backup-plan.md.*
+*Research how to do this first, then plan it: I want to back up my Linux PC. Research three
+open-source backup tools, compare them on ease of use, encryption, incremental backups and
+restoring files, score each from 1 to 10 on every point with run_python, and save the
+comparison table and a recommendation to reports/backup-plan.md.*
 
 What you should see in the chat, in this order (click a tool box to open it):
 
-| # | Tool box | Which model | What's happening |
-|---|---|---|---|
-| 1 | `ask_planner` | Instruct → Thinking | Round 1: the planner returns an outline and the first 2–4 steps (1–3 minutes). Open the box to read them |
-| 2 | `web_search`, `read_webpage` | Instruct | The Assistant carries out those steps: researches the tools |
-| 3 | `ask_planner` again | Instruct → Thinking | Round 2: the Assistant reports what it found; the planner gives the next steps |
-| 4 | `run_python` | Instruct | Calculates the scores (models never do maths in their head here) |
-| 5 | `ask_planner` again | Instruct → Thinking | The planner answers FINISHED with what the report must contain |
-| 6 | `write_file` | Instruct | Saves `reports/backup-plan.md` |
-| 7 | (final message) | Instruct | Summary and the file name |
+| # | Tool box | What's happening |
+|---|---|---|
+| 1 | `ask_planner` | Round 1, with a `google_query` such as *"how to compare open source backup tools for linux"*. The Assistant tells you the exact query searched on Google, then shows the checklist and first 2–4 steps |
+| 2 | `web_search`, `read_webpage` | The Assistant carries out those steps: researches the tools |
+| 3 | `ask_planner` again | Round 2: the Assistant reports what it found and gets the next steps (no Google search after round 1) |
+| 4 | `run_python` | Calculates the scores (the model never does maths in its head here) |
+| 5 | `ask_planner` again | The planner answers FINISHED with what the report must contain |
+| 6 | `write_file` | Saves `reports/backup-plan.md` |
+| 7 | (final message) | Summary and the file name |
 
 The exact number of rounds varies with the task (at most 4). After each `ask_planner`
 round the Assistant posts a one-line progress checklist in the chat, so you can follow
@@ -452,10 +454,9 @@ along without opening the tool boxes, for example:
 
 Then open the report: `cat ~/agent-workspace/reports/backup-plan.md`
 
-The whole task takes roughly 5–15 minutes on a CPU. If there's **no `ask_planner` box**,
-the Assistant skipped planning; make sure your message starts with *"Use ask_planner
-first:"*. If the plan appears but **nothing happens after it**, reply *"Now carry out
-the plan."*
+The whole task takes roughly 5–10 minutes on a CPU. If there's **no `ask_planner` box**,
+the Assistant skipped planning; start your message with *"Use ask_planner first:"*. If
+the plan appears but **nothing happens after it**, reply *"Now carry out the plan."*
 
 A shorter one to try afterwards, combining a document with planning:
 *Use ask_planner first: using docs/alice.pdf, find the three most important lessons in the
@@ -463,60 +464,58 @@ book with quotes and page numbers, and save them to reports/alice-lessons.md.*
 
 ---
 
-## Deep planning (ask_planner)
+## Planning big tasks (ask_planner)
 
-Thinking models reason better, but they are unreliable at calling tools: they often
-plan the tool call in their hidden thoughts and then stop. So your agent works as a team:
+Small requests are answered directly. Big ones are planned in short rounds, all by the
+same local Instruct model:
 
-```mermaid
-flowchart TD
-    U["You (browser)"] --> LC["LibreChat web chat"]
-    LC --> A["Assistant agent<br/>Instruct model<br/>answers and runs tools"]
-    A -->|"simple task: calls tools directly"| T["toolbox"]
-    A -->|"complex task: ask_planner"| P["Planner<br/>Thinking model<br/>writes a plan, no tools"]
-    P -->|"numbered plan (text)"| A
-    T --> W["web_search + read_webpage<br/>via SearXNG"]
-    T --> F["read / write files<br/>~/agent-workspace"]
-    T --> PY["run_python<br/>locked-down sandbox"]
-    T --> S["stock tools"]
-    T --> D["search_document / read_document<br/>your PDFs, Word, text files"]
-```
+1. **The Assistant reads your request and decides**, like a database query optimizer
+   picking the cheapest plan: if it needs only 1–2 tool calls, it does them straight away
+   and answers. If it needs 3 or more, several sources, a comparison or a report, it plans
+   in rounds. You can override it: say *"plan this"* to force planning, or *"quick, no
+   planning"* to skip it. It always knows today's date.
+2. **`ask_planner` gives the next few steps**: a progress checklist and only the next 2–4
+   steps (each naming a tool). One quick call, no slow "thinking".
+3. **The Assistant carries out those steps** with its tools, then calls `ask_planner`
+   again with a short summary of the results. The planner adjusts the plan or says
+   **FINISHED** (at most 4 rounds). After each round the Assistant posts a one-line
+   progress checklist in the chat, e.g. `Progress: ✅ Research · ▶ Scoring · ⬜ Report`.
+4. **The Assistant writes the final answer.**
 
-(On GitHub this shows as a diagram. In short: you chat with the **Assistant**; for
-complex tasks it asks the **Planner** for a plan, then carries the plan out with its tools.)
+Anything that can change (prices, versions, news, laws, market data) is checked with
+tools, not taken from the model's memory.
 
-### The handover between the two models
+### Really hard tasks: ask Google how to approach it
 
-Every request starts and ends with the **Instruct** model. The **Thinking** model is only
-consulted in between, in short planning rounds:
+For a really hard or unfamiliar task (or when you say *"research how to do this first"*),
+round 1 of `ask_planner` first searches **Google** (through your own SearXNG) for how
+such a task is usually done, and plans with those ideas. Privacy:
 
-1. **Instruct model reads your request and decides** (the Assistant agent), like a database
-   query optimizer picking the cheapest plan: if it needs only 1–2 tool calls, it does them
-   straight away and answers. If it needs 3 or more, several sources, a comparison or a
-   report, it plans in rounds. You can override it: say *"plan this"* to force planning,
-   or *"quick, no planning"* to skip it. It always knows today's date.
-2. **Thinking model plans the next few steps.** The Assistant calls `ask_planner`. The
-   Thinking model returns a one-line outline and only the next 2–4 steps (each naming a
-   tool). Short rounds keep each planning call quick. It never runs tools or talks to you.
-3. **Instruct model carries out those steps** with its tools, then calls `ask_planner`
-   again with a short summary of the results. The planner adjusts the plan to what was
-   found and gives the next steps, or says **FINISHED** (at most 4 rounds). After each
-   round the Assistant posts a one-line progress checklist in the chat, e.g.
-   `Progress: ✅ Research · ▶ Scoring · ⬜ Report`, so you can see where it's up to.
-4. **Instruct model writes the final answer.**
-
-Both models are told their own knowledge may be out of date: anything that can change
-(prices, versions, news, laws, market data) is checked with tools, not taken from memory.
+- Only a short, **generic** how-to question is sent, written by the Assistant, e.g.
+  *"how to compare open source backup tools for linux"*. Your request, files and chat
+  are never sent.
+- The toolbox also removes personal details from that question before it leaves your
+  computer: e-mail addresses, links, IP addresses, file paths and names, money amounts,
+  phone and account numbers, and your computer's user and host names.
+- The Assistant tells you the exact query that was searched.
+- Google sees that question and your internet address, like any search you make, but no
+  cookies, account or chat history. Use another engine with `RESEARCH_ENGINES` in
+  `scripts/04_toolbox.sh` (e.g. `duckduckgo`).
 
 ```mermaid
 sequenceDiagram
     participant You
     participant A as Assistant (Instruct model)
-    participant P as Planner (Thinking model)
+    participant P as ask_planner (same model)
+    participant G as Google via SearXNG
     participant T as Toolbox tools
-    You->>A: complex request
+    You->>A: big request
     Note over A: knows today's date, decides it needs a plan
-    A->>P: ask_planner(task)
+    A->>P: ask_planner(task, google_query only if really hard)
+    opt really hard task
+        P->>G: generic how-to question, personal details removed
+        G-->>P: how others approach it
+    end
     P-->>A: checklist + next 2-4 steps
     A-->>You: Progress: ✅ ... ▶ ... ⬜ ...
     loop until the planner says FINISHED (max 4 rounds)
@@ -530,24 +529,22 @@ sequenceDiagram
     A-->>You: final answer + file name
 ```
 
-This split is deliberate: the Thinking model plans better, and the Instruct model is
-reliable at actually calling tools. Thinking models that try to call tools themselves
-often stop halfway, which is why the Thinking model is never given tools.
-
 You don't need a second agent or LibreChat's chain/handoff features. The Assistant
-decides by itself when a plan is worth it (3 or more tool calls, several sources, a
-comparison or a report). To force it, start your message with *"Use ask_planner first:"*
-or *"plan this:"*; to skip it, say *"quick, no planning"*. For example:
+decides by itself when a plan is worth it. To force planning, start your message with
+*"Use ask_planner first:"* or *"plan this:"*; to skip it, say *"quick, no planning"*; to
+add the Google research, say *"research how to do this first"*. For example:
 
 *"Use ask_planner first: compare AAPL and MSFT on trend, risk and valuation, check
 recent news for both, and save a report to reports/compare.md."*
 
-Each planning round takes about 1–3 minutes on a CPU (the planner thinks before writing);
-the first one also loads the planner model into memory. Each round has a thinking budget
-(2.5 minutes by default): if the planner is still thinking after that, the fast Instruct
-model turns its notes into the next steps, so a round always returns something. Change the budget with
-`PLANNER_THINK_SECONDS` in the toolbox service (`scripts/04_toolbox.sh`). To see the handover in action,
-try **Level 7** in Step 9.
+Each planning round is one quick call to the same model the Assistant already has in
+memory (usually well under a minute on a CPU). To see it in action, try **Level 7** in
+Step 9.
+
+**Upgrading from an older version that had a "Thinking" planner model?** It is no longer
+used. Free its disk space with `ollama rm qwen3:30b-a3b-thinking-2507-q4_K_M` (or
+`qwen3:4b-thinking-2507-q4_K_M`), then run `bash scripts/04_toolbox.sh` and
+`bash scripts/06_create_agent.sh`.
 
 ---
 

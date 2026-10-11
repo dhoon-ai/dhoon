@@ -37,4 +37,4 @@ mcpServers:
   toolbox:
     type: streamable-http
     url: "http://host.docker.internal:8001/mcp"
-    timeout: 600000                  # 10 min: CPU-only machines are slow; ask_planner can take minutes
+    timeout: 600000                  # 10 min: CPU-only machines are slow; big tasks can take minutes

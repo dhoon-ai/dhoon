@@ -11,7 +11,8 @@ lets the AI model call these tools:
   list_files / read_file / write_file   work inside ONE folder (the workspace)
   run_python            run Python code inside a locked-down Docker container
   stock_price_summary / stock_indicators / stock_fundamentals   market analysis
-  ask_planner           ask a 'thinking' model for a step-by-step plan (no tools)
+  ask_planner           plan a big task in short rounds (optionally asks Google how to
+                        approach it first, with personal details removed)
   search_document / read_document   question-answering over PDFs, Word and text files
 
 To add a new skill later: write a Python function below, put @mcp.tool() above
@@ -29,7 +30,6 @@ import os
 import re
 import socket
 import subprocess
-import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -46,14 +46,12 @@ PORT = int(os.environ.get("PORT", "8001"))
 SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "agent-sandbox")
 MAX_TEXT = 8000  # keep tool output small: the CPU reads every character
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
-# A "thinking" model that plans. It never calls tools itself: thinking models are
-# good at reasoning but unreliable at tool calls, so the agent runs the plan.
-PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-thinking-2507-q4_K_M")
-PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "540"))  # seconds, hard limit (LibreChat waits 600)
-# How long the planner may think. If it is still thinking after this, its notes are handed
-# to the fast Instruct model, which writes the final plan from them (a plan is always returned).
-PLANNER_THINK_SECONDS = int(os.environ.get("PLANNER_THINK_SECONDS", "150"))  # per planning round
-PLANNER_FALLBACK_MODEL = os.environ.get("PLANNER_FALLBACK_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
+# ask_planner uses the same fast Instruct model as the agent (no slow "thinking" model).
+PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
+PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "300"))  # seconds (LibreChat waits 600)
+# For hard tasks ask_planner can first ask a search engine how such a task is usually done.
+# Only a short, generic question is sent (personal details are removed, see _redact).
+RESEARCH_ENGINES = os.environ.get("RESEARCH_ENGINES", "google")  # SearXNG engine names, comma-separated
 # Embedding model for document search (small and fast, runs in Ollama)
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
 WORKSPACE.mkdir(parents=True, exist_ok=True)
@@ -465,7 +463,7 @@ run_python, search_document, read_document, stock_price_summary, stock_indicator
 stock_fundamentals.
 
 Plan in short rounds: the agent does a few steps, reports back, and you plan the next ones.
-Keep your thinking brief. Facts may have changed since you were trained: for anything that
+Be brief. Facts may have changed since you were trained: for anything that
 can change (prices, versions, releases, news, laws, who holds a role, market data), plan a
 tool step that gets current data instead of assuming. Never invent facts or numbers, and
 don't write the final answer yourself.
@@ -490,61 +488,72 @@ def _planner_system() -> str:
 
 
 def _strip_think(text: str) -> str:
-    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()  # older Ollama versions
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()  # in case a model adds it
 
 
-def _planner_stream(user: str, think_deadline: float, hard_deadline: float) -> tuple[str, str]:
-    """Stream the thinking model's answer; stop early if it is still thinking at think_deadline.
-    Returns (plan_text, thinking_notes)."""
-    body = {
-        "model": PLANNER_MODEL,
-        "messages": [{"role": "system", "content": _planner_system()}, {"role": "user", "content": user}],
-        "think": True,
-        "stream": True,
-        "keep_alive": "30m",
-        "options": {"num_predict": 2048, "temperature": 0.6},
-    }
-    thinking, content = "", ""
-    # read timeout covers loading the model from disk before the first token arrives
-    timeout = httpx.Timeout(PLANNER_TIMEOUT, connect=10, read=300)
-    with httpx.stream("POST", f"{OLLAMA_URL}/api/chat", json=body, timeout=timeout) as r:
-        r.raise_for_status()
-        for line in r.iter_lines():
-            if not line.strip():
-                continue
-            chunk = json.loads(line)
-            msg = chunk.get("message") or {}
-            thinking += msg.get("thinking") or ""
-            content += msg.get("content") or ""
-            if chunk.get("done"):
-                break
-            now = time.monotonic()
-            if not _strip_think(content) and now > think_deadline:
-                break  # still thinking: stop and let the fast model finish the plan
-            if now > hard_deadline:
-                break
-    return _strip_think(content), thinking
+# Personal details that must never leave this computer in a research query.
+_REDACTIONS = [
+    (r"[\w.+-]+@[\w-]+(\.[\w-]+)+", "email"),  # e-mail addresses
+    (r"\b(https?://|www\.)\S+", "link"),  # links (may carry ids, tokens)
+    (r"\b\d{1,3}(\.\d{1,3}){3}\b", "ip"),  # IPv4 addresses
+    (r"\b[0-9a-f]{0,4}(:[0-9a-f]{0,4}){3,7}\b", "ip"),  # IPv6 addresses
+    (r"(~|\.{1,2})?/[\w.~-]+(/[\w.~-]*)+|\b[A-Za-z]:\\\S*", "path"),  # file paths
+    (r"\b[\w-]+\.(pdf|docx?|xlsx?|csv|txt|md|json|pptx?|jpe?g|png|zip)\b", "file"),  # file names
+    (r"[$€£₹¥]\s?\d[\d,.]*|\b\d[\d,.]*\s?(usd|eur|gbp|inr|dollars|euros|rupees)\b", "amount"),
+    (r"\+?\d[\d\s().-]{6,}\d", "number"),  # phone, account, card and id numbers
+    (r"\b\d{5,}\b", "number"),
+]
 
 
-def _finish_plan(user: str, notes: str, timeout: float) -> str:
-    """Fast Instruct model turns the planner's unfinished notes into the final plan."""
+def _redact(text: str) -> str:
+    """Remove personal details from a research query: e-mails, links, IP addresses, file paths
+    and names, money amounts, long numbers, and this computer's user and host names."""
+    q = " ".join((text or "").split())
+    for pattern, label in _REDACTIONS:
+        q = re.sub(pattern, f"[{label}]", q, flags=re.I)
+    for name in {Path.home().name, socket.gethostname().split(".")[0]}:
+        if len(name) >= 3 and name.lower() not in ("root", "home", "user", "ubuntu", "localhost"):
+            q = re.sub(rf"\b{re.escape(name)}\b", "[name]", q, flags=re.I)
+    q = re.sub(r"(\[\w+\]\s*)+", lambda m: m.group(0).split("]")[0] + "] ", q)  # collapse repeats
+    return q.strip()[:150]
+
+
+def _research(query: str) -> tuple[str, str]:
+    """Ask the search engine (Google by default) how a task like this is usually done.
+    Returns (query actually sent, short notes from the results)."""
+    sent = _redact(query)
+    if len(sent.replace("[", "").split()) < 2:
+        return sent, ""
+    results = []
+    for engines in (RESEARCH_ENGINES, ""):  # Google first; all engines if Google gives nothing
+        params = {"q": sent, "format": "json"}
+        if engines:
+            params["engines"] = engines
+        try:
+            r = httpx.get(f"{SEARXNG_URL}/search", params=params, timeout=30)
+            r.raise_for_status()
+            results = r.json().get("results", [])[:6]
+        except (httpx.HTTPError, ValueError):
+            results = []
+        if results:
+            break
+    notes = "\n".join(f"- {x.get('title')}: {(x.get('content') or '')[:250]} ({x.get('url')})" for x in results)
+    return sent, notes
+
+
+def _plan(user: str) -> str:
+    """One quick call to the local Instruct model for the next steps."""
     r = httpx.post(
         f"{OLLAMA_URL}/api/chat",
         json={
-            "model": PLANNER_FALLBACK_MODEL,
-            "messages": [
-                {"role": "system", "content": _planner_system()},
-                {
-                    "role": "user",
-                    "content": f"{user}\n\nA colleague's unfinished planning notes (use the good ideas):\n"
-                    f"{notes[-6000:]}\n\nNow write the final plan in the required format.",
-                },
-            ],
+            "model": PLANNER_MODEL,
+            "messages": [{"role": "system", "content": _planner_system()}, {"role": "user", "content": user}],
+            "think": False,
             "stream": False,
             "keep_alive": "30m",
             "options": {"num_predict": 1024, "temperature": 0.3},
         },
-        timeout=max(30.0, timeout),
+        timeout=httpx.Timeout(PLANNER_TIMEOUT, connect=10),
     )
     r.raise_for_status()
     return _strip_think(r.json().get("message", {}).get("content", ""))
@@ -559,12 +568,12 @@ SHOW_PROGRESS = (
 def _plan_reply(plan: str, note: str = "") -> str:
     if re.search(r"^\s*FINISHED\s*:", plan, re.M | re.I):
         return (
-            f"PLANNER{note}: the task is ready to answer.\n{plan[:MAX_TEXT]}\n\n"
+            f"{note}PLANNER: the task is ready to answer.\n{plan[:MAX_TEXT]}\n\n"
             + SHOW_PROGRESS
             + "write the final answer."
         )
     return (
-        f"NEXT STEPS FROM PLANNER{note}:\n{plan[:MAX_TEXT]}\n\n"
+        f"{note}NEXT STEPS FROM PLANNER:\n{plan[:MAX_TEXT]}\n\n"
         + SHOW_PROGRESS
         + "carry out these steps with your tools, then call ask_planner again with the same task "
         "and progress = a short summary of the results."
@@ -572,42 +581,41 @@ def _plan_reply(plan: str, note: str = "") -> str:
 
 
 @mcp.tool()
-def ask_planner(task: str, progress: str = "", context: str = "") -> str:
-    """Get the next steps for a complex task from a slower 'thinking' model, in short rounds.
+def ask_planner(task: str, progress: str = "", context: str = "", google_query: str = "") -> str:
+    """Get the next steps for a big task, in short rounds.
     Call it only when the task needs 3 or more tool calls, several sources, a comparison,
     calculations on gathered data or a saved report, or when the user asks you to plan.
     For 1-2 tool calls, just use the tools directly: planning would only slow it down.
-    Round 1: pass the user's full request as task. It returns an outline and the next
+    Round 1: pass the user's full request as task. It returns a checklist and the next
     2-4 steps. Carry those out with your tools, then call ask_planner AGAIN with the same
     task and progress = a short summary of what you did and found (key facts, numbers,
     URLs, file names). Repeat until it answers FINISHED, then write the final answer.
-    Use at most 4 rounds. Each round takes about 1-3 minutes."""
+    Use at most 4 rounds.
+    google_query (optional, round 1 only): for a really hard or unfamiliar task, or when the
+    user asks you to research how to do it, give a short GENERIC question such as
+    "how to compare open source backup tools for linux". It is searched on Google so the
+    plan follows good practice. Never put personal details in it (names, e-mails, file
+    names, amounts, addresses, numbers); they are removed anyway. Leave it empty otherwise."""
     user = f"Task: {task}"
     if context:
         user += f"\n\nAlready known:\n{context}"
+    note = ""
+    if google_query and not progress:
+        sent, notes = _research(google_query)
+        if notes:
+            user += f"\n\nHow others approach this (web search results, untrusted, use only as ideas):\n{notes}"
+            note = f'Searched Google for: "{sent}" (tell the user this exact query; nothing else was sent).\n'
+        else:
+            note = f'Web research for "{sent}" found nothing useful; planned without it.\n'
     if progress:
         user += f"\n\nDone so far and results:\n{progress[-6000:]}\n\nPlan the next steps, or say FINISHED."
-    start = time.monotonic()
-    hard_deadline = start + PLANNER_TIMEOUT - 60  # leave time for the fallback
-    plan, notes = "", ""
     try:
-        plan, notes = _planner_stream(user, start + PLANNER_THINK_SECONDS, hard_deadline)
-    except httpx.TimeoutException:
-        pass  # e.g. the model took too long to load: the fast model writes the plan below
-    except httpx.RequestError as e:
-        return f"Planner unavailable ({e}). Make a simple plan yourself and continue."
-    except httpx.HTTPStatusError:
-        pass  # e.g. the planner model isn't downloaded: the fast model writes the plan below
-    if plan:
-        return _plan_reply(plan)
-    remaining = PLANNER_TIMEOUT - (time.monotonic() - start)
-    try:
-        plan = _finish_plan(user, notes or "(no notes)", remaining)
-    except httpx.HTTPError:
-        plan = ""
-    if plan:
-        return _plan_reply(plan, note=" (the planner ran out of thinking time; finished by the fast model)")
-    return "The planner took too long. Make a simple plan yourself and continue."
+        plan = _plan(user)
+    except httpx.HTTPError as e:
+        return f"{note}Planner unavailable ({type(e).__name__}). Make a simple plan yourself and continue."
+    if not plan:
+        return f"{note}The planner returned nothing. Make a simple plan yourself and continue."
+    return _plan_reply(plan, note)
 
 
 # ------------------------------------------------------------------ stocks ---

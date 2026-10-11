@@ -83,7 +83,8 @@ fi
 if [ "$LEVEL" = "everything" ]; then
   step "Deleting this project's AI models"
   if command -v ollama >/dev/null 2>&1; then
-    for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER" qwen3:30b-a3b qwen3:4b qwen3:8b; do
+    for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER" qwen3:30b-a3b qwen3:4b qwen3:8b \
+             qwen3:30b-a3b-thinking-2507-q4_K_M qwen3:4b-thinking-2507-q4_K_M; do
       ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qx "$m" && run ollama rm "$m"
     done
   fi

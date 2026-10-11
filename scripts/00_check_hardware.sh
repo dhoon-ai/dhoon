@@ -23,7 +23,6 @@ elif [ "$RAM_GB" -lt 28 ]; then
 else
   ok "RAM: ${RAM_GB} GB -> agent model: ${MODEL_MAIN}"
 fi
-echo "         planner model: ${MODEL_PLANNER}  (all models are downloaded by script 02)"
 
 if lspci 2>/dev/null | grep -qiE 'nvidia|radeon rx|arc a'; then
   ok "Graphics card found. Ollama uses NVIDIA/AMD GPUs automatically once their drivers are installed (much faster)."
@@ -31,11 +30,10 @@ else
   echo "  GPU: none suitable - everything runs on the CPU (normal for mini PCs and most laptops)"
 fi
 
-# disk needed = all models (agent + planner + fast + embeddings) plus room for apps
-case "$MODEL_MAIN:$MODEL_PLANNER" in
-  *30b*:*30b*) need_gb=60 ;;
-  *30b*:*)     need_gb=40 ;;
-  *)           need_gb=20 ;;
+# disk needed = all models (agent + fast + embeddings) plus room for apps
+case "$MODEL_MAIN" in
+  *30b*) need_gb=35 ;;
+  *)     need_gb=15 ;;
 esac
 root_free=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
 if mountpoint -q /data; then

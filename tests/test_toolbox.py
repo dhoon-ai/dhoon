@@ -218,50 +218,25 @@ class FakePost:
         return self._data
 
 
-class FakeStream:
-    """Stands in for httpx.stream(): yields Ollama's streamed chat chunks (JSON lines)."""
-
-    def __init__(self, chunks, on_chunk=None):
-        self.chunks, self.on_chunk, self.closed_early = chunks, on_chunk, False
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
-
-    def raise_for_status(self):
-        pass
-
-    def iter_lines(self):
-        for i, c in enumerate(self.chunks):
-            if self.on_chunk:
-                self.on_chunk(i)
-            yield json.dumps(c)
-        self.closed_early = False
+def _ollama(content):
+    return FakePost({"message": {"content": content}})
 
 
-def _chunk(thinking="", content="", done=False):
-    return {"message": {"thinking": thinking, "content": content}, "done": done}
+def test_ask_planner_uses_local_instruct_model_once(tb, monkeypatch):
+    seen = []
 
+    def fake_post(url, json=None, timeout=None):
+        seen.append(json)
+        return _ollama("<think>x</think>Checklist:\n▶ Add\nNext steps:\n1. run_python: 2+2")
 
-def test_ask_planner_returns_plan_when_thinking_finishes(tb, monkeypatch):
-    seen = {}
-
-    def fake_stream(method, url, json=None, timeout=None):
-        seen["body"] = json
-        return FakeStream(
-            [_chunk(thinking="hmm"), _chunk(content="<think>x</think>1. run_python: 2+2"), _chunk(done=True)]
-        )
-
-    monkeypatch.setattr(tb.httpx, "stream", fake_stream)
-    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: pytest.fail("fallback must not run"))
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    monkeypatch.setattr(tb.httpx, "get", lambda *a, **k: pytest.fail("no web search unless asked"))
     out = tb.ask_planner("add numbers", context="none")
+    assert len(seen) == 1 and seen[0]["think"] is False and seen[0]["stream"] is False
+    assert seen[0]["model"] == tb.PLANNER_MODEL and "thinking" not in tb.PLANNER_MODEL
     assert out.startswith("NEXT STEPS FROM PLANNER") and "1. run_python" in out and "<think>" not in out
     assert "call ask_planner again" in out and "progress" in out
-    assert seen["body"]["think"] is True and seen["body"]["stream"] is True
-    assert seen["body"]["model"] == tb.PLANNER_MODEL
-    system = seen["body"]["messages"][0]["content"]
+    system = seen[0]["messages"][0]["content"]
     assert tb.dt.date.today().isoformat() in system  # planner knows today's date
     assert "current data" in system and "Next steps" in system
     assert "Checklist:" in system and "✅" in system and "▶" in system and "⬜" in system
@@ -271,59 +246,87 @@ def test_ask_planner_returns_plan_when_thinking_finishes(tb, monkeypatch):
 def test_ask_planner_second_round_sends_progress_and_detects_finished(tb, monkeypatch):
     seen = {}
 
-    def fake_stream(method, url, json=None, timeout=None):
+    def fake_post(url, json=None, timeout=None):
         seen["user"] = json["messages"][1]["content"]
-        return FakeStream([_chunk(content="FINISHED: a table comparing the three tools"), _chunk(done=True)])
+        return _ollama("FINISHED: a table comparing the three tools")
 
-    monkeypatch.setattr(tb.httpx, "stream", fake_stream)
-    out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati with features")
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    monkeypatch.setattr(tb.httpx, "get", lambda *a, **k: pytest.fail("research is for round 1 only"))
+    out = tb.ask_planner("compare backup tools", progress="found restic, borg, duplicati", google_query="how to x")
     assert "Task: compare backup tools" in seen["user"] and "found restic, borg" in seen["user"]
     assert "ready to answer" in out and "FINISHED: a table" in out and "write the final answer" in out
     assert "show the user the Checklist" in out  # final progress line before the answer
 
 
-def test_ask_planner_out_of_thinking_time_is_finished_by_fast_model(tb, monkeypatch):
-    clock = {"t": 1000.0}
-    monkeypatch.setattr(tb.time, "monotonic", lambda: clock["t"])
-
-    def advance(i):
-        clock["t"] += 100  # each chunk "takes" 100 s, so the 150 s thinking budget runs out
-
-    chunks = [_chunk(thinking=f"idea {i}: search, then score with python. ") for i in range(10)]
-    monkeypatch.setattr(tb.httpx, "stream", lambda *a, **k: FakeStream(chunks, on_chunk=advance))
-    seen = {}
-
-    def fake_post(url, json=None, timeout=None):
-        seen["body"] = json
-        return FakePost({"message": {"content": "1. web_search: backup tools\nFinal answer should: compare"}})
-
-    monkeypatch.setattr(tb.httpx, "post", fake_post)
-    out = tb.ask_planner("compare backup tools")
-    assert out.startswith("NEXT STEPS FROM PLANNER (the planner ran out of thinking time") and "1. web_search" in out
-    assert seen["body"]["model"] == tb.PLANNER_FALLBACK_MODEL
-    notes = seen["body"]["messages"][1]["content"]
-    assert "idea 0" in notes and "idea 2" not in notes  # stopped after the budget, notes handed over
-
-
-def test_ask_planner_slow_load_timeout_still_gives_plan(tb, monkeypatch):
-    def slow(*a, **k):
-        raise tb.httpx.ReadTimeout("loading model")
-
-    monkeypatch.setattr(tb.httpx, "stream", slow)
-    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: FakePost({"message": {"content": "1. current_datetime"}}))
-    assert "1. current_datetime" in tb.ask_planner("x")
-
-
-def test_ask_planner_ollama_down_and_total_failure(tb, monkeypatch):
+def test_ask_planner_ollama_down_or_empty(tb, monkeypatch):
     def down(*a, **k):
         raise tb.httpx.ConnectError("down")
 
-    monkeypatch.setattr(tb.httpx, "stream", down)
-    assert "Planner unavailable" in tb.ask_planner("x")
-
-    monkeypatch.setattr(tb.httpx, "stream", lambda *a, **k: FakeStream([_chunk(done=True)]))
     monkeypatch.setattr(tb.httpx, "post", down)
+    assert "Planner unavailable" in tb.ask_planner("x")
+    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: _ollama(""))
     assert "Make a simple plan yourself" in tb.ask_planner("x")
+
+
+@pytest.mark.parametrize(
+    "text,secret",
+    [
+        ("email rahul.k@example.com my report", "rahul.k@example.com"),
+        ("see https://bank.example.com/acct?id=99 now", "bank.example.com"),
+        ("server 192.168.1.20 backup", "192.168.1.20"),
+        ("backup /home/rahul/photos/2024 to disk", "/home/rahul"),
+        ("summarise salary_2025.xlsx for me", "salary_2025"),
+        ("call +1 (555) 123-4567 tomorrow", "555"),
+        ("budget of $12,500 for a car", "12,500"),
+        ("account 123456789 balance", "123456789"),
+    ],
+)
+def test_redact_removes_personal_details(tb, text, secret):
+    out = tb._redact(text)
+    assert secret not in out and "[" in out
+
+
+def test_redact_keeps_generic_questions_and_removes_user_name(tb, monkeypatch):
+    q = "how to compare open source backup tools for linux in 2026"
+    assert tb._redact(q) == q
+    monkeypatch.setattr(tb.Path, "home", lambda: tb.Path("/home/rahulk"))
+    assert "rahulk" not in tb._redact("plan for rahulk backups")
+    assert len(tb._redact("word " * 100)) <= 150
+
+
+def test_ask_planner_google_research_is_redacted_and_reported(tb, monkeypatch):
+    searched, planned = [], {}
+
+    def fake_get(url, params=None, timeout=None):
+        searched.append(params)
+        return FakeResponse(data={"results": [{"title": "Guide", "url": "https://g.example/a", "content": "Step A"}]})
+
+    def fake_post(url, json=None, timeout=None):
+        planned["user"] = json["messages"][1]["content"]
+        return _ollama("Checklist:\n▶ Research\nNext steps:\n1. web_search: restic")
+
+    monkeypatch.setattr(tb.httpx, "get", fake_get)
+    monkeypatch.setattr(tb.httpx, "post", fake_post)
+    out = tb.ask_planner("back up my files", google_query="how to back up /home/rahul for me@x.com")
+    assert len(searched) == 1 and searched[0]["engines"] == "google"
+    assert "/home/rahul" not in searched[0]["q"] and "me@x.com" not in searched[0]["q"]
+    assert "Step A" in planned["user"] and "untrusted" in planned["user"]
+    assert out.startswith('Searched Google for: "how to back up [path] for [email]"')
+    assert "NEXT STEPS FROM PLANNER" in out
+
+
+def test_research_falls_back_to_all_engines_then_plans_without(tb, monkeypatch):
+    searched = []
+
+    def fake_get(url, params=None, timeout=None):
+        searched.append(params)
+        return FakeResponse(data={"results": []})
+
+    monkeypatch.setattr(tb.httpx, "get", fake_get)
+    monkeypatch.setattr(tb.httpx, "post", lambda *a, **k: _ollama("1. web_search: x"))
+    out = tb.ask_planner("task", google_query="how to plan a garden")
+    assert [p.get("engines") for p in searched] == ["google", None]
+    assert "found nothing useful" in out and "1. web_search" in out
 
 
 # ---------------------------------------------------------------- documents ---

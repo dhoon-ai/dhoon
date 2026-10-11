@@ -30,13 +30,8 @@ if [ -z "${MODEL_MAIN:-}" ]; then
 fi
 MODEL_FAST="${MODEL_FAST:-qwen3:4b-instruct-2507-q4_K_M}"
 MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
-# The planner "thinks" and writes plans for the agent (used by the ask_planner tool).
-# A second 19 GB model needs RAM to hold both, so smaller machines get the 4b one.
-if [ -z "${MODEL_PLANNER:-}" ]; then
-  if [ "$RAM_GB" -ge 50 ]; then MODEL_PLANNER="qwen3:30b-a3b-thinking-2507-q4_K_M"
-  else                          MODEL_PLANNER="qwen3:4b-thinking-2507-q4_K_M"
-  fi
-fi
+# The ask_planner tool uses the main Instruct model by default (fast, no separate download).
+MODEL_PLANNER="${MODEL_PLANNER:-$MODEL_MAIN}"
 
 step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
@@ -107,8 +102,8 @@ step_done() {
       systemctl is-active --quiet ai-toolbox 2>/dev/null || { STATUS_REASON="toolbox service not running"; return 1; }
       grep -q "^ExecStart=.*$KIT/toolbox/toolbox_server.py" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
         || { STATUS_REASON="toolbox service points to another folder"; return 1; }
-      if ! grep -q "PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
-        || ! grep -q "PLANNER_FALLBACK_MODEL=$MODEL_MAIN" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
+      if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || ! grep -q "^Environment=RESEARCH_ENGINES=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
         STATUS_REASON="toolbox settings out of date"; return 1
       fi
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \
