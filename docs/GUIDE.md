@@ -604,8 +604,11 @@ The Assistant can e-mail you messages and files from your workspace (reports, ch
 cp config/email.env.example config/email.env
 nano config/email.env          # provider, address, app password, allowed recipients
 bash scripts/04_toolbox.sh     # once: the toolbox reads config/email.env
-bash scripts/email_test.sh     # sends you a test e-mail
+bash scripts/email_test.sh     # sends a test e-mail to the first address in EMAIL_ALLOWED_TO
 ```
+
+`EMAIL_ADDRESS` is the account that sends (it can be a separate account just for the agent);
+`EMAIL_ALLOWED_TO` is where mail may go, e.g. your personal inbox.
 
 **Safety:** the agent can only send to the addresses in `EMAIL_ALLOWED_TO` (by default only
 your own), only attach files from your workspace, and at most `EMAIL_MAX_PER_DAY` (20) e-mails

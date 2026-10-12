@@ -121,3 +121,20 @@ def test_settings_are_read_from_the_env_file(tmp_path, monkeypatch):
     assert s["allowed"] == {"me@zoho.com"}
     for k in ("EMAIL_PROVIDER", "EMAIL_ADDRESS", "EMAIL_APP_PASSWORD"):
         monkeypatch.delenv(k, raising=False)
+
+
+def test_send_test_goes_to_your_inbox_not_the_sender(tb, monkeypatch):
+    monkeypatch.setenv("EMAIL_ADDRESS", "mentor-bot@gmail.com")
+    monkeypatch.setenv("EMAIL_ALLOWED_TO", "Me@Personal.com, other@x.com")
+    out = tb.emailer.send_test()
+    assert "sent to Me@Personal.com" in out
+    server, msg = FakeSMTP.sent[-1]
+    assert msg["To"] == "Me@Personal.com" and "mentor-bot@gmail.com" in msg["From"]
+
+
+def test_test_script_prints_a_message_instead_of_a_traceback(tmp_path):
+    import subprocess
+
+    env = {"PATH": "/usr/bin:/bin", "EMAIL_ENV_FILE": str(tmp_path / "none.env"), "HOME": str(tmp_path)}
+    r = subprocess.run([sys.executable, str(REPO / "toolbox/emailer.py")], env=env, capture_output=True, text=True)
+    assert r.returncode == 1 and "E-mail not sent: E-mail is not set up" in r.stdout and "Traceback" not in r.stderr

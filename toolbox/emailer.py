@@ -102,6 +102,7 @@ def settings() -> dict:
         "security": security,
         "from_name": os.environ.get("EMAIL_FROM_NAME", "Local AI"),
         "allowed": {a.strip().lower() for a in allowed.split(",") if a.strip()},
+        "allowed_list": [a.strip() for a in allowed.split(",") if a.strip()],  # in the order you wrote them
         "max_per_day": int(os.environ.get("EMAIL_MAX_PER_DAY", "20")),
     }
 
@@ -200,6 +201,23 @@ def send(
     return f"E-mail '{subject[:80]}' sent to {', '.join(recipients)}{names}."
 
 
-if __name__ == "__main__":  # bash scripts/email_test.sh
+def send_test() -> str:
+    """bash scripts/email_test.sh: send a test e-mail to the first address in EMAIL_ALLOWED_TO
+    (your own inbox), from EMAIL_ADDRESS (the sending account)."""
     s = settings()
-    print(send([s["address"]], "Test from your local AI agent", "It works! **E-mail is set up.**"))
+    to = s["allowed_list"][0]
+    body = (
+        f"It works! **E-mail is set up.**\n\nSent from {s['address']} through {s['host']}. "
+        f"The agent may send to: {', '.join(s['allowed_list'])}."
+    )
+    return send([to], "Test from your local AI agent", body)
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        print(send_test())
+    except EmailError as e:
+        print(f"E-mail not sent: {e}")
+        sys.exit(1)
