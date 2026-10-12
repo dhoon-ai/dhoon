@@ -55,6 +55,12 @@ esac
 step "Stopping and removing services"
 run sudo systemctl disable --now ai-toolbox ai-model-preload
 run sudo rm -f /etc/systemd/system/ai-toolbox.service /etc/systemd/system/ai-model-preload.service
+# any other ai-* service or timer, e.g. added by a private plugin
+for unit in "$SYSTEMD_ROOT"/ai-*.service "$SYSTEMD_ROOT"/ai-*.timer; do
+  [ -e "$unit" ] || continue
+  run sudo systemctl disable --now "$(basename "$unit")"
+  run sudo rm -f "$unit"
+done
 run sudo systemctl daemon-reload
 if command -v docker >/dev/null 2>&1; then
   run docker rm -f searxng

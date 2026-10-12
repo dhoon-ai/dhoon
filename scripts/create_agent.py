@@ -46,10 +46,18 @@ STARTERS = [
 ]
 
 
+PLUGINS = Path(os.environ.get("PLUGINS_DIR", KIT / "plugins"))  # private, git-ignored add-ons
+
+
 def toolbox_tools() -> list[str]:
-    """Names of all @mcp.tool() functions in the toolbox, so this list never goes stale."""
-    src = (KIT / "toolbox" / "toolbox_server.py").read_text()
-    return re.findall(r"@mcp\.tool\(\)\s*\ndef (\w+)\(", src)
+    """Names of all @mcp.tool() functions in the toolbox and in private plugins."""
+    sources = [KIT / "toolbox" / "toolbox_server.py", *sorted(PLUGINS.glob("*/tools.py"))]
+    return [t for f in sources for t in re.findall(r"@(?:tb\.)?mcp\.tool\(\)\s*\ndef (\w+)\(", f.read_text())]
+
+
+def plugin_extras(name: str) -> list[str]:
+    """Text from plugins/*/<name> (instructions.md, starters.txt)."""
+    return [f.read_text().strip() for f in sorted(PLUGINS.glob(f"*/{name}")) if f.read_text().strip()]
 
 
 def agent_payload(model: str) -> dict:
@@ -58,13 +66,17 @@ def agent_payload(model: str) -> dict:
     return {
         "name": AGENT_NAME,
         "description": "Private general-purpose agent: web search, files, Python, documents, stocks.",
-        "instructions": (KIT / "config" / "agent-instructions.md").read_text().strip(),
+        "instructions": "\n".join(
+            [(KIT / "config" / "agent-instructions.md").read_text().strip(), *plugin_extras("instructions.md")]
+        ),
         "provider": PROVIDER,
         "model": model,
         "tools": tools,
         "model_parameters": {"max_tokens": 4096},
         "recursion_limit": 50,  # max steps per run (librechat.yaml allows up to 100)
-        "conversation_starters": STARTERS,
+        "conversation_starters": (
+            STARTERS + [line for text in plugin_extras("starters.txt") for line in text.splitlines() if line.strip()]
+        )[:6],
     }
 
 

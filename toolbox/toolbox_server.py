@@ -24,6 +24,7 @@ it, write a clear docstring (the AI reads it), and restart the service:
 import datetime as dt
 import functools
 import hashlib
+import importlib.util
 import io
 import ipaddress
 import json
@@ -33,6 +34,7 @@ import os
 import re
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -799,6 +801,34 @@ def stock_save_history(tickers: str, period: str = "1y") -> str:
         f"In run_python: df = pd.read_csv('{rel}', parse_dates=['Date'], index_col='Date')\n"
         f"Last rows:\n{table.tail(3).to_string()}"
     )
+
+
+# ------------------------------------------------------------------ private plugins ---
+# Your own tools that are not part of this public repo: put a folder in plugins/ (git-ignored)
+# with a tools.py that does `import toolbox_server as tb` and defines functions under
+# `@tb.mcp.tool()`. Optional: instructions.md (added to the agent's instructions) and
+# starters.txt (conversation starters), both used by scripts/create_agent.py.
+PLUGINS_DIR = Path(os.environ.get("PLUGINS_DIR", str(Path(__file__).resolve().parents[1] / "plugins")))
+
+
+def _load_plugins() -> list[str]:
+    sys.modules.setdefault("toolbox_server", sys.modules[__name__])  # plugins share this module
+    loaded = []
+    for tools in sorted(PLUGINS_DIR.glob("*/tools.py")):
+        name = tools.parent.name
+        try:
+            if str(tools.parent) not in sys.path:
+                sys.path.insert(0, str(tools.parent))  # so a plugin can import its own modules
+            spec = importlib.util.spec_from_file_location(f"plugin_{name}", tools)
+            spec.loader.exec_module(importlib.util.module_from_spec(spec))
+            loaded.append(name)
+            log.info("PLUGIN %s loaded", name)
+        except Exception as e:  # noqa: BLE001 - a broken plugin must not stop the toolbox
+            log.warning("PLUGIN %s failed to load: %s: %s", name, type(e).__name__, e)
+    return loaded
+
+
+LOADED_PLUGINS = _load_plugins()
 
 
 # ------------------------------------------------------------------ start ---

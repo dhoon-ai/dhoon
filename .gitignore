@@ -20,3 +20,7 @@ venv/
 
 # Your personal model choices (see config/models.env.example)
 config/models.env
+
+# Private plugins: your own tools, never committed (see plugins/README.md)
+plugins/*
+!plugins/README.md

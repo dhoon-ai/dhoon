@@ -65,3 +65,11 @@ Add a test in `tests/test_toolbox.py` too, then run `pytest`.
 | `rss_digest(feeds)` | Fetch RSS feeds and return today's headlines |
 | `ping_hosts()` | Check which devices on your home network are up |
 | `watchlist_report()` | Run the stock tools over a list of tickers and write a report |
+
+## Private tools (plugins)
+
+To keep a tool out of the public repo (personal, experimental or sensitive), make it a
+plugin instead of editing `toolbox_server.py`: a folder in `plugins/` with a `tools.py`.
+Everything in `plugins/` except its README is git-ignored. See
+[plugins/README.md](../plugins/README.md) for the layout and an example.
+

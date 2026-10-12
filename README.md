@@ -273,6 +273,7 @@ assets/         the Assistant's picture and the script that draws it
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
                 benchmark, unban, update, uninstall
 toolbox/        the MCP server with all agent tools
+plugins/        your private add-on tools (git-ignored, see plugins/README.md)
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates
 docs/           beginner guide and how to add tools
