@@ -42,6 +42,7 @@ class FakeSMTP:
 def tb(tmp_path, monkeypatch):
     monkeypatch.setenv("WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("EMAIL_STATE", str(tmp_path / "count.json"))
+    monkeypatch.setenv("EMAIL_ENV_FILE", str(tmp_path / "none.env"))
     monkeypatch.setenv("EMAIL_PROVIDER", "gmail")
     monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "abcd efgh ijkl mnop")
@@ -104,3 +105,19 @@ def test_providers_and_friendly_errors(tb, monkeypatch):
 def test_tool_is_registered_for_the_agent(tb):
     names = {t.name for t in asyncio.run(tb.mcp.list_tools())}
     assert "send_email" in names
+
+
+def test_settings_are_read_from_the_env_file(tmp_path, monkeypatch):
+    import emailer
+
+    for k in ("EMAIL_PROVIDER", "EMAIL_ADDRESS", "EMAIL_APP_PASSWORD", "EMAIL_ALLOWED_TO"):
+        monkeypatch.delenv(k, raising=False)
+    env = tmp_path / "email.env"
+    env.write_text('# comment\nEMAIL_PROVIDER=zoho\nEMAIL_ADDRESS=me@zoho.com\nEMAIL_APP_PASSWORD="pw 123"\n')
+    monkeypatch.setenv("EMAIL_ENV_FILE", str(env))
+    emailer = importlib.reload(emailer)
+    s = emailer.settings()
+    assert (s["provider"], s["host"], s["password"]) == ("zoho", "smtp.zoho.com", "pw 123")
+    assert s["allowed"] == {"me@zoho.com"}
+    for k in ("EMAIL_PROVIDER", "EMAIL_ADDRESS", "EMAIL_APP_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)

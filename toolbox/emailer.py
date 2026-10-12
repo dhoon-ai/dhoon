@@ -56,7 +56,24 @@ class EmailError(Exception):
     """A problem the user can fix (settings, recipients, attachments): the message says how."""
 
 
+ENV_FILE = Path(os.environ.get("EMAIL_ENV_FILE", str(Path(__file__).resolve().parents[1] / "config" / "email.env")))
+
+
+def _load_env_file() -> None:
+    """Read config/email.env when the settings aren't in the environment yet (e.g. a script
+    run from the terminal). Values already set in the environment win."""
+    if os.environ.get("EMAIL_PROVIDER") or not ENV_FILE.is_file():
+        return
+    for line in ENV_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
 def settings() -> dict:
+    _load_env_file()
     provider = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
     address = os.environ.get("EMAIL_ADDRESS", "").strip()
     if not provider or not address:
