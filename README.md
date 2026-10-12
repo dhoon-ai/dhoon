@@ -57,8 +57,9 @@ uses the fast **Instruct** model. For really hard tasks, the planner can look up
 web how such a task is usually done (see below), which helps more than slow thinking.
 
 The 30B models are *mixture-of-experts*: 30B parameters, but only ~3B are used per token,
-so they run at usable speed on a CPU. Override any choice in `config/models.env`
-(copy `config/models.env.example`).
+so they run at usable speed on a CPU. Override any choice (models, context window, keep-alive, research engines) in
+`config/models.env` (copy `config/models.env.example`); see
+[Choosing different models and settings](docs/GUIDE.md#choosing-different-models-and-settings).
 
 ## How a request flows
 
@@ -269,7 +270,8 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Assistant's picture and the script that draws it
-scripts/        install steps 00 → 06, status, check, logs, benchmark, unban, update, uninstall
+scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
+                benchmark, unban, update, uninstall
 toolbox/        the MCP server with all agent tools
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates
@@ -290,6 +292,10 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
 - **Files**: the agent can only read and write `~/agent-workspace`.
 - **Ollama and LibreChat** are reachable on your home network. Never port-forward them
   to the internet. Disable sign-ups after creating your account (see the guide).
+- **Web research for hard tasks** sends only a short, generic how-to question; e-mails,
+  links, IPs, file paths and names, amounts, long numbers and your user/host names are
+  removed first, and the agent shows you the exact query.
+- **Logs stay local**: tool calls are logged to `runtime/logs/toolbox.log` on your computer.
 - **Web pages are untrusted**: content is labelled, and the agent instructions tell
   the model not to follow instructions found in it. No defence against prompt
   injection is perfect, so don't give a web-browsing agent dangerous tools.

@@ -103,7 +103,7 @@ such a task is usually done (see "Planning big tasks" below).
 | 28 GB or more | Strong agent; multi-step tasks and planning work well |
 | 8–27 GB | Fine for simple tasks; weaker as an agent |
 
-You can override these choices later (see "Choosing different models" below).
+You can override these choices later (see "Choosing different models and settings" below).
 
 ---
 
@@ -198,6 +198,11 @@ ollama --version
 ```
 
 You should see "Hello from Docker!" and an Ollama version number.
+
+Script 01 also sets up Ollama for agent work (`scripts/ollama_settings.sh`, safe to re-run):
+a bigger context window (32k tokens with 28+ GB RAM, else 16k) so long tasks don't lose
+your request, models kept in memory (forever with 28+ GB RAM, else 30 minutes), and a
+small service that loads the main model whenever Ollama starts.
 
 > **Have an NVIDIA graphics card?** Install its driver first
 > (`sudo ubuntu-drivers install`, then reboot). Ollama will use it automatically.
@@ -668,19 +673,28 @@ With a supported graphics card, expect answers several times faster.
 
 ---
 
-## Choosing different models
+## Choosing different models and settings
+
+All your own choices go in one file. Create it once, remove the `#` in front of a line
+and change the value:
 
 ```bash
 cp config/models.env.example config/models.env
-nano config/models.env      # remove the # in front of a line and set the model
-bash scripts/02_download_models.sh
-bash scripts/update.sh
+nano config/models.env
 ```
 
-Then run `bash scripts/06_create_agent.sh` to switch the Assistant to the new model (or
-pick it in the Agent Builder). Browse models at
-[ollama.com/library](https://ollama.com/library). For agents, choose models
-that list **tools** support.
+| Setting | Default | What it does | Then run |
+|---|---|---|---|
+| `MODEL_MAIN` | 30B Instruct with 28+ GB RAM, else 4B | The agent's model (runs tools and plans) | `bash scripts/02_download_models.sh`, `bash scripts/update.sh`, `bash scripts/06_create_agent.sh` |
+| `MODEL_FAST` | `qwen3:4b-instruct-2507-q4_K_M` | Quick questions, chat titles | same as above |
+| `MODEL_EMBED` | `nomic-embed-text` | Document search | same as above |
+| `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
+| `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
+| `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory | `bash scripts/ollama_settings.sh` |
+| `RESEARCH_ENGINES` | empty (SearXNG's usual engines) | Search engines for the "research how to do this" step | `bash scripts/04_toolbox.sh` |
+
+Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose
+models that list **tools** support and are *instruct* (not *thinking*) models.
 
 ---
 
@@ -802,7 +816,7 @@ select it with **+**. Check indexing with
 searched without OCR.
 
 **Out of memory / computer freezes**: Your main model is too big. Set a smaller
-`MODEL_MAIN` (see "Choosing different models").
+`MODEL_MAIN` (see "Choosing different models and settings").
 
 ---
 
