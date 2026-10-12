@@ -16,6 +16,8 @@ python3 -m venv "$RUNTIME/venv"
 
 # 4c. the only folder the agent may read/write
 mkdir -p "$WORKSPACE_DIR"
+# e-mail settings hold a password: readable only by you
+[ -f "$KIT/config/email.env" ] && chmod 600 "$KIT/config/email.env"
 
 # 4d. listen only on Docker's internal address (containers can reach it, your LAN cannot)
 BRIDGE_IP=$(docker_bridge_ip)
@@ -39,6 +41,8 @@ Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
 # every tool call is logged here (see: bash scripts/logs.sh)
 Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
+# e-mail settings for the send_email tool (optional; see config/email.env.example)
+EnvironmentFile=-$KIT/config/email.env
 # ask_planner can research on the web how a hard task is usually done (generic question
 # only, personal details removed). Empty = your SearXNG's usual engines. Choose your own in
 # config/models.env, e.g. RESEARCH_ENGINES="startpage,duckduckgo,brave"

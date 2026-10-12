@@ -120,7 +120,8 @@ step_done() {
         || { STATUS_REASON="toolbox service points to another folder"; return 1; }
       if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
         || ! grep -q "^Environment=RESEARCH_ENGINES=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
-        || ! grep -q "^Environment=TOOLBOX_LOG=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
+        || ! grep -q "^Environment=TOOLBOX_LOG=" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null \
+        || ! grep -q "^EnvironmentFile=-$KIT/config/email.env" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
         STATUS_REASON="toolbox settings out of date"; return 1
       fi
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \

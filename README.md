@@ -6,8 +6,8 @@ A **100% self-hosted, open-source AI agent** for an ordinary home computer: a mi
 an old desktop, a home server or a laptop. **No graphics card required.**
 
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
-work with files, run Python in a sandbox, answer questions about your PDFs and documents, and analyse
-stocks**, and you can teach it new skills with a few lines of Python.
+work with files, run Python in a sandbox, answer questions about your PDFs and documents, analyse
+stocks and e-mail you the results**, and you can teach it new skills with a few lines of Python.
 
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
 downloads and market data your agent asks for.
@@ -190,6 +190,7 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │                  (no network, read-only, no caps)   │
   │  stock_price_summary · stock_indicators ·           │
   │  stock_fundamentals · stock_save_history (CSV)      │
+  │  send_email (your SMTP account, allow-listed)       │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
   │  ask_planner ──▶ Instruct model in Ollama ──────────┘
@@ -296,6 +297,8 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
 - **Web research for hard tasks** sends only a short, generic how-to question; e-mails,
   links, IPs, file paths and names, amounts, long numbers and your user/host names are
   removed first, and the agent shows you the exact query.
+- **E-mail** goes only to the addresses you allow in `config/email.env` (default: yourself),
+  with workspace files only and a daily limit; the file is never committed.
 - **Logs stay local**: tool calls are logged to `runtime/logs/toolbox.log` on your computer.
 - **Web pages are untrusted**: content is labelled, and the agent instructions tell
   the model not to follow instructions found in it. No defence against prompt

@@ -6,3 +6,4 @@ pandas
 pypdf
 python-docx
 numpy
+markdown

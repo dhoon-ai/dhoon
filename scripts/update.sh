@@ -13,7 +13,8 @@ step "Updating toolbox"
 # make sure the service file has the current settings (e.g. PLANNER_MODEL)
 if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
    || ! grep -q "^Environment=RESEARCH_ENGINES=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
-   || ! grep -q "^Environment=TOOLBOX_LOG=" /etc/systemd/system/ai-toolbox.service 2>/dev/null; then
+   || ! grep -q "^Environment=TOOLBOX_LOG=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
+   || ! grep -q "^EnvironmentFile=-$KIT/config/email.env" /etc/systemd/system/ai-toolbox.service 2>/dev/null; then
   warn "Toolbox service settings are outdated - re-running script 04"
   bash "$KIT/scripts/04_toolbox.sh"
 fi
