@@ -856,7 +856,9 @@ def _load_plugins() -> list[str]:
     return loaded
 
 
-LOADED_PLUGINS = _load_plugins()
+# Scripts that only borrow the toolbox's helpers (e.g. a plugin's own command line) set
+# TOOLBOX_NO_PLUGINS=1, so plugins aren't loaded (and logged) a second time.
+LOADED_PLUGINS = [] if os.environ.get("TOOLBOX_NO_PLUGINS") else _load_plugins()
 
 
 # ------------------------------------------------------------------ start ---
