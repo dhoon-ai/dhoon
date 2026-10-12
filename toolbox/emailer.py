@@ -4,6 +4,8 @@ emailer.py - send e-mail (with attachments) through your own mail account over S
 Settings come from config/email.env (the toolbox service loads it; never commit it):
 
   EMAIL_PROVIDER=gmail          gmail | zoho | zoho-in | zoho-eu | outlook | office365 | custom
+                                or, over HTTPS (when mail ports are blocked): resend | brevo
+  EMAIL_API_KEY=...             only for resend / brevo
   EMAIL_ADDRESS=you@gmail.com   the account that sends
   EMAIL_APP_PASSWORD="abcd efgh ijkl mnop"   an app password, not your normal password
   EMAIL_ALLOWED_TO=you@gmail.com,you@outlook.com   the ONLY addresses the agent may write to
@@ -49,6 +51,12 @@ AUTH_HELP = {
 }
 AUTH_HELP["zoho-in"] = AUTH_HELP["zoho-eu"] = AUTH_HELP["zoho"]
 AUTH_HELP["office365"] = AUTH_HELP["outlook"]
+# Providers that send through a web API over HTTPS (port 443): they work on networks where
+# the mail ports 587/465 are blocked or cut off. Value: the API address.
+API_PROVIDERS = {
+    "resend": "https://api.resend.com/emails",
+    "brevo": "https://api.brevo.com/v3/smtp/email",
+}
 # Second way to connect if the first one fails before login (blocked port, cut connection)
 FALLBACK = {
     "gmail": ("smtp.gmail.com", 465, "ssl"),
@@ -83,19 +91,29 @@ def settings() -> dict:
     _load_env_file()
     provider = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
     address = os.environ.get("EMAIL_ADDRESS", "").strip()
+    if provider == "resend" and not address:
+        address = "onboarding@resend.dev"  # Resend's test sender: works without your own domain
     if not provider or not address:
         raise EmailError(
             "E-mail is not set up. Copy config/email.env.example to config/email.env, fill it in, "
             "then run: bash scripts/04_toolbox.sh"
         )
-    if provider == "custom":
+    if provider in API_PROVIDERS:
+        host, port, security = API_PROVIDERS[provider], 443, "https"
+        if not os.environ.get("EMAIL_API_KEY", "").strip():
+            raise EmailError(f"EMAIL_API_KEY is missing in config/email.env (your {provider} API key).")
+        if not os.environ.get("EMAIL_ALLOWED_TO", "").strip():
+            raise EmailError("Set EMAIL_ALLOWED_TO in config/email.env to your own inbox (where mail may go).")
+    elif provider == "custom":
         host = os.environ.get("EMAIL_SMTP_HOST", "")
         port = int(os.environ.get("EMAIL_SMTP_PORT", "587"))
         security = os.environ.get("EMAIL_SMTP_SECURITY", "starttls").lower()
     elif provider in PROVIDERS:
         host, port, security = PROVIDERS[provider]
     else:
-        raise EmailError(f"Unknown EMAIL_PROVIDER '{provider}'. Use one of: {', '.join(PROVIDERS)}, custom.")
+        raise EmailError(
+            f"Unknown EMAIL_PROVIDER '{provider}'. Use one of: {', '.join([*PROVIDERS, *API_PROVIDERS])}, custom."
+        )
     password = os.environ.get("EMAIL_APP_PASSWORD", "")
     if provider == "gmail":
         password = password.replace(" ", "")  # Google shows app passwords in groups of 4
@@ -104,6 +122,7 @@ def settings() -> dict:
         "provider": provider,
         "address": address,
         "password": password,
+        "api_key": os.environ.get("EMAIL_API_KEY", "").strip(),
         "host": host,
         "port": port,
         "security": security,
@@ -147,6 +166,58 @@ def markdown_to_html(text: str) -> str:
         "th{background:#f3f3f3}"
     )
     return f"<html><head><style>{style}</style></head><body>{body}</body></html>"
+
+
+def _send_api(cfg: dict, recipients: list[str], subject: str, body_markdown: str, attachments: list[Path]) -> None:
+    """Send through Resend or Brevo's web API (HTTPS)."""
+    import base64
+
+    import httpx
+
+    files = [(a.name, base64.b64encode(a.read_bytes()).decode()) for a in attachments]
+    html = markdown_to_html(body_markdown)
+    if cfg["provider"] == "resend":
+        headers = {"Authorization": f"Bearer {cfg['api_key']}"}
+        body = {
+            "from": formataddr((cfg["from_name"], cfg["address"])),
+            "to": recipients,
+            "subject": subject,
+            "html": html,
+            "text": body_markdown,
+            "attachments": [{"filename": n, "content": c} for n, c in files],
+        }
+    else:  # brevo
+        headers = {"api-key": cfg["api_key"], "accept": "application/json"}
+        body = {
+            "sender": {"name": cfg["from_name"], "email": cfg["address"]},
+            "to": [{"email": r} for r in recipients],
+            "subject": subject,
+            "htmlContent": html,
+        }
+        if files:
+            body["attachment"] = [{"name": n, "content": c} for n, c in files]
+    try:
+        r = httpx.post(API_PROVIDERS[cfg["provider"]], json=body, headers=headers, timeout=60)
+    except httpx.HTTPError as e:
+        raise EmailError(f"Could not reach {cfg['provider']} ({type(e).__name__}: {e}).") from None
+    if r.status_code in (200, 201, 202):
+        return
+    try:
+        detail = r.json().get("message") or r.text
+    except ValueError:
+        detail = r.text
+    detail = str(detail)[:300]
+    if r.status_code in (401, 403):
+        hint = f"Check EMAIL_API_KEY (the {cfg['provider']} API key) in config/email.env."
+        if cfg["provider"] == "resend" and "own email" in detail:
+            hint = (
+                "Without your own domain, Resend only sends to the e-mail address you signed up with: "
+                "put that address in EMAIL_ALLOWED_TO."
+            )
+        if cfg["provider"] == "brevo" and "sender" in detail.lower():
+            hint = "EMAIL_ADDRESS must be a sender you verified in Brevo (Senders, Domains & Dedicated IPs)."
+        raise EmailError(f"{cfg['provider']} refused it ({r.status_code}): {detail}. {hint}")
+    raise EmailError(f"{cfg['provider']} could not send it ({r.status_code}): {detail}")
 
 
 def _deliver(host: str, port: int, security: str, cfg: dict, msg: EmailMessage) -> None:
@@ -193,6 +264,12 @@ def send(
     total = sum(Path(a).stat().st_size for a in attachments)
     if total > MAX_ATTACHMENTS_MB * 1024 * 1024:
         raise EmailError(f"Attachments are {total / 1e6:.1f} MB; the limit is {MAX_ATTACHMENTS_MB} MB.")
+
+    if cfg["provider"] in API_PROVIDERS:
+        _send_api(cfg, recipients, subject[:200], body_markdown, [Path(a) for a in attachments])
+        _count_one()
+        names = f" with {len(attachments)} attachment(s)" if attachments else ""
+        return f"E-mail '{subject[:80]}' sent to {', '.join(recipients)}{names} (via {cfg['provider']})."
 
     msg = EmailMessage()
     msg["From"] = formataddr((cfg["from_name"], cfg["address"]))

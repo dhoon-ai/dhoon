@@ -168,3 +168,63 @@ def test_no_second_send_if_goodbye_fails_and_clear_error_when_all_fail(tb, monke
     FakeSMTP.drop_on_starttls = True
     out = tb.send_email("me@gmail.com", "x", "y")
     assert "Tried smtp-mail.outlook.com:587" in out and "block mail ports" in out
+
+
+class FakeAPIResponse:
+    def __init__(self, status, data):
+        self.status_code, self._data, self.text = status, data, str(data)
+
+    def json(self):
+        return self._data
+
+
+def test_resend_over_https_with_attachment(tb, monkeypatch):
+    calls = []
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("EMAIL_ADDRESS", "")
+    monkeypatch.setenv("EMAIL_API_KEY", "re_test123")
+    monkeypatch.setenv("EMAIL_ALLOWED_TO", "me@gmail.com")
+    monkeypatch.setattr(
+        "httpx.post",
+        lambda url, json=None, headers=None, timeout=None: (
+            calls.append((url, json, headers)) or FakeAPIResponse(200, {"id": "x"})
+        ),
+    )
+    (tb.WORKSPACE / "r.md").parent.mkdir(parents=True, exist_ok=True)
+    (tb.WORKSPACE / "r.md").write_text("# Report")
+    out = tb.send_email("me@gmail.com", "Daily", "**hi**", "r.md")
+    assert "sent to me@gmail.com with 1 attachment(s) (via resend)" in out and not FakeSMTP.sent
+    url, body, headers = calls[0]
+    assert url == "https://api.resend.com/emails" and headers["Authorization"] == "Bearer re_test123"
+    assert "onboarding@resend.dev" in body["from"] and body["to"] == ["me@gmail.com"]
+    assert "<strong>hi</strong>" in body["html"] and body["attachments"][0]["filename"] == "r.md"
+
+
+def test_brevo_and_friendly_api_errors(tb, monkeypatch):
+    monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
+    monkeypatch.setenv("EMAIL_ADDRESS", "mentor@gmail.com")
+    monkeypatch.setenv("EMAIL_API_KEY", "xkeysib-1")
+    monkeypatch.setenv("EMAIL_ALLOWED_TO", "me@gmail.com")
+    calls = []
+    monkeypatch.setattr(
+        "httpx.post",
+        lambda url, json=None, headers=None, timeout=None: (
+            calls.append((url, json, headers)) or FakeAPIResponse(201, {"messageId": "1"})
+        ),
+    )
+    assert "(via brevo)" in tb.send_email("me@gmail.com", "x", "y")
+    url, body, headers = calls[0]
+    assert url == "https://api.brevo.com/v3/smtp/email" and headers["api-key"] == "xkeysib-1"
+    assert body["sender"]["email"] == "mentor@gmail.com" and body["to"] == [{"email": "me@gmail.com"}]
+    monkeypatch.setattr(
+        "httpx.post", lambda *a, **k: FakeAPIResponse(401, {"message": "Key not found", "code": "unauthorized"})
+    )
+    assert "Check EMAIL_API_KEY" in tb.send_email("me@gmail.com", "x", "y")
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setattr(
+        "httpx.post",
+        lambda *a, **k: FakeAPIResponse(403, {"message": "You can only send testing emails to your own email address"}),
+    )
+    assert "address you signed up with" in tb.send_email("me@gmail.com", "x", "y")
+    monkeypatch.setenv("EMAIL_API_KEY", "")
+    assert "EMAIL_API_KEY is missing" in tb.send_email("me@gmail.com", "x", "y")

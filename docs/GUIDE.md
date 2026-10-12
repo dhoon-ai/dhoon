@@ -597,6 +597,8 @@ The Assistant can e-mail you messages and files from your workspace (reports, ch
 | Zoho Mail | `zoho` (`zoho-in` for accounts made in India, `zoho-eu` Europe) | Account → Security → App passwords (needed when 2-factor login is on) |
 | Outlook / Microsoft 365 | `outlook` / `office365` | Microsoft is retiring password sign-in for apps (OAuth2 only), so sending usually fails with "basic authentication is not supported". Send with Gmail or Zoho instead; you can still send **to** your Outlook address |
 | Other | `custom` | Your provider's SMTP host, port and security |
+| **Resend** (over HTTPS) | `resend` | No password: an API key. See "If the mail ports are blocked" below |
+| **Brevo** (over HTTPS) | `brevo` | No password: an API key. See below |
 
 **2. Fill in the settings and test:**
 
@@ -609,6 +611,31 @@ bash scripts/email_test.sh     # sends a test e-mail to the first address in EMA
 
 `EMAIL_ADDRESS` is the account that sends (it can be a separate account just for the agent);
 `EMAIL_ALLOWED_TO` is where mail may go, e.g. your personal inbox.
+
+**If the mail ports are blocked** (the test says "Connection unexpectedly closed" on
+ports 587 and 465): some networks block or cut e-mail connections. Send over HTTPS (port 443,
+like web browsing) through a free e-mail service instead. Your messages then pass through
+that company.
+
+*Resend* (simplest; free plan: 100 e-mails a day, 3,000 a month):
+1. Sign up at [resend.com](https://resend.com) with the address you want to receive mail at.
+2. **API Keys** → **Create API Key**, permission *Sending access*, copy the key (`re_…`).
+3. In `config/email.env`: `EMAIL_PROVIDER=resend`, `EMAIL_API_KEY=re_…`,
+   `EMAIL_ALLOWED_TO=<the address you signed up with>`. Leave `EMAIL_ADDRESS` empty.
+   Without your own domain, Resend sends from `onboarding@resend.dev` and only to the
+   address you signed up with: exactly right for reports to yourself.
+
+*Brevo* (free plan with a daily limit; you choose the sender address):
+1. Sign up at [brevo.com](https://www.brevo.com).
+2. **Senders, Domains & Dedicated IPs** → **Senders** → add the address that should send
+   (e.g. a Gmail address) and click the link in the confirmation e-mail.
+3. **SMTP & API** → **API Keys** → **Generate a new API key**, copy it (`xkeysib-…`).
+4. In `config/email.env`: `EMAIL_PROVIDER=brevo`, `EMAIL_API_KEY=xkeysib-…`,
+   `EMAIL_ADDRESS=<the verified sender>`, `EMAIL_ALLOWED_TO=<your inbox>`.
+   Mail from a Gmail sender sent through Brevo may land in spam the first time: mark it
+   "Not spam".
+
+Then run `bash scripts/email_test.sh` again.
 
 **Safety:** the agent can only send to the addresses in `EMAIL_ALLOWED_TO` (by default only
 your own), only attach files from your workspace, and at most `EMAIL_MAX_PER_DAY` (20) e-mails
