@@ -49,6 +49,13 @@ AUTH_HELP = {
 }
 AUTH_HELP["zoho-in"] = AUTH_HELP["zoho-eu"] = AUTH_HELP["zoho"]
 AUTH_HELP["office365"] = AUTH_HELP["outlook"]
+# Second way to connect if the first one fails before login (blocked port, cut connection)
+FALLBACK = {
+    "gmail": ("smtp.gmail.com", 465, "ssl"),
+    "zoho": ("smtp.zoho.com", 587, "starttls"),
+    "zoho-in": ("smtp.zoho.in", 587, "starttls"),
+    "zoho-eu": ("smtp.zoho.eu", 587, "starttls"),
+}
 MAX_ATTACHMENTS_MB = 15
 
 
@@ -142,6 +149,26 @@ def markdown_to_html(text: str) -> str:
     return f"<html><head><style>{style}</style></head><body>{body}</body></html>"
 
 
+def _deliver(host: str, port: int, security: str, cfg: dict, msg: EmailMessage) -> None:
+    context = ssl.create_default_context()
+    if security == "ssl":
+        server = smtplib.SMTP_SSL(host, port, context=context, timeout=60)
+    else:
+        server = smtplib.SMTP(host, port, timeout=60)
+    try:
+        if security != "ssl":
+            server.starttls(context=context)
+        server.login(cfg["address"], cfg["password"])
+        server.send_message(msg)
+    except BaseException:
+        server.close()
+        raise
+    try:  # the message is accepted: a problem while saying goodbye must not cause a second send
+        server.quit()
+    except (smtplib.SMTPException, OSError):
+        server.close()
+
+
 def send(
     to: list[str],
     subject: str,
@@ -179,23 +206,25 @@ def send(
         maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
         msg.add_attachment(path.read_bytes(), maintype=maintype, subtype=subtype, filename=path.name)
 
-    context = ssl.create_default_context()
-    try:
-        if cfg["security"] == "ssl":
-            server = smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context, timeout=60)
-        else:
-            server = smtplib.SMTP(cfg["host"], cfg["port"], timeout=60)
-        with server:
-            if cfg["security"] != "ssl":
-                server.starttls(context=context)
-            server.login(cfg["address"], cfg["password"])
-            server.send_message(msg)
-    except smtplib.SMTPAuthenticationError as e:
+    attempts = [(cfg["host"], cfg["port"], cfg["security"])]
+    if cfg["provider"] in FALLBACK:  # e.g. Gmail on port 465 when port 587 is blocked or cut off
+        attempts.append(FALLBACK[cfg["provider"]])
+    problems = []
+    for host, port, security in attempts:
+        try:
+            _deliver(host, port, security, cfg, msg)
+            break
+        except smtplib.SMTPAuthenticationError as e:
+            raise EmailError(
+                f"The mail server refused the login ({e.smtp_code}). {AUTH_HELP.get(cfg['provider'], '')}".strip()
+            ) from None
+        except (smtplib.SMTPException, OSError) as e:
+            problems.append(f"{host}:{port} ({security}): {type(e).__name__}: {e}")
+    else:
         raise EmailError(
-            f"The mail server refused the login ({e.smtp_code}). {AUTH_HELP.get(cfg['provider'], '')}".strip()
-        ) from None
-    except (smtplib.SMTPException, OSError) as e:
-        raise EmailError(f"Could not send through {cfg['host']}:{cfg['port']}: {type(e).__name__}: {e}") from None
+            "Could not send. Tried " + "; ".join(problems) + ". Check the internet connection; some networks "
+            "block mail ports 587/465 (try another network, or ask your provider)."
+        )
     _count_one()
     names = f" with {len(attachments)} attachment(s)" if attachments else ""
     return f"E-mail '{subject[:80]}' sent to {', '.join(recipients)}{names}."

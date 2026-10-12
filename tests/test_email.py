@@ -16,6 +16,8 @@ sys.path.insert(0, str(REPO / "toolbox"))
 class FakeSMTP:
     sent = []
     fail_login = False
+    drop_on_starttls = False
+    fail_quit = False
 
     def __init__(self, host, port, context=None, timeout=None):
         self.host, self.port, self.tls = host, port, False
@@ -27,7 +29,16 @@ class FakeSMTP:
         return False
 
     def starttls(self, context=None):
+        if FakeSMTP.drop_on_starttls:
+            raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
         self.tls = True
+
+    def quit(self):
+        if FakeSMTP.fail_quit:
+            raise smtplib.SMTPServerDisconnected("gone")
+
+    def close(self):
+        pass
 
     def login(self, user, password):
         if FakeSMTP.fail_login:
@@ -47,7 +58,7 @@ def tb(tmp_path, monkeypatch):
     monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "abcd efgh ijkl mnop")
     monkeypatch.setenv("EMAIL_ALLOWED_TO", "me@gmail.com, Me@Outlook.com")
-    FakeSMTP.sent, FakeSMTP.fail_login = [], False
+    FakeSMTP.sent, FakeSMTP.fail_login, FakeSMTP.drop_on_starttls, FakeSMTP.fail_quit = [], False, False, False
     import emailer
     import toolbox_server
 
@@ -138,3 +149,22 @@ def test_test_script_prints_a_message_instead_of_a_traceback(tmp_path):
     env = {"PATH": "/usr/bin:/bin", "EMAIL_ENV_FILE": str(tmp_path / "none.env"), "HOME": str(tmp_path)}
     r = subprocess.run([sys.executable, str(REPO / "toolbox/emailer.py")], env=env, capture_output=True, text=True)
     assert r.returncode == 1 and "E-mail not sent: E-mail is not set up" in r.stdout and "Traceback" not in r.stderr
+
+
+def test_gmail_falls_back_to_port_465_when_587_is_cut(tb):
+    FakeSMTP.drop_on_starttls = True
+    assert "sent to me@gmail.com" in tb.send_email("me@gmail.com", "x", "y")
+    server, _ = FakeSMTP.sent[-1]
+    assert (server.host, server.port, server.tls) == ("smtp.gmail.com", 465, False)
+    assert len(FakeSMTP.sent) == 1
+
+
+def test_no_second_send_if_goodbye_fails_and_clear_error_when_all_fail(tb, monkeypatch):
+    FakeSMTP.fail_quit = True
+    assert "sent" in tb.send_email("me@gmail.com", "x", "y")
+    assert len(FakeSMTP.sent) == 1  # accepted once, not retried on port 465
+    FakeSMTP.fail_quit = False
+    monkeypatch.setenv("EMAIL_PROVIDER", "outlook")  # no fallback for Outlook
+    FakeSMTP.drop_on_starttls = True
+    out = tb.send_email("me@gmail.com", "x", "y")
+    assert "Tried smtp-mail.outlook.com:587" in out and "block mail ports" in out
