@@ -35,3 +35,7 @@ bash scripts/06_create_agent.sh         # give them (and instructions.md) to the
 
 Check it loaded: `journalctl -u ai-toolbox -n 30 | grep PLUGIN`. A plugin can keep its own
 git history: run `git init` inside its folder (this repo ignores it).
+
+Because plugins are never pushed, a broken disk would lose them. `scripts/backup.sh --setup`
+backs up this folder (with each plugin's git history) encrypted to a private repo of yours;
+see "Encrypted backup" in docs/GUIDE.md.

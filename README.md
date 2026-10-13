@@ -272,7 +272,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Assistant's picture and the script that draws it
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
-                benchmark, unban, update, uninstall
+                benchmark, unban, update, uninstall, encrypted backup + restore
 toolbox/        the MCP server with all agent tools
 plugins/        your private add-on tools (git-ignored, see plugins/README.md)
 sandbox/        Dockerfile for the isolated Python sandbox
@@ -299,6 +299,8 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
   removed first, and the agent shows you the exact query.
 - **E-mail** goes only to the addresses you allow in `config/email.env` (default: yourself),
   with workspace files only and a daily limit; the file is never committed.
+- **Backups** (optional, `scripts/backup.sh`) are encrypted with age on your computer, to
+  an offline recovery key and optionally a YubiKey, before they go to your private git repo.
 - **Logs stay local**: tool calls are logged to `runtime/logs/toolbox.log` on your computer.
 - **Web pages are untrusted**: content is labelled, and the agent instructions tell
   the model not to follow instructions found in it. No defence against prompt

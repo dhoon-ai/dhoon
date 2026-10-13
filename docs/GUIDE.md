@@ -642,6 +642,78 @@ your own), only attach files from your workspace, and at most `EMAIL_MAX_PER_DAY
 a day. This matters because a web page could try to trick the agent into mailing your files to
 someone else. `config/email.env` is never committed and is readable only by you.
 
+## Encrypted backup (optional)
+
+Back up your private files off this computer: private plugins (with their own git history),
+settings including secrets (`config/`), and the agent's workspace. The backup is **encrypted
+on your computer** before it goes to a private GitHub repo (or any git server you choose). A
+"private" repo still lives on someone else's servers. Encrypted, the host stores bytes it
+can't read.
+
+Each backup is encrypted with [age](https://age-encryption.org) to:
+- a **recovery key**, a small text file you keep **offline** (USB stick, printed paper), and
+- optionally a **YubiKey or other FIDO2 security key**: opening needs the physical key and a touch.
+
+Either one opens a backup. Making a backup needs only the public keys, so the daily run
+works while the key is unplugged.
+
+**1. Install age** (and the security-key plugin, if you have one):
+
+```bash
+sudo apt install age
+# Optional, for a YubiKey / FIDO2 key: get the newest version number from
+# https://github.com/olastor/age-plugin-fido2-hmac/releases
+sudo apt install libfido2-1
+VERSION=v0.5.0
+curl -fsSLO https://github.com/olastor/age-plugin-fido2-hmac/releases/download/$VERSION/age-plugin-fido2-hmac-$VERSION-linux-amd64.tar.gz
+tar -xzf age-plugin-fido2-hmac-$VERSION-linux-amd64.tar.gz
+sudo install -m 755 age-plugin-fido2-hmac/age-plugin-fido2-hmac /usr/local/bin/
+```
+
+**2. Create an empty private repo** on github.com: New repository → *Private* → no README.
+
+**3. Run the setup** and answer its questions:
+
+```bash
+bash scripts/backup.sh --setup
+```
+
+- **Keys:** it makes the recovery key. If the plugin is installed, it offers to add your
+  security key: answer `y` to the PIN question and `y` to "separate identity".
+- **What:** it lists the folders it will back up, with their sizes. Press Enter, or type your own list.
+- **Where:** your GitHub user name and the repo name. It then shows a key line. In the repo,
+  open **Settings → Deploy keys → Add deploy key**, paste it and tick **Allow write access**.
+  This key can push to that one repo and nothing else, and it uses port 443, which works on
+  networks that block SSH.
+- **When:** every day at 07:15 (`ai-backup.timer`). It then makes the first backup.
+
+**4. Copy the keys to a USB stick, now.** Copy `~/.config/ai-kit-backup/recovery-key.txt`,
+and `yubikey.txt` if you made one. Keep the stick somewhere safe, then you may delete
+`recovery-key.txt` from the computer. **Lose every key and the backups can never be opened.**
+
+**Getting files back:**
+
+| What | Command |
+|---|---|
+| Does the newest backup open? (monthly) | `bash scripts/restore.sh --test` |
+| List backups and what's inside | `bash scripts/restore.sh --list` |
+| Unpack to `~/restore-<time>/` to look | `bash scripts/restore.sh` |
+| Put everything back | `bash scripts/restore.sh --apply` |
+| Put back one folder | `bash scripts/restore.sh --only ai-kit/plugins/NAME` |
+| Without the security key | add `--key /media/usb/recovery-key.txt` |
+| On a new computer | `bash scripts/restore.sh --from https://github.com/USER/REPO.git --key …` |
+| Back up right now | `bash scripts/backup.sh` |
+
+What is there now is moved aside to `NAME.before-restore-<time>`, never deleted. On a new
+computer, install the kit first. `--from` asks you to log in to GitHub: as the password, use
+a [personal access token](https://github.com/settings/tokens). Or download the newest `.age`
+file from the repo's web page and run `bash scripts/restore.sh --key … FILE.age`.
+
+The backup repo keeps one commit with the newest 30 backups, so it never grows forever.
+Settings are in `~/.config/ai-kit-backup/backup.env`: `BACKUP_KEEP`, `BACKUP_PATHS`,
+`BACKUP_EXCLUDE` (e.g. `'*.mp4 downloads'`) and `BACKUP_TIME`. A backup over 95 MB is refused,
+because GitHub rejects files that big. Leave big folders out. Log: `journalctl -u ai-backup`.
+
 ---
 
 ## Ask questions about your documents
@@ -776,6 +848,7 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | Restart Ollama | `sudo systemctl restart ollama` |
 | Why did a chat stop? (all logs + diagnosis) | `bash scripts/logs.sh` (`--follow` to watch live) |
 | Send a test e-mail | `bash scripts/email_test.sh` |
+| Encrypted backup now / check it opens | `bash scripts/backup.sh` / `bash scripts/restore.sh --test` |
 | Every tool call the agent made | `less runtime/logs/toolbox.log` |
 | See chat website errors | `cd runtime/LibreChat && docker compose logs api --tail 50` |
 | List models | `ollama list` |

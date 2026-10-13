@@ -135,12 +135,12 @@ def test_settings_are_read_from_the_env_file(tmp_path, monkeypatch):
 
 
 def test_send_test_goes_to_your_inbox_not_the_sender(tb, monkeypatch):
-    monkeypatch.setenv("EMAIL_ADDRESS", "mentor-bot@gmail.com")
+    monkeypatch.setenv("EMAIL_ADDRESS", "agent-bot@gmail.com")
     monkeypatch.setenv("EMAIL_ALLOWED_TO", "Me@Personal.com, other@x.com")
     out = tb.emailer.send_test()
     assert "sent to Me@Personal.com" in out
     server, msg = FakeSMTP.sent[-1]
-    assert msg["To"] == "Me@Personal.com" and "mentor-bot@gmail.com" in msg["From"]
+    assert msg["To"] == "Me@Personal.com" and "agent-bot@gmail.com" in msg["From"]
 
 
 def test_test_script_prints_a_message_instead_of_a_traceback(tmp_path):
@@ -202,7 +202,7 @@ def test_resend_over_https_with_attachment(tb, monkeypatch):
 
 def test_brevo_and_friendly_api_errors(tb, monkeypatch):
     monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
-    monkeypatch.setenv("EMAIL_ADDRESS", "mentor@gmail.com")
+    monkeypatch.setenv("EMAIL_ADDRESS", "agent@gmail.com")
     monkeypatch.setenv("EMAIL_API_KEY", "xkeysib-1")
     monkeypatch.setenv("EMAIL_ALLOWED_TO", "me@gmail.com")
     calls = []
@@ -215,7 +215,7 @@ def test_brevo_and_friendly_api_errors(tb, monkeypatch):
     assert "(via brevo)" in tb.send_email("me@gmail.com", "x", "y")
     url, body, headers = calls[0]
     assert url == "https://api.brevo.com/v3/smtp/email" and headers["api-key"] == "xkeysib-1"
-    assert body["sender"]["email"] == "mentor@gmail.com" and body["to"] == [{"email": "me@gmail.com"}]
+    assert body["sender"]["email"] == "agent@gmail.com" and body["to"] == [{"email": "me@gmail.com"}]
     monkeypatch.setattr(
         "httpx.post", lambda *a, **k: FakeAPIResponse(401, {"message": "Key not found", "code": "unauthorized"})
     )
