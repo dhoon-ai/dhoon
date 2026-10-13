@@ -32,7 +32,7 @@ render_librechat_config
 (cd "$LIBRECHAT_DIR" && docker compose pull && docker compose up -d)
 
 step "Updating Ollama"
-curl -fsSL https://ollama.com/install.sh | sh
+install_ollama   # downloads only when a different version is wanted
 
 if ! grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
    || ! grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \

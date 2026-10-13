@@ -23,7 +23,7 @@ sudo usermod -aG docker "$USER"
 # ---- Ollama ----
 if ! command -v ollama >/dev/null 2>&1; then
   echo "--- Installing Ollama ---"
-  curl -fsSL https://ollama.com/install.sh | sh
+  install_ollama
 fi
 
 bash "$KIT/scripts/ollama_settings.sh"

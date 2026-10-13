@@ -40,4 +40,31 @@ def test_update_waits_for_ollama_before_downloading_models():
     'could not connect to ollama server' (found by the bare-metal release test)."""
     text = (REPO / "scripts/update.sh").read_text()
     wait, pull = text.index("wait_for_ollama"), text.index("ollama pull")
-    assert text.index("ollama.com/install.sh") < wait < pull
+    assert text.index("install_ollama") < wait < pull
+
+
+def test_ollama_is_downloaded_only_when_the_version_changes(tmp_path):
+    """update.sh used to re-download Ollama (~1.5 GB) and restart it on every run."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "ollama").write_text('#!/bin/bash\necho "ollama version is 0.12.6"\n')
+    log = tmp_path / "curl.log"
+    (bin_dir / "curl").write_text(
+        f'#!/bin/bash\necho "$*" >> {log}\n'
+        'case "$*" in *releases/latest*) echo -n "https://github.com/ollama/ollama/releases/tag/v$LATEST" ;;\n'
+        "  *install.sh*) echo 'echo installing $OLLAMA_VERSION' ;; esac\n"
+    )
+    for f in bin_dir.iterdir():
+        f.chmod(0o755)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "RUNTIME_DIR": str(tmp_path / "rt")}
+
+    def run(**extra):
+        r = subprocess.run(["bash", "-c", f"source {REPO}/scripts/lib.sh && install_ollama"],
+                           env={**env, **extra}, capture_output=True, text=True)  # fmt: skip
+        return r.stdout
+
+    assert "already the right version" in run(LATEST="0.12.6")
+    assert "install.sh" not in log.read_text()
+    assert "installing 0.12.7" in run(LATEST="0.12.7")  # a newer release
+    assert "already the right version" in run(LATEST="0.12.7", OLLAMA_VERSION="0.12.6")  # pinned
+    assert "installing 0.12.5" in run(LATEST="0.12.7", OLLAMA_VERSION="0.12.5")

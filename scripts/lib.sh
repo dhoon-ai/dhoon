@@ -74,6 +74,26 @@ cpu_temp() {
 }
 
 # IP address of Docker's internal bridge (containers reach the host here)
+# Ollama: install or update only when the version changes (its installer downloads ~1.5 GB
+# and restarts Ollama every time). OLLAMA_VERSION (config/models.env) pins one, e.g. 0.12.6;
+# empty = the newest release.
+ollama_installed_version() { ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1; }
+ollama_latest_version() {
+  curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/ollama/ollama/releases/latest 2>/dev/null \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$'
+}
+install_ollama() {
+  local want have
+  want="${OLLAMA_VERSION:-$(ollama_latest_version)}"
+  have="$(ollama_installed_version)"
+  if [ -n "$have" ] && { [ -z "$want" ] || [ "$have" = "$want" ]; }; then
+    ok "Ollama $have is already the right version (nothing to download)"
+    return 0
+  fi
+  echo "Installing Ollama ${want:-(newest)}${have:+ (now $have)}"
+  curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION="$want" sh
+}
+
 # Wait until Ollama answers (after an install or restart it takes a few seconds). 0 = ready.
 wait_for_ollama() {
   local _

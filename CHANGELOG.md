@@ -9,6 +9,9 @@
 - **Memory.** The assistant remembers what you tell it about yourself across chats, using the
   small fast model and your own database. Each person can switch it off in Settings ->
   Personalization; `MEMORY=off` in `config/models.env` switches it off for everyone.
+- **Updates download Ollama only when needed.** `update.sh` used to download Ollama
+  (~1.5 GB) and restart it every time; now only when the version changes.
+  `OLLAMA_VERSION` in `config/models.env` can pin one.
 - **Excel and Word.** The Assistant can make `.xlsx` and `.docx` files (the code sandbox now
   has openpyxl and python-docx) and `read_document` / `search_document` read Excel files.
 
