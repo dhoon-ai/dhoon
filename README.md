@@ -212,6 +212,15 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
 The models are *open-weight* (free to download and use; training data not public).
 Market data comes from Yahoo Finance via yfinance.
 
+## After a reboot
+
+Everything starts by itself: Docker, Ollama (and the main model is loaded into memory),
+SearXNG, LibreChat and the toolbox with your plugins. Scheduled jobs keep their times, and a
+job missed while the computer was off runs shortly after it starts. Give it 2-3 minutes after
+boot; `bash scripts/check.sh` confirms. If something is stuck, `bash scripts/restart.sh`
+restarts every part in order and runs the check, with no reboot needed. Details: "After a
+reboot" in [docs/GUIDE.md](docs/GUIDE.md).
+
 ## Logs: finding out why a chat stopped
 
 ```bash
@@ -272,7 +281,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Assistant's picture and the script that draws it
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
-                benchmark, unban, update, uninstall, encrypted backup + restore
+                benchmark, unban, update, restart, uninstall, encrypted backup + restore
 toolbox/        the MCP server with all agent tools
 plugins/        your private add-on tools (git-ignored, see plugins/README.md)
 sandbox/        Dockerfile for the isolated Python sandbox

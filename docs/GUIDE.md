@@ -855,9 +855,39 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | Which models are in memory now | `ollama ps` (UNTIL "Forever" = pinned) |
 | Load the main model now | `bash scripts/preload_model.sh` |
 | Remove the services (keeps data) | `bash scripts/uninstall.sh` |
+| Restart everything (when something is stuck) | `bash scripts/restart.sh` |
 | Remove everything | see "Uninstall and start over" below |
 
-Everything starts automatically after a reboot.
+### After a reboot (or a power cut)
+
+**You don't need to do anything: everything starts by itself.** Give it 2-3 minutes, then
+open the chat website as usual. To be sure, run `bash scripts/check.sh`.
+
+| Part | Starts by itself because | Ready after about |
+|---|---|---|
+| Docker | it's a system service (script 01 turned it on) | 10 seconds |
+| Ollama (the AI models) | it's a system service (its installer turned it on) | 10 seconds |
+| Main model loaded into memory | `ai-model-preload` runs whenever Ollama starts | 1-3 minutes (big model) |
+| SearXNG (private search) | its container restarts unless you stopped it | 20 seconds |
+| LibreChat (website and its database) | its containers always restart | 1 minute |
+| Toolbox (agent tools and your private plugins) | the `ai-toolbox` service, started after Docker | 15 seconds |
+| Scheduled jobs (encrypted backup, plugin jobs) | systemd timers | at their usual times |
+
+A scheduled job that was missed while the computer was off (for example a nightly job at
+01:30, or the 07:15 backup) runs a few minutes after the computer starts. A long nightly job
+can make the computer slower for a while. See what's scheduled with
+`systemctl list-timers 'ai-*'`.
+
+**If something is stuck** (the website doesn't load, the agent doesn't answer, tools fail),
+you don't have to reboot. Run:
+
+```bash
+bash scripts/restart.sh
+```
+
+It restarts Ollama, SearXNG, LibreChat and the toolbox in the right order, reloads the main
+model in the background, shows the scheduled jobs and runs the health check. Your chats,
+files, models and settings are kept. To restart just one part, see the table above.
 
 ---
 
