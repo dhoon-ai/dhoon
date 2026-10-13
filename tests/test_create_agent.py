@@ -186,3 +186,10 @@ def _no_tty(monkeypatch):
 def test_parse_handles_librechat_sse_error():
     parsed = create_agent.LibreChat._parse(b'event: error\ndata: "Illegal request"\n\n')
     assert parsed["error"] is True and "Illegal request" in parsed["message"]
+
+
+def test_instructions_stay_the_same_all_day_so_ollama_can_reuse_them():
+    # a changing time at the top made the model re-read ~5,000 tokens on every message
+    text = (Path(__file__).resolve().parents[1] / "config" / "agent-instructions.md").read_text()
+    assert "{{current_datetime}}" not in text and "{{iso_datetime}}" not in text
+    assert text.rstrip().endswith("Today is {{current_date}}. For the exact time, call current_datetime.")

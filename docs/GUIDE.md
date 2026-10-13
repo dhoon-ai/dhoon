@@ -334,7 +334,6 @@ updates the agent instead of making a second one. Reload the web page and pick
 
      ```text
      You are a helpful general-purpose assistant running privately on the user's computer.
-     Current date and time: {{current_datetime}}.
 
      How to work:
      - First decide how to handle the request, like a query optimizer choosing the cheapest
@@ -387,6 +386,8 @@ updates the agent instead of making a second one. Reload the web page and pick
        Never invent or guess an e-mail address: use only one the user wrote, otherwise ask.
      - For stocks, use the stock_* tools and quote their numbers. For a chart, first call
        stock_save_history, then read that CSV file in run_python. Never give buy/sell advice.
+
+     Today is {{current_date}}. For the exact time, call current_datetime.
      ```
 3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all 13 of its tools
    (including `ask_planner`, `search_document` and `read_document`) are selected.
@@ -797,7 +798,19 @@ faster, and it has less computing power. A separate NVIDIA/AMD graphics card wit
 memory is different: it is usually many times faster. `scripts/benchmark.sh` measures this
 on your own PC and picks the faster option.
 
+**Why the first answer of the day takes minutes, even for "send a test e-mail":** before
+the Assistant can do anything, the model reads its instructions and the description of every
+tool, about 5,000 tokens (more with plugins). On a CPU it reads roughly 20-50 tokens a second,
+so that's 2-4 minutes, and nothing shows on screen meanwhile. Ollama keeps what it has read
+in memory, so the next messages (in this chat or a new one the same day) skip that part and
+start within seconds. The memory is reset when something else uses the main model (the
+planner, a nightly plugin job) and when the date changes. Measure your PC's reading speed:
 
+```bash
+M=$(bash -c 'source scripts/lib.sh; echo $MODEL_MAIN')
+curl -s http://127.0.0.1:11434/api/generate -d "{\"model\": \"$M\", \"prompt\": \"$(printf 'word %.0s' {1..2000})\", \"stream\": false, \"options\": {\"num_predict\": 1}}" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); s=d['prompt_eval_duration']/1e9; print(f\"{d['prompt_eval_count']} tokens read in {s:.0f} s = {d['prompt_eval_count']/s:.0f} tokens/s\")"
+```
 
 - Short questions with the 4b model: a few seconds.
 - Agent tasks with the main model: **30 seconds to several minutes**, because each
