@@ -4,9 +4,9 @@ cache: true
 
 # Memory: when you say "Remember that..." (and only then), the small fast model saves it and
 # the assistant knows it in later chats. Kept in your own database on this computer; see and
-# delete memories in Settings -> Personalization. Each person can switch it off in
-# Settings -> Personalization; switch it off for everyone with MEMORY=off in
-# config/models.env (then: bash scripts/05_librechat.sh).
+# delete memories in Settings -> Personalization. Off unless MEMORY=on in config/models.env
+# (the installer asks; then: bash scripts/05_librechat.sh). When on, each person can still
+# switch it off in Settings -> Personalization.
 memory:
   disabled: __MEMORY_DISABLED__
   personalize: true

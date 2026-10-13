@@ -52,8 +52,8 @@ def test_render_copies_the_icons(tmp_path):
     assert re.search(r"default: \[\"a\", \"b\"\]", (lc / "librechat.yaml").read_text())
 
 
-def test_memory_uses_the_fast_model_and_can_be_switched_off(tmp_path):
-    for setting, disabled in (("", False), ("off", True)):
+def test_memory_is_off_unless_switched_on_and_uses_the_fast_model(tmp_path):
+    for setting, disabled in (("", True), ("off", True), ("on", False)):
         env = {**os.environ, "RUNTIME_DIR": str(tmp_path / setting), "MODEL_MAIN": "big", "MODEL_FAST": "small",
                "MEMORY": setting}  # fmt: skip
         (tmp_path / setting / "LibreChat").mkdir(parents=True, exist_ok=True)

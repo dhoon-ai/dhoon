@@ -618,7 +618,7 @@ also covers your scheduled tasks, home city and Google sign-in from `runtime/`).
 | **Your home city** | "What's the weather?" without naming a place | Nothing to edit: the first time you ask, the Assistant asks and remembers it | — |
 | **Models, memory, context** | other models or settings than the ones picked from your RAM | `cp config/models.env.example config/models.env`, then edit ([table](#choosing-different-models-and-settings)) | the command in the table's last column |
 | **Encrypted backup** | a daily copy of your settings, plugins and workspace off this computer | `bash scripts/backup.sh --setup` ([Encrypted backup](#encrypted-backup-optional)); settings in `~/.config/ai-kit-backup/` | copy the recovery key to a USB stick |
-| **Memory** | the assistant remembering things across chats when you say *"Remember that…"* (it saves nothing unasked); see and delete memories in **Settings → Personalization**; on by default | each person: **Settings → Personalization**; everyone: `MEMORY=off` in `config/models.env` | `bash scripts/05_librechat.sh` |
+| **Memory** | the assistant remembering things across chats when you say *"Remember that…"* (it saves nothing unasked); see and delete memories in **Settings → Personalization**; **off** unless you said yes during install | everyone: `MEMORY=on` or `off` in `config/models.env`; when on, each person can switch it off in **Settings → Personalization** | `bash scripts/05_librechat.sh` |
 | **Lock sign-up** | stopping others on your network from making an account | `runtime/LibreChat/.env`: `ALLOW_REGISTRATION=false` ([Safety](#safety)) | `cd runtime/LibreChat && docker compose up -d` |
 | **Your own tools** | new skills, kept private | a folder in `plugins/` ([ADDING_TOOLS.md](ADDING_TOOLS.md)) | `sudo systemctl restart ai-toolbox` and `bash scripts/06_create_agent.sh` |
 
@@ -989,7 +989,7 @@ nano config/models.env
 | `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
 | `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory | `bash scripts/ollama_settings.sh` |
-| `MEMORY` | `on` | Memory across chats (a small model notes what you tell it about yourself, next to each answer) | `bash scripts/05_librechat.sh` |
+| `MEMORY` | `off` (the installer asks) | Memory across chats: when you say *"Remember that…"*, a small model saves it for later chats | `bash scripts/05_librechat.sh` |
 | `RESEARCH_ENGINES` | empty (SearXNG's usual engines) | Search engines for the "research how to do this" step | `bash scripts/04_toolbox.sh` |
 
 Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose

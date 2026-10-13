@@ -30,6 +30,7 @@ def test_installer_runs_all_steps_in_order(tmp_path):
         "02_download_models.sh",
         "03_searxng.sh",
         "04_toolbox.sh",
+        "memory across chats",
         "05_librechat.sh",
         "06_create_agent.sh",
         "bash scripts/benchmark.sh",
@@ -78,3 +79,25 @@ def test_new_installs_go_to_dhoon(tmp_path):
 def test_an_install_from_before_the_rename_is_updated_in_place(tmp_path):
     home, out = _dry_run_home(tmp_path, old_install=True)
     assert f"Getting the project into {home}/ai-kit" in out and f"git -C {home}/ai-kit pull" in out
+
+
+def _ask_memory(tmp_path, answer_env, models_env=None):
+    """Run only the installer's memory question (taken from install.sh) in a test folder."""
+    (tmp_path / "config").mkdir(parents=True)
+    if models_env is not None:
+        (tmp_path / "config" / "models.env").write_text(models_env)
+    src = (REPO / "install.sh").read_text()
+    func = src[src.index("  ask_memory() {") : src.index("  ask_memory\n")]
+    script = f'say() {{ echo "$*"; }}\ndir="{tmp_path}"; dry=""\n{func}\nask_memory\n'
+    env = {**{k: v for k, v in os.environ.items() if k != "MEMORY"}, **answer_env}
+    r = subprocess.run(["setsid", "bash", "-c", script], env=env, capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL, timeout=30)  # fmt: skip  # setsid: no terminal to ask
+    assert r.returncode == 0, r.stderr
+    return (tmp_path / "config" / "models.env").read_text()
+
+
+def test_memory_question_saves_the_answer_and_defaults_to_off(tmp_path):
+    assert _ask_memory(tmp_path / "a", {}).strip().endswith("MEMORY=off")  # nobody to ask: off
+    assert _ask_memory(tmp_path / "b", {"MEMORY": "on"}).strip().endswith("MEMORY=on")
+    kept = _ask_memory(tmp_path / "c", {"MEMORY": "on"}, models_env="MEMORY=off\n")
+    assert kept == "MEMORY=off\n"  # asked only once

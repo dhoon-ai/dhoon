@@ -6,10 +6,12 @@
   (chats, accounts, agents, memories) is exported to `runtime/chat-backup/` and backed up
   with the rest. `bash scripts/restore.sh --chats` puts it back. Files uploaded in chats are
   optional (`BACKUP_CHAT_UPLOADS=yes`).
-- **Memory.** Say *"Remember that…"* and the assistant remembers it in later chats (it saves
-  nothing unasked; see and delete memories in Settings -> Personalization), using the
-  small fast model and your own database. Each person can switch it off in Settings ->
-  Personalization; `MEMORY=off` in `config/models.env` switches it off for everyone.
+- **Memory (optional, off by default).** The installer asks whether to switch it on. Then
+  say *"Remember that…"* and the assistant remembers it in later chats (it saves nothing
+  unasked; see and delete memories in Settings -> Personalization), using the small fast
+  model and your own database. Change it with `MEMORY=on` or `off` in `config/models.env`,
+  then `bash scripts/05_librechat.sh`. When on, each person can switch it off in Settings ->
+  Personalization.
 - **Updates download Ollama only when needed.** `update.sh` used to download Ollama
   (~1.5 GB) and restart it every time; now only when the version changes.
   `OLLAMA_VERSION` in `config/models.env` can pin one.

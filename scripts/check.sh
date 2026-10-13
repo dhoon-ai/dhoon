@@ -82,8 +82,8 @@ if [ -f "$HOME/.config/ai-kit-backup/backup.env" ]; then
     echo "    backup:     set up, daily$( [ -f "$KIT/runtime/chat-backup/librechat.archive.gz" ] && echo ", chats included")"
   else echo "    backup:     set up, but not scheduled  ->  bash scripts/backup.sh --setup"; fi
 else echo "    backup:     not set up (bash scripts/backup.sh --setup)"; fi
-if [ "${MEMORY:-on}" = "off" ]; then echo "    memory:     off for everyone (MEMORY=off in config/models.env)"
-else echo "    memory:     on (each person can switch it off in Settings -> Personalization)"; fi
+if [ "${MEMORY:-off}" = "on" ]; then echo "    memory:     on (each person can switch it off in Settings -> Personalization)"
+else echo "    memory:     off (switch on: MEMORY=on in config/models.env, then bash scripts/05_librechat.sh)"; fi
 reg=$(setting ALLOW_REGISTRATION "$LIBRECHAT_DIR/.env")
 if [ "$reg" = "false" ]; then echo "    sign-up:    locked"
 else echo "    sign-up:    open to anyone on your network (lock it: docs/GUIDE.md \"Safety\")"; fi

@@ -16,6 +16,7 @@
 #   LIBRECHAT_EMAIL / LIBRECHAT_PASSWORD   account for the web app (otherwise asked)
 #   SKIP_MODELS=1             skip downloading models (if you manage them yourself)
 #   RUN_BENCHMARK=yes|no      answer the speed-test question in advance
+#   MEMORY=on|off             answer the memory question in advance (default: off)
 #   INSTALL_DRY_RUN=1         only print the steps
 #   FORCE=1                   re-run every step even if it looks done
 #
@@ -122,6 +123,27 @@ EOT
 
   do_step 3 "Starting the private search engine" as_docker scripts/03_searxng.sh
   do_step 4 "Starting the agent toolbox" as_docker scripts/04_toolbox.sh
+  # Memory across chats: off unless you say yes. Asked once; the answer is saved as MEMORY=
+  # in config/models.env (change it there any time, then: bash scripts/05_librechat.sh).
+  ask_memory() {
+    local f="$dir/config/models.env" answer="${MEMORY:-}"
+    grep -qs '^MEMORY=' "$f" && return 0   # chosen before
+    say "Optional: memory across chats"
+    echo "  When you say \"Remember that...\", the Assistant saves it and knows it in later chats."
+    echo "  It stays on this computer. The first answer after saving a memory is slower."
+    if [ -n "$dry" ]; then echo "  [dry-run] ask, then save MEMORY=on|off in config/models.env"; return 0; fi
+    if [ -z "$answer" ]; then
+      if [ -r /dev/tty ]; then read -r -p "  Switch memory on? [y/N] " answer </dev/tty || answer=""
+      else answer="no"; fi
+    fi
+    case "$answer" in y|Y|yes|YES|on|1) MEMORY=on ;; *) MEMORY=off ;; esac
+    printf '\n# Memory across chats (chosen during install). After changing: bash scripts/05_librechat.sh\nMEMORY=%s\n' \
+      "$MEMORY" >> "$f"
+    echo "  Memory is $MEMORY. Change it any time: MEMORY=on or off in config/models.env,"
+    echo "  then: bash scripts/05_librechat.sh"
+  }
+  ask_memory
+
   do_step 5 "Installing the LibreChat web app" as_docker scripts/05_librechat.sh
 
   create_agent() {
