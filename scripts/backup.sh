@@ -290,7 +290,7 @@ Each file in `backups/` is encrypted with age to a recovery key (kept offline) a
 set up, a YubiKey / FIDO2 security key. Without one of them the files can't be read, not by the
 git host either. `yubikey-identity.txt` is not a secret: it is useless without the physical key.
 
-Restore with Dhoon (https://github.com/dhoon-ai/dhoon):
+Restore with Dhoon (https://dhoon.knowreva.com):
 
     bash scripts/restore.sh                        # newest backup, security key (touch it)
     bash scripts/restore.sh --key recovery-key.txt # with the recovery key instead

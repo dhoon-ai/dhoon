@@ -12,6 +12,7 @@ def test_page_offers_the_install_command():
     page = (REPO / "site" / "index.html").read_text()
     assert "install.sh | bash" in page and 'new URL("install.sh", location.href)' in page
     assert "docs/GUIDE.md" in page and "<title>Dhoon" in page
+    assert "curl -fsSL https://dhoon.knowreva.com/install.sh | bash" in page  # shown without JavaScript
     assert (REPO / "site" / ".nojekyll").exists()
 
 

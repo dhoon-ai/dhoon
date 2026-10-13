@@ -1,8 +1,9 @@
 name: Website
 
 # Publishes site/ and install.sh with GitHub Pages, so the home page and the short install
-# command always match main:  curl -fsSL https://dhoon-ai.github.io/dhoon/install.sh | bash
-# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
+# command always match main:  curl -fsSL https://dhoon.knowreva.com/install.sh | bash
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions", Custom domain:
+# dhoon.knowreva.com (a CNAME record dhoon -> dhoon-ai.github.io), Enforce HTTPS.
 
 on:
   push:

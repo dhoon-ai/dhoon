@@ -35,7 +35,7 @@ BROWSER_HEADERS = {
 # Honest identity, as asked for by e.g. Wikimedia's User-Agent policy. Used for Wikipedia's
 # API and as a retry when a site refuses the browser-style request.
 BOT_HEADERS = {
-    "User-Agent": "Dhoon/1.0 (+https://github.com/dhoon-ai/dhoon; personal self-hosted assistant)",
+    "User-Agent": "Dhoon/1.0 (+https://dhoon.knowreva.com; personal self-hosted assistant)",
     "Accept": "text/html,application/json,application/pdf,text/plain;q=0.9,*/*;q=0.8",
 }
 MAX_DOWNLOAD = 5_000_000  # bytes

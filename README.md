@@ -2,6 +2,8 @@
 
 # Dhoon
 
+**Website: [dhoon.knowreva.com](https://dhoon.knowreva.com)**
+
 *Dhoon comes from the Hindi धुन (dhun): the inner spark, the drive that keeps going until the
 work is done. Dhoon is an AI assistant with that drive, running privately on your own computer.*
 
@@ -19,7 +21,7 @@ downloads, market data and weather your agent asks for, and the calendars you co
 **Install with one command** (Ubuntu/Debian, run as your normal user):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dhoon-ai/dhoon/main/install.sh | bash
+curl -fsSL https://dhoon.knowreva.com/install.sh | bash
 ```
 
 It runs the whole setup, including creating the agent, and asks only for your password

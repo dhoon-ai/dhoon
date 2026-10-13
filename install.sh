@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command installer for Dhoon, your private AI assistant.
 #
-#   curl -fsSL https://raw.githubusercontent.com/dhoon-ai/dhoon/main/install.sh | bash
+#   curl -fsSL https://dhoon.knowreva.com/install.sh | bash
 #
 # It downloads the project to ~/dhoon and runs scripts 00-06 in order: hardware check,
 # Docker + Ollama, models, private search, toolbox, LibreChat, and the Assistant agent.

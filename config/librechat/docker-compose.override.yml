@@ -4,7 +4,7 @@ services:
     environment:
       # Dhoon branding: these win over the same names in LibreChat's .env
       - APP_TITLE=Dhoon
-      - "CUSTOM_FOOTER=[Dhoon](https://github.com/dhoon-ai/dhoon) · your private AI, on your own computer · chat app by [LibreChat](https://librechat.ai)"
+      - "CUSTOM_FOOTER=[Dhoon](https://dhoon.knowreva.com) · your private AI, on your own computer · chat app by [LibreChat](https://librechat.ai)"
       - HELP_AND_FAQ_URL=https://github.com/dhoon-ai/dhoon/blob/main/docs/GUIDE.md
     volumes:
       - ./librechat.yaml:/app/librechat.yaml

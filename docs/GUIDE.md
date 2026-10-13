@@ -26,7 +26,7 @@ To open a Terminal on Ubuntu: press **Ctrl + Alt + T**.
 If you're happy to let a script do every step for you, open a Terminal and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dhoon-ai/dhoon/main/install.sh | bash
+curl -fsSL https://dhoon.knowreva.com/install.sh | bash
 ```
 
 It does Steps 0 and 2–8 below automatically (about 30–90 minutes, mostly downloads). It
