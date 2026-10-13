@@ -298,7 +298,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
-assets/         the Assistant's picture and the script that draws it
+assets/         the agents' pictures and the script that draws them
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
                 benchmark, unban, update, restart, uninstall, encrypted backup + restore
 toolbox/        the MCP server: toolbox_server.py (core) + toolset/ (the tools, one file per

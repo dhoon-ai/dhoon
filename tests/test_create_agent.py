@@ -152,6 +152,10 @@ def test_existing_account_creates_agent_then_updates_on_rerun():
     assert len(fake.agents) == 2  # no duplicates
     assert fake.violations == 0  # always looked like a browser (LibreChat bans non-browsers)
     assert fake.avatar_uploads == 2  # a picture for each, added once, not again on the re-run
+    assert (
+        create_agent.QUICK_AVATAR.exists()
+        and create_agent.QUICK_AVATAR.read_bytes() != create_agent.AVATAR.read_bytes()
+    )
 
 
 def test_missing_account_is_created_with_yes():

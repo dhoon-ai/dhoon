@@ -28,6 +28,7 @@ from pathlib import Path
 KIT = Path(__file__).resolve().parents[1]
 AGENT_NAME = "Assistant"
 AVATAR = KIT / "assets" / "assistant-avatar.png"
+QUICK_AVATAR = KIT / "assets" / "quick-assistant-avatar.png"  # amber, with a lightning bolt
 # The custom endpoint is named "Ollama" in librechat.yaml, but LibreChat normalises that name
 # to lowercase "ollama" for its model lists, so agents must use the lowercase id. Using
 # "Ollama" makes chats fail with "Models for Ollama could not be loaded".
@@ -215,7 +216,7 @@ def ask(prompt: str, secret: bool = False) -> str:
         sys.exit("No terminal available: set LIBRECHAT_EMAIL and LIBRECHAT_PASSWORD.")
 
 
-def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str) -> int:
+def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str, avatar: Path = AVATAR) -> int:
     """Create or update one agent. Returns 1 if some tools were not accepted, else 0."""
     name = payload["name"]
     existing = [a for a in agents if a.get("name") == name]
@@ -230,8 +231,8 @@ def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str) -
     if status not in (200, 201) or not agent_id or data.get("error"):
         sys.exit(f"Could not save the agent '{name}' (status {status}): {data}")
 
-    if AVATAR.exists() and not data.get("avatar"):
-        a_status, a_data = lc.upload_avatar(agent_id, AVATAR)
+    if avatar.exists() and not data.get("avatar"):
+        a_status, a_data = lc.upload_avatar(agent_id, avatar)
         if a_status in (200, 201) and not a_data.get("error"):
             print(f"  Added the picture to '{name}'.")
         else:
@@ -292,8 +293,8 @@ def main() -> int:
         data = {}
     agents = data.get("data") or []
     problems = 0
-    for payload in (agent_payload(args.model), quick_payload(args.model)):
-        problems += save_agent(lc, payload, agents, args.model)
+    for payload, avatar in ((agent_payload(args.model), AVATAR), (quick_payload(args.model), QUICK_AVATAR)):
+        problems += save_agent(lc, payload, agents, args.model, avatar)
     if problems:
         return 1
     marker = Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-created"  # read by status.sh

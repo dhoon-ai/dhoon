@@ -318,7 +318,7 @@ It asks for your web-app email and password (and offers to create the account if
 doesn't exist yet), lifts any LibreChat sign-in ban left by an earlier attempt, then creates the **Assistant** agent with the right model, all toolbox
 tools, File Search, the instructions below, a few starter prompts and its picture
 (`assets/assistant-avatar.png`; swap in your own image to change it). It also creates the
-**Quick Assistant**: the same model with only the everyday tools (weather, calendar,
+**Quick Assistant** (its own amber picture with a lightning bolt, `assets/quick-assistant-avatar.png`): the same model with only the everyday tools (weather, calendar,
 reminders and scheduled tasks, web search, e-mail) and short instructions, so it answers
 faster (see "How fast should it be?"). Running it again updates both agents instead of making
 new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assistant**).
