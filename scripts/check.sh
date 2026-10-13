@@ -56,6 +56,33 @@ else fail "Sandbox image missing  ->  bash scripts/04_toolbox.sh"; problems=$((p
 if curl -fs http://localhost:3080 >/dev/null; then ok "LibreChat web UI is up (http://localhost:3080)"
 else fail "LibreChat  ->  cd $LIBRECHAT_DIR && docker compose up -d"; problems=$((problems+1)); fi
 
+# Optional settings (docs/GUIDE.md "After installing: your settings"); never counted as problems.
+setting() { sed -n "s/^$1=//p" "$2" 2>/dev/null | tail -1 | tr -d '"'"'"; }
+echo
+echo "  Your settings:"
+if [ -f "$KIT/config/email.env" ]; then
+  echo "    e-mail:     $(setting EMAIL_PROVIDER "$KIT/config/email.env"), only to: $(setting EMAIL_ALLOWED_TO "$KIT/config/email.env")   (test: bash scripts/email_test.sh)"
+else echo "    e-mail:     not set up (config/email.env)"; fi
+cal="private calendar"
+if [ -f "$KIT/config/calendar.env" ]; then
+  [ -n "$(setting CALENDAR_ICS_URLS "$KIT/config/calendar.env")" ] && cal+=", calendar links"
+  [ -n "$(setting CALDAV_URL "$KIT/config/calendar.env")" ] && cal+=", CalDAV"
+fi
+[ -f "$RUNTIME/google_token.json" ] && cal+=", Google (read and write)"
+echo "    calendars:  $cal"
+if [ -f "$KIT/config/models.env" ] && grep -q '^[A-Z]' "$KIT/config/models.env"; then
+  echo "    models:     your choices in config/models.env"
+else echo "    models:     chosen from your RAM (change in config/models.env)"; fi
+if [ -f "$HOME/.config/ai-kit-backup/backup.env" ]; then
+  if systemctl is-active --quiet ai-backup.timer 2>/dev/null; then echo "    backup:     set up, daily"
+  else echo "    backup:     set up, but not scheduled  ->  bash scripts/backup.sh --setup"; fi
+else echo "    backup:     not set up (bash scripts/backup.sh --setup)"; fi
+reg=$(setting ALLOW_REGISTRATION "$LIBRECHAT_DIR/.env")
+if [ "$reg" = "false" ]; then echo "    sign-up:    locked"
+else echo "    sign-up:    open to anyone on your network (lock it: docs/GUIDE.md \"Safety\")"; fi
+plugins=$(find "$KIT/plugins" -mindepth 1 -maxdepth 1 -type d ! -name '__pycache__' -printf '%f ' 2>/dev/null)
+echo "    plugins:    ${plugins:-none}"
+
 echo
 echo "  Memory: $(free -h | awk '/Mem:/{print $3" used of "$2}')"
 echo "  Disk /: $(df -h / | awk 'NR==2{print $4" free"}')"

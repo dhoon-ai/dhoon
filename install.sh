@@ -158,6 +158,7 @@ EOT
   echo "Choose  Agents -> Assistant  and try one of the suggested starters."
   echo "Log out and back in once, so 'docker' works in new terminals without sudo."
   echo "Guide: $dir/docs/GUIDE.md"
+  echo "Optional: e-mail, calendars, backups -> the guide's \"After installing: your settings\"."
 }
 
 main "$@"

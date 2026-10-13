@@ -35,6 +35,8 @@ password for the web app** (that account is created for you), and finally whethe
 the optional **speed test** (`scripts/benchmark.sh`, about 5 minutes), which switches
 Ollama to CPU only if that turns out faster on your PC. When it finishes, open
 **http://localhost:3080**, choose **Agents → Assistant**, and jump to **Step 9**.
+Then set up what you want from [After installing: your settings](#after-installing-your-settings):
+e-mail, calendars, backups and more.
 
 **If a step fails, the installer stops** instead of carrying on with a half-working setup.
 It shows a red box with what to do:
@@ -596,6 +598,26 @@ used. Free its disk space with `ollama rm qwen3:30b-a3b-thinking-2507-q4_K_M` (o
 `bash scripts/06_create_agent.sh`.
 
 ---
+
+## After installing: your settings
+
+Dhoon works without any of these. Each one switches on something extra. Every settings
+file is yours only: never committed to git, readable only by you, kept by `update.sh`,
+and included in the encrypted backup (`config/` by default; a backup set up with v1.0 or later
+also covers your scheduled tasks, home city and Google sign-in from `runtime/`).
+
+| What | Needed for | How to set it up | Then |
+|---|---|---|---|
+| **E-mail** | `send_email`, and getting scheduled results by e-mail | `cp config/email.env.example config/email.env`, then fill it in ([Send e-mail](#send-e-mail-optional)) | `bash scripts/email_test.sh` (sends a test and restarts the toolbox) |
+| **Calendars** | Google, Outlook, iCloud, Nextcloud calendars (your private calendar works without) | `cp config/calendar.env.example config/calendar.env`, then fill it in ([Calendar](#weather-calendar-and-scheduled-tasks)) | `sudo systemctl restart ai-toolbox`, check with `runtime/venv/bin/python toolbox/calendars.py` |
+| **Google Calendar, read and write** | adding events to Google Calendar | `config/google_oauth_client.json`, then `runtime/venv/bin/python toolbox/calendars.py --google-setup` ([steps](#weather-calendar-and-scheduled-tasks)) | `sudo systemctl restart ai-toolbox` |
+| **Your home city** | "What's the weather?" without naming a place | Nothing to edit: the first time you ask, the Assistant asks and remembers it | — |
+| **Models, memory, context** | other models or settings than the ones picked from your RAM | `cp config/models.env.example config/models.env`, then edit ([table](#choosing-different-models-and-settings)) | the command in the table's last column |
+| **Encrypted backup** | a daily copy of your settings, plugins and workspace off this computer | `bash scripts/backup.sh --setup` ([Encrypted backup](#encrypted-backup-optional)); settings in `~/.config/ai-kit-backup/` | copy the recovery key to a USB stick |
+| **Lock sign-up** | stopping others on your network from making an account | `runtime/LibreChat/.env`: `ALLOW_REGISTRATION=false` ([Safety](#safety)) | `cd runtime/LibreChat && docker compose up -d` |
+| **Your own tools** | new skills, kept private | a folder in `plugins/` ([ADDING_TOOLS.md](ADDING_TOOLS.md)) | `sudo systemctl restart ai-toolbox` and `bash scripts/06_create_agent.sh` |
+
+See what's set up at any time: `bash scripts/check.sh`.
 
 ## Send e-mail (optional)
 

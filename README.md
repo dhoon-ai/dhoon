@@ -33,6 +33,9 @@ command to run and fix that step by hand, then you re-run the installer.
 > **New to this?** Follow **[docs/GUIDE.md](docs/GUIDE.md)**. It's written for
 > beginners, with copy-paste commands for every step.
 
+**Optional settings** (e-mail, calendars, your own models, encrypted backup, locking sign-up):
+see [After installing: your settings](docs/GUIDE.md#after-installing-your-settings).
+
 ## Requirements
 
 | | Minimum | Recommended |

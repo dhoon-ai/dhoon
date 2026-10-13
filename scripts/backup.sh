@@ -6,7 +6,8 @@
 #   bash scripts/restore.sh --help   get files back
 #
 # What: by default your private plugins (plugins/, with their own git history), your settings
-# (config/, including secrets such as email.env) and the agent's workspace. Change the list
+# (config/, including secrets such as email.env, plus scheduled tasks, home city and Google
+# sign-in from runtime/) and the agent's workspace. Change the list
 # with --setup or BACKUP_PATHS in the settings file. Everything is packed into one file and
 # encrypted with age (https://age-encryption.org) to:
 #   - a recovery key: a small text file you keep OFFLINE (USB stick, paper), and optionally
@@ -52,7 +53,10 @@ home_rel() {
 
 default_paths() {
   local out=() p
-  for p in "$KIT/plugins" "$KIT/config" "$WORKSPACE_DIR"; do
+  # plus the few settings the toolbox keeps in runtime/: scheduled tasks, your home city,
+  # the Google Calendar sign-in
+  for p in "$KIT/plugins" "$KIT/config" "$WORKSPACE_DIR" \
+           "$KIT/runtime/schedule.json" "$KIT/runtime/assistant.json" "$KIT/runtime/google_token.json"; do
     [ -e "$p" ] && out+=("$(home_rel "$p" || true)")
   done
   printf '%s ' "${out[@]}"

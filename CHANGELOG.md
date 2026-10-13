@@ -26,8 +26,13 @@ that keeps going until the work is done). Website: https://dhoon.knowreva.com
 - Main model kept in memory, instructions read in advance (fast first answer), short tool
   outputs, CPU-vs-GPU speed test.
 
+**Settings in one place**
+- The guide's "After installing: your settings" lists every optional setting (e-mail,
+  calendars, models, backup, sign-up lock, your own tools); `scripts/check.sh` shows which
+  are set up, without showing any secret.
+
 **Reliability and safety**
 - Status, check, logs and restart scripts; automatic start after a reboot.
 - Encrypted daily backups to a git repo you own (recovery key and optional YubiKey).
 - LibreChat (code and images) and SearXNG pinned to the tested versions.
-- 139 automated tests and CI on every push.
+- 141 automated tests and CI on every push.
