@@ -248,6 +248,12 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 
 ## Design choices for modest hardware
 
+- **A tested LibreChat version.** The chat website is pinned to the exact LibreChat commit
+  and images Dhoon was tested with (`LIBRECHAT_REF` in `scripts/lib.sh` and the images in
+  `config/librechat/docker-compose.override.yml`), so a change upstream can't break an
+  install. `scripts/update.sh` keeps it there; moving to a newer LibreChat is a deliberate,
+  tested release.
+
 - **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
   `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait
   for the 19 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
@@ -302,6 +308,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 ## Repository layout
 
 ```
+CHANGELOG.md    what changed in each release
 install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Dhoon logo, the agents' pictures and the scripts that draw them
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,

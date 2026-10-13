@@ -1,6 +1,9 @@
 # Your changes on top of LibreChat's own docker-compose.yml (never edit that one).
 services:
+  # LibreChat's images pinned to the exact builds Dhoon is tested with (matching
+  # LIBRECHAT_REF in scripts/lib.sh), so a change upstream can't break a new install.
   api:
+    image: registry.librechat.ai/librechat-ai/librechat-dev@sha256:9ff616417d60b6ad5f2362736a3a1fd51b9faf01a41e0d070f2d40da11f33b5e
     environment:
       # Dhoon branding: these win over the same names in LibreChat's .env
       - APP_TITLE=Dhoon
@@ -16,7 +19,10 @@ services:
       - ./branding/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
       - ./branding/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
       - ./branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
+  admin-panel:
+    image: registry.librechat.ai/clickhouse/librechat-admin-panel@sha256:a395465d1daa3c11495810a8c224df86675985d50de42e98e36eeedbd8aecb94
   rag_api:
+    image: registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite@sha256:a62ce2221b43a9bb57fa6cb733e7047c80132960272c33d5704028f3071a1251
     # lets the document-search service reach Ollama on the host for embeddings
     extra_hosts:
       - "host.docker.internal:host-gateway"

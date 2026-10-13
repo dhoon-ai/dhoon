@@ -6,9 +6,7 @@ source "$(dirname "$0")/lib.sh"
 
 step "Script 05: installing LibreChat"
 
-if [ ! -d "$LIBRECHAT_DIR/.git" ]; then
-  git clone --depth 1 https://github.com/danny-avila/LibreChat.git "$LIBRECHAT_DIR"
-fi
+librechat_checkout   # the LibreChat version Dhoon is tested with (LIBRECHAT_REF in lib.sh)
 cd "$LIBRECHAT_DIR"
 [ -f .env ] || cp .env.example .env
 

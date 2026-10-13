@@ -8,6 +8,11 @@ KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME="${RUNTIME_DIR:-$KIT/runtime}"
 LIBRECHAT_DIR="$RUNTIME/LibreChat"
 SEARXNG_DIR="$RUNTIME/searxng"
+# The LibreChat version Dhoon is tested with. Its images are pinned to match in
+# config/librechat/docker-compose.override.yml. To move to a newer LibreChat: change both,
+# run scripts/update.sh, test, then release.
+LIBRECHAT_REF="${LIBRECHAT_REF:-e1dfc10449ff713faffacd60273fddcfe2c0a698}"
+LIBRECHAT_GIT_URL="${LIBRECHAT_GIT_URL:-https://github.com/danny-avila/LibreChat.git}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
 
@@ -72,6 +77,18 @@ docker_bridge_ip() {
 }
 
 # Copy the LibreChat config template, filling in the chosen model names.
+# Get LibreChat's files at exactly LIBRECHAT_REF (new install, or an older install that
+# followed LibreChat's main branch). Your .env and the files Dhoon writes there are kept.
+librechat_checkout() {
+  if [ ! -d "$LIBRECHAT_DIR/.git" ]; then
+    git init -q "$LIBRECHAT_DIR"
+    git -C "$LIBRECHAT_DIR" remote add origin "$LIBRECHAT_GIT_URL"
+  fi
+  [ "$(git -C "$LIBRECHAT_DIR" rev-parse -q --verify HEAD 2>/dev/null)" = "$LIBRECHAT_REF" ] && return 0
+  git -C "$LIBRECHAT_DIR" fetch -q --depth 1 origin "$LIBRECHAT_REF"
+  git -C "$LIBRECHAT_DIR" checkout -q --detach FETCH_HEAD
+}
+
 render_librechat_config() {
   sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
     "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"

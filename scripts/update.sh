@@ -27,7 +27,7 @@ docker pull searxng/searxng:latest
 bash "$KIT/scripts/03_searxng.sh"
 
 step "Updating LibreChat"
-git -C "$LIBRECHAT_DIR" pull --ff-only
+librechat_checkout   # stays on the tested version (LIBRECHAT_REF in lib.sh)
 render_librechat_config
 (cd "$LIBRECHAT_DIR" && docker compose pull && docker compose up -d)
 
