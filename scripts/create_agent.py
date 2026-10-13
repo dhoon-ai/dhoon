@@ -15,6 +15,7 @@ Only Python's standard library is used.
 
 import argparse
 import getpass
+import hashlib
 import json
 import os
 import re
@@ -216,6 +217,11 @@ def ask(prompt: str, secret: bool = False) -> str:
         sys.exit("No terminal available: set LIBRECHAT_EMAIL and LIBRECHAT_PASSWORD.")
 
 
+def _avatar_record() -> Path:
+    """Which picture each agent was given (so a changed picture is uploaded again)."""
+    return Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-avatars.json"
+
+
 def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str, avatar: Path = AVATAR) -> int:
     """Create or update one agent. Returns 1 if some tools were not accepted, else 0."""
     name = payload["name"]
@@ -231,9 +237,20 @@ def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str, a
     if status not in (200, 201) or not agent_id or data.get("error"):
         sys.exit(f"Could not save the agent '{name}' (status {status}): {data}")
 
-    if avatar.exists() and not data.get("avatar"):
+    # Upload the picture when the agent has none, or a different one than ours: an agent made
+    # by an older version may still show the Assistant's picture (the Quick Assistant did).
+    record = _avatar_record()
+    try:
+        given = json.loads(record.read_text())
+    except (OSError, ValueError):
+        given = {}
+    digest = hashlib.sha256(avatar.read_bytes()).hexdigest()[:16] if avatar.exists() else ""
+    if digest and (not data.get("avatar") or given.get(agent_id) != digest):
         a_status, a_data = lc.upload_avatar(agent_id, avatar)
         if a_status in (200, 201) and not a_data.get("error"):
+            given[agent_id] = digest
+            record.parent.mkdir(parents=True, exist_ok=True)
+            record.write_text(json.dumps(given, indent=1))
             print(f"  Added the picture to '{name}'.")
         else:
             print(f"  (could not add the picture: {a_data.get('message', a_status)} - not important)")

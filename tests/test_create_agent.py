@@ -207,3 +207,18 @@ def test_quick_assistant_is_light():
     assert len(quick["tools"]) < len(full["tools"]) / 2 and len(quick["instructions"]) < len(full["instructions"]) / 2
     assert quick["instructions"].rstrip().endswith("For the exact time, call current_datetime.")
     assert "{{current_datetime}}" not in quick["instructions"]
+
+
+def test_an_agent_with_an_old_picture_gets_its_own_once():
+    """Agents made before the Quick Assistant had its own picture kept the Assistant's: the
+    picture is replaced once, then left alone (found by the bare-metal release test)."""
+    fake = FakeLibreChat(accounts={"me@example.com": "secret123"})
+    for i, name in enumerate(("Assistant", "Quick Assistant"), 1):  # made by an older version
+        fake.agents[f"agent_{i}"] = {"id": f"agent_{i}", "name": name, "tools": [],
+                                     "avatar": {"filepath": "/images/old.png", "source": "local"}}  # fmt: skip
+    assert run(fake).returncode == 0
+    assert fake.avatar_uploads == 2  # both get the current picture
+    assert run(fake).returncode == 0
+    assert fake.avatar_uploads == 2  # and not again
+    given = json.loads(Path(fake.runtime, ".agent-avatars.json").read_text())
+    assert given["agent_1"] != given["agent_2"]  # two different pictures
