@@ -956,7 +956,7 @@ Run these from the `~/dhoon` folder (`cd ~/dhoon` first).
 | Which install steps are done | `bash scripts/status.sh` |
 | Lift a LibreChat sign-in ban | `bash scripts/unban.sh` |
 | Continue / repair the install | `bash install.sh` |
-| Update everything (LibreChat stays on the version Dhoon is tested with) | `bash scripts/update.sh` |
+| Update everything (LibreChat and SearXNG stay on the versions Dhoon is tested with) | `bash scripts/update.sh` |
 | Restart the chat website | `cd runtime/LibreChat && docker compose restart` |
 | Restart the toolbox | `sudo systemctl restart ai-toolbox` |
 | Restart Ollama | `sudo systemctl restart ollama` |

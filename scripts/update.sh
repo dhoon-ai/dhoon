@@ -23,7 +23,7 @@ docker build --pull -t agent-sandbox "$KIT/sandbox"
 sudo systemctl restart ai-toolbox
 
 step "Updating SearXNG"
-docker pull searxng/searxng:latest
+docker pull "$SEARXNG_IMAGE"   # stays on the tested build (SEARXNG_IMAGE in lib.sh)
 bash "$KIT/scripts/03_searxng.sh"
 
 step "Updating LibreChat"

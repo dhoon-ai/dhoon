@@ -67,3 +67,15 @@ def test_an_install_that_followed_main_moves_to_the_pinned_commit(tmp_path):
     git("clone", "-q", f"file://{up}", str(tmp_path / "runtime" / "LibreChat"))  # how older installs did it
     lc = checkout(tmp_path, up, pinned)
     assert git("rev-parse", "HEAD", cwd=lc) == pinned
+
+
+def test_every_container_dhoon_starts_has_a_fixed_version():
+    """No ':latest' anywhere Dhoon starts or updates a container (LibreChat's own compose file
+    is covered by the image pins in the override)."""
+    import re
+
+    lib = (REPO / "scripts/lib.sh").read_text()
+    assert re.search(r'SEARXNG_IMAGE="\$\{SEARXNG_IMAGE:-searxng/searxng@sha256:[0-9a-f]{64}\}"', lib)
+    for script in ("03_searxng.sh", "update.sh"):
+        text = (REPO / "scripts" / script).read_text()
+        assert "searxng/searxng:latest" not in text and '"$SEARXNG_IMAGE"' in text, script

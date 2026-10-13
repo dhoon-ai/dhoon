@@ -21,7 +21,7 @@ docker rm -f searxng >/dev/null 2>&1 || true
 docker run -d --name searxng --restart unless-stopped \
   -p 127.0.0.1:8888:8080 \
   -v "$SEARXNG_DIR:/etc/searxng" \
-  searxng/searxng:latest
+  "$SEARXNG_IMAGE"   # the tested build (scripts/lib.sh)
 
 echo "Waiting for SearXNG to start..."
 for _ in $(seq 1 30); do

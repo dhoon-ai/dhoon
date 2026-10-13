@@ -13,6 +13,8 @@ SEARXNG_DIR="$RUNTIME/searxng"
 # run scripts/update.sh, test, then release.
 LIBRECHAT_REF="${LIBRECHAT_REF:-e1dfc10449ff713faffacd60273fddcfe2c0a698}"
 LIBRECHAT_GIT_URL="${LIBRECHAT_GIT_URL:-https://github.com/danny-avila/LibreChat.git}"
+# The SearXNG build Dhoon is tested with (version 2026.10.11-ad46ebd7d).
+SEARXNG_IMAGE="${SEARXNG_IMAGE:-searxng/searxng@sha256:ddd642cae6eac75412938fd846ddbf440a2df029cfeae8a562b8b205f4e35e25}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
 

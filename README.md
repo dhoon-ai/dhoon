@@ -248,11 +248,11 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 
 ## Design choices for modest hardware
 
-- **A tested LibreChat version.** The chat website is pinned to the exact LibreChat commit
-  and images Dhoon was tested with (`LIBRECHAT_REF` in `scripts/lib.sh` and the images in
-  `config/librechat/docker-compose.override.yml`), so a change upstream can't break an
-  install. `scripts/update.sh` keeps it there; moving to a newer LibreChat is a deliberate,
-  tested release.
+- **Tested versions only.** The chat website and the search engine are pinned to the exact
+  versions Dhoon was tested with (`LIBRECHAT_REF` and `SEARXNG_IMAGE` in `scripts/lib.sh`,
+  LibreChat's images in `config/librechat/docker-compose.override.yml`), so a change upstream
+  can't break an install. `scripts/update.sh` keeps them there; moving to newer versions is a
+  deliberate, tested release.
 
 - **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
   `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait

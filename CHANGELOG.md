@@ -29,5 +29,5 @@ that keeps going until the work is done). Website: https://dhoon.knowreva.com
 **Reliability and safety**
 - Status, check, logs and restart scripts; automatic start after a reboot.
 - Encrypted daily backups to a git repo you own (recovery key and optional YubiKey).
-- LibreChat pinned to the tested version (code and images).
-- 138 automated tests and CI on every push.
+- LibreChat (code and images) and SearXNG pinned to the tested versions.
+- 139 automated tests and CI on every push.

@@ -83,7 +83,8 @@ for d in "${LC_DIRS[@]}"; do run sudo rm -rf "$d"; done
 run sudo rm -rf "$RUNTIME" "$KIT/toolbox/venv"   # toolbox/venv: older kit layout
 run rm -rf "$WORKSPACE_DIR"
 if command -v docker >/dev/null 2>&1; then
-  run docker rmi searxng/searxng:latest
+  run docker rmi "$SEARXNG_IMAGE"
+  docker image inspect searxng/searxng:latest >/dev/null 2>&1 && run docker rmi searxng/searxng:latest   # older installs
 fi
 
 if [ "$LEVEL" = "everything" ]; then
