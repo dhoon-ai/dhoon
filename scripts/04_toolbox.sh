@@ -109,8 +109,47 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+# 4g. knowledge base of world news and market events since the AI model's training: every
+# night at 22:30 it adds the missing weeks (newest first, at most KNOWLEDGE_MAX_MINUTES), so
+# the catch-up finishes over a few nights; after that it only adds last week. See news_kb.py.
+sudo tee /etc/systemd/system/ai-knowledge.service >/dev/null <<EOF
+[Unit]
+Description=Add the missing weeks to the world news and markets knowledge base
+After=network-online.target ollama.service
+
+[Service]
+Type=oneshot
+User=$USER
+WorkingDirectory=$KIT/toolbox
+Environment=WORKSPACE=$WORKSPACE_DIR
+Environment=SEARXNG_URL=http://127.0.0.1:8888
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=PLANNER_MODEL=$MODEL_PLANNER
+Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
+Environment=KNOWLEDGE_START=$KNOWLEDGE_START
+Environment=KNOWLEDGE_MAX_MINUTES=$KNOWLEDGE_MAX_MINUTES
+ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/news_kb.py --update
+TimeoutStartSec=4h
+Nice=10
+EOF
+sudo tee /etc/systemd/system/ai-knowledge.timer >/dev/null <<EOF
+[Unit]
+Description=Every night: add the missing weeks to the world news and markets knowledge base
+
+[Timer]
+OnCalendar=*-*-* 22:30:00
+
+[Install]
+WantedBy=timers.target
+EOF
+
 sudo systemctl daemon-reload
 sudo systemctl enable ai-toolbox
+if [ "$KNOWLEDGE" = "off" ]; then
+  sudo systemctl disable --now ai-knowledge.timer >/dev/null 2>&1 || true
+else
+  sudo systemctl enable --now ai-knowledge.timer >/dev/null 2>&1 || true
+fi
 sudo systemctl enable ai-files >/dev/null 2>&1
 sudo systemctl restart ai-files
 sudo systemctl enable --now ai-scheduler.timer >/dev/null 2>&1 || true

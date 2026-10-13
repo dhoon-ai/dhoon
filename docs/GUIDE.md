@@ -375,6 +375,9 @@ new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assi
      - Your own knowledge may be out of date. For anything that can change (prices, versions,
        releases, news, laws, who holds a role, market data), get current data with your tools
        before answering, and say how recent it is. Never present remembered facts as current.
+     - For world news or market events after your training (late 2024 onward), call
+       search_knowledge first (weekly notes up to last week, with market moves) and cite the week.
+       For today's news use web_search; for current prices use the stock tools.
      - For facts you are not sure of, use web_search, then read_webpage on the best result.
        Cite the URLs you used.
      - For questions about a document or book, use search_document on the file and answer
@@ -619,6 +622,7 @@ also covers your scheduled tasks, home city and Google sign-in from `runtime/`).
 | **Models, memory, context** | other models or settings than the ones picked from your RAM | `cp config/models.env.example config/models.env`, then edit ([table](#choosing-different-models-and-settings)) | the command in the table's last column |
 | **Encrypted backup** | a daily copy of your settings, plugins and workspace off this computer | `bash scripts/backup.sh --setup` ([Encrypted backup](#encrypted-backup-optional)); settings in `~/.config/ai-kit-backup/` | copy the recovery key to a USB stick |
 | **Memory** | the assistant remembering things across chats when you say *"Remember that…"* (it saves nothing unasked); see and delete memories in **Settings → Personalization**; **off** unless you said yes during install | everyone: `MEMORY=on` or `off` in `config/models.env`; when on, each person can switch it off in **Settings → Personalization** | `bash scripts/05_librechat.sh` |
+| **Knowledge base of world news and markets** | knowing world events and market moves after the AI's training (late 2024 to last week); **on** by default, fills itself over a few nights | `KNOWLEDGE=off` in `config/models.env` to switch it off ([Knowledge base](#knowledge-base-of-world-news-and-markets)) | `bash scripts/04_toolbox.sh` |
 | **Lock sign-up** | stopping others on your network from making an account | `runtime/LibreChat/.env`: `ALLOW_REGISTRATION=false` ([Safety](#safety)) | `cd runtime/LibreChat && docker compose up -d` |
 | **Your own tools** | new skills, kept private | a folder in `plugins/` ([ADDING_TOOLS.md](ADDING_TOOLS.md)) | `sudo systemctl restart ai-toolbox` and `bash scripts/06_create_agent.sh` |
 
@@ -899,6 +903,46 @@ phone at home. Try *"Make an Excel file of my monthly budget: rent 1800, food 60
 
 ---
 
+## Knowledge base of world news and markets
+
+The AI models know the world only up to their training (around late 2024). Dhoon fills the
+gap with a **knowledge base of world news events and market events**, written on your
+computer, one short note per week:
+
+- **What's in it:** world news (conflicts, elections and politics, diplomacy and trade,
+  central banks and the economy, big company news, disasters, health) from Wikipedia's
+  day-by-day ["Current events"](https://en.wikipedia.org/wiki/Portal:Current_events) pages,
+  plus a table of how the world's main markets moved that week (stock indexes of the US,
+  Canada, the UK, Germany, Japan, Hong Kong, China and India, the VIX, US 10-year rates, the
+  dollar, oil, gold, Bitcoin), computed from prices, not written by the AI. No sports, arts or
+  science items.
+- **Where:** `~/agent-workspace/knowledge/`: `weeks/2025-W10.md`, `months/2025-03.md` and
+  `overview.md` (*what changed since late 2024*). `raw/` keeps the full text of each week.
+- **How the Assistant uses it:** for world events or markets after its training it calls
+  `search_knowledge` (about a second, then it reads a few short passages) and cites the week.
+  That is faster and more reliable than searching the web each time. For today's news it
+  still uses `web_search`; for current prices the stock tools.
+- **How it fills up:** every night at 22:30 the `ai-knowledge` timer adds the missing weeks,
+  newest first, for at most 2½ hours, so the catch-up (about 100 weeks, 2–4 minutes each on
+  a CPU) is done after a few nights. After that it only adds last week, in a few minutes,
+  and for that week also searches recent world and market headlines through your SearXNG.
+
+```bash
+bash scripts/knowledge.sh                       # what it has so far
+bash scripts/knowledge.sh --catch-up            # do the whole catch-up now (a few hours; Ctrl+C to stop, run again to continue)
+bash scripts/knowledge.sh --preview 2025-W10    # what Wikipedia has for one week (no AI, saves nothing)
+bash scripts/knowledge.sh --week 2025-W10       # write one week again
+```
+
+Try: *"What happened with interest rates in Canada and the US in 2025?"* or *"How did world
+markets move in April 2025, and why?"*
+
+Only public pages are downloaded; nothing about you is sent. The notes are summaries of web
+content made by a local AI: good for context, but check anything important. Switch it off
+with `KNOWLEDGE=off` in `config/models.env`, then `bash scripts/04_toolbox.sh`.
+
+---
+
 ## How fast should it be?
 
 Without a graphics card, the processor does all the work, so the AI is slower than
@@ -990,6 +1034,9 @@ nano config/models.env
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
 | `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory | `bash scripts/ollama_settings.sh` |
 | `MEMORY` | `off` (the installer asks) | Memory across chats: when you say *"Remember that…"*, a small model saves it for later chats | `bash scripts/05_librechat.sh` |
+| `KNOWLEDGE` | `on` | Knowledge base of world news and market events since the models' training | `bash scripts/04_toolbox.sh` |
+| `KNOWLEDGE_START` | `2024-10` | First month of the knowledge base (around the models' training cutoff) | `bash scripts/04_toolbox.sh` |
+| `KNOWLEDGE_MAX_MINUTES` | `150` | Longest nightly run while catching up | `bash scripts/04_toolbox.sh` |
 | `RESEARCH_ENGINES` | empty (SearXNG's usual engines) | Search engines for the "research how to do this" step | `bash scripts/04_toolbox.sh` |
 
 Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose

@@ -44,6 +44,11 @@ else fail "The toolbox can't pass chats to Ollama  ->  bash scripts/restart.sh";
 code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$FILES_PORT/f/0/x/x")
 if [ "$code" = "404" ]; then ok "Download links for created files work (port $FILES_PORT, home network only)"
 else warn "Download links for created files are off  ->  bash scripts/04_toolbox.sh"; fi
+weeks=$(find "$WORKSPACE_DIR/knowledge/weeks" -name '*.md' 2>/dev/null | wc -l)
+if [ "$KNOWLEDGE" = "off" ]; then echo "         knowledge base of world news and markets: off (KNOWLEDGE=off)"
+elif systemctl is-active --quiet ai-knowledge.timer 2>/dev/null; then
+  ok "Knowledge base of world news and markets: $weeks weeks so far, updated every night (bash scripts/knowledge.sh)"
+else warn "Knowledge base of world news and markets is not scheduled  ->  bash scripts/04_toolbox.sh"; fi
 if systemctl is-active --quiet ai-scheduler.timer 2>/dev/null; then
   n=$(grep -o '"active": true' "$RUNTIME/schedule.json" 2>/dev/null | wc -l)
   ok "Scheduled tasks: checked every minute ($n active)"

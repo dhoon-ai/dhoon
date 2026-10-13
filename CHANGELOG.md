@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.0 (unreleased)
+
+- **Knowledge base of world news and markets.** The models know the world only up to their
+  training (late 2024). Every night Dhoon now adds short weekly notes of world news events and
+  market events since then (`~/agent-workspace/knowledge/`): world news from Wikipedia's
+  "Current events" pages (no sports, arts or science items), a table of how the world's main
+  markets moved computed from prices, and for the last week recent headlines from your SearXNG,
+  summarised by your main model, with monthly notes and an overview of what changed. The new
+  `search_knowledge` tool finds them in about a second, so questions about recent world events
+  or markets are answered faster and more reliably than with a web search each time. On by
+  default (`KNOWLEDGE=off` to switch off); the catch-up takes a few nights, or
+  `bash scripts/knowledge.sh --catch-up`.
+
 ## v1.0.1 (2026-10)
 
 - **Your chats are backed up.** Before each encrypted backup, the chat website's database

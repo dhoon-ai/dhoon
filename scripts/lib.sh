@@ -18,6 +18,10 @@ SEARXNG_IMAGE="${SEARXNG_IMAGE:-searxng/searxng@sha256:ddd642cae6eac75412938fd84
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
 FILES_PORT="${FILES_PORT:-3081}"   # download links for created files (home network only)
+# knowledge base of world news and market events since the model's training (news_kb.py)
+KNOWLEDGE="${KNOWLEDGE:-on}"
+KNOWLEDGE_START="${KNOWLEDGE_START:-2024-10}"
+KNOWLEDGE_MAX_MINUTES="${KNOWLEDGE_MAX_MINUTES:-150}"
 
 mkdir -p "$RUNTIME"
 
@@ -181,6 +185,7 @@ step_done() {
         STATUS_REASON="toolbox settings out of date"; return 1
       fi
       [ -f "$SYSTEMD_ROOT/ai-files.service" ] || { STATUS_REASON="download-link service missing"; return 1; }
+      [ -f "$SYSTEMD_ROOT/ai-knowledge.timer" ] || { STATUS_REASON="knowledge-base timer missing"; return 1; }
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \
         || { STATUS_REASON="toolbox Python packages missing or outdated"; return 1; }
       ;;

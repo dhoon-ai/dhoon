@@ -16,7 +16,8 @@ if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" /etc/systemd/system/ai-
    || ! grep -q "^Environment=TOOLBOX_LOG=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
    || ! grep -q "^EnvironmentFile=-$KIT/config/email.env" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
    || [ ! -f /etc/systemd/system/ai-scheduler.timer ] \
-   || [ ! -f /etc/systemd/system/ai-files.service ]; then
+   || [ ! -f /etc/systemd/system/ai-files.service ] \
+   || [ ! -f /etc/systemd/system/ai-knowledge.timer ]; then
   warn "Toolbox service settings are outdated - re-running script 04"
   bash "$KIT/scripts/04_toolbox.sh"
 fi

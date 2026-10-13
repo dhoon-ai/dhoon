@@ -167,7 +167,7 @@ import importlib  # noqa: E402
 import emailer  # noqa: E402, F401  (toolbox/emailer.py, settings in config/email.env; tools use tb.emailer)
 
 sys.modules.setdefault("toolbox_server", sys.modules[__name__])
-TOOLSETS = ["everyday", "web", "files", "documents", "planner", "stocks", "mail"]
+TOOLSETS = ["everyday", "web", "files", "documents", "knowledge", "planner", "stocks", "mail"]
 for _name in TOOLSETS:
     _mod = sys.modules.get(f"toolset.{_name}")
     if _mod is not None and getattr(_mod, "_registered_on", None) is not mcp:

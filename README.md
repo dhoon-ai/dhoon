@@ -13,8 +13,8 @@ an old desktop, a home server or a laptop. **No graphics card required.**
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
 work with files, run Python in a sandbox, answer questions about your PDFs, Word and Excel
 files, make Excel and Word reports you open with one click, analyse stocks, check the weather, manage your calendar,
-do tasks on a schedule, e-mail you the results and remember what you ask it to
-remember**, and you can teach it new skills with a few lines of Python.
+do tasks on a schedule, e-mail you the results, remember what you ask it to
+remember and keep up with world news and markets since its training**, and you can teach it new skills with a few lines of Python.
 
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
 downloads, market data and weather your agent asks for, and the calendars you connect.
@@ -358,6 +358,9 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
 - **Scheduled tasks** are stored outside the workspace (so nothing the agent reads or writes
   can add one) and run unattended without the tools that send e-mail, change calendars,
   record investments or schedule more tasks. Results go only to your own inbox.
+- **Knowledge base** downloads only public pages (Wikipedia's "Current events", market prices,
+  headline searches through your SearXNG); nothing about you is sent, and its notes are
+  labelled as untrusted web content for the model.
 - **Logs stay local**: tool calls are logged to `runtime/logs/toolbox.log` on your computer.
 - **Web pages are untrusted**: content is labelled, and the agent instructions tell
   the model not to follow instructions found in it. No defence against prompt
@@ -403,6 +406,7 @@ page address, a place name, a ticker), never your chats or files.
 | [rank-bm25](https://github.com/dorianbrown/rank_bm25) | keyword search in documents | Apache-2.0 |
 | [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Matplotlib](https://matplotlib.org) | numbers and charts (also in the sandbox) | BSD-3-Clause, BSD-3-Clause, Matplotlib (PSF-based) |
 | [yfinance](https://github.com/ranaroussi/yfinance) | market data from Yahoo Finance *(online; Yahoo's terms: personal use)* | Apache-2.0 |
+| [Wikipedia "Current events"](https://en.wikipedia.org/wiki/Portal:Current_events) | world news for the knowledge base, summarised on your computer *(online)* | CC BY-SA 4.0 (content) |
 | [Python-Markdown](https://python-markdown.github.io) | e-mails in HTML | BSD-3-Clause |
 | [icalendar](https://github.com/collective/icalendar), [recurring-ical-events](https://github.com/niccokunzmann/python-recurring-ical-events), [caldav](https://github.com/python-caldav/caldav) | calendars | BSD-2-Clause, LGPL-3.0-or-later, Apache-2.0 / GPL-3.0 |
 | [Open-Meteo](https://open-meteo.com) | weather forecasts *(online)*, data under CC BY 4.0 | free API |
