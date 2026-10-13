@@ -13,6 +13,7 @@ memory:
   tokenLimit: 1500
   messageWindowSize: 3
   agent:
+    enabled: true          # without this, LibreChat only reads memories and never saves new ones
     provider: "ollama"
     model: "__MODEL_FAST__"
 

@@ -59,4 +59,6 @@ def test_memory_uses_the_fast_model_and_can_be_switched_off(tmp_path):
         (tmp_path / setting / "LibreChat").mkdir(parents=True, exist_ok=True)
         subprocess.run(["bash", "-c", f"source {REPO}/scripts/lib.sh && render_librechat_config"], env=env, check=True)
         memory = yaml.safe_load((tmp_path / setting / "LibreChat/librechat.yaml").read_text())["memory"]
-        assert memory["disabled"] is disabled and memory["agent"] == {"provider": "ollama", "model": "small"}
+        assert memory["disabled"] is disabled
+        # enabled: true is required, or LibreChat never saves a memory (found in release testing)
+        assert memory["agent"] == {"enabled": True, "provider": "ollama", "model": "small"}
