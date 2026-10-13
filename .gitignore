@@ -17,6 +17,7 @@ venv/
 # Never commit secrets
 .env
 *.env
+config/google_oauth_client.json
 
 # Your personal model choices (see config/models.env.example)
 config/models.env

@@ -7,10 +7,11 @@ an old desktop, a home server or a laptop. **No graphics card required.**
 
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
 work with files, run Python in a sandbox, answer questions about your PDFs and documents, analyse
-stocks and e-mail you the results**, and you can teach it new skills with a few lines of Python.
+stocks, check the weather, manage your calendar, do tasks on a schedule and e-mail you the
+results**, and you can teach it new skills with a few lines of Python.
 
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
-downloads and market data your agent asks for.
+downloads, market data and weather your agent asks for, and the calendars you connect.
 
 **Install with one command** (Ubuntu/Debian, run as your normal user):
 
@@ -191,6 +192,10 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │  stock_price_summary · stock_indicators ·           │
   │  stock_fundamentals · stock_save_history (CSV)      │
   │  send_email (your SMTP account, allow-listed)       │
+  │  weather (Open-Meteo) · calendar_events ·           │
+  │  calendar_add_event · calendar_delete_event         │
+  │  schedule_task · scheduled_tasks ·                  │
+  │  cancel_scheduled_task (run by ai-scheduler timer)  │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
   │  ask_planner ──▶ Instruct model in Ollama ──────────┘
@@ -319,6 +324,12 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
   with workspace files only and a daily limit; the file is never committed.
 - **Backups** (optional, `scripts/backup.sh`) are encrypted with age on your computer, to
   an offline recovery key and optionally a YubiKey, before they go to your private git repo.
+- **Calendars** you connect keep their passwords and tokens in `config/calendar.env` and
+  `runtime/google_token.json`, readable only by you; Google access is limited to calendar
+  events. The agent adds or deletes events only when you ask.
+- **Scheduled tasks** are stored outside the workspace (so nothing the agent reads or writes
+  can add one) and run unattended without the tools that send e-mail, change calendars,
+  record investments or schedule more tasks. Results go only to your own inbox.
 - **Logs stay local**: tool calls are logged to `runtime/logs/toolbox.log` on your computer.
 - **Web pages are untrusted**: content is labelled, and the agent instructions tell
   the model not to follow instructions found in it. No defence against prompt

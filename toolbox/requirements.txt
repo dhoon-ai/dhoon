@@ -7,3 +7,7 @@ pypdf
 python-docx
 numpy
 markdown
+# calendars: .ics files and links, CalDAV (iCloud, Nextcloud...)
+icalendar
+recurring-ical-events
+caldav

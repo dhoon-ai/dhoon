@@ -55,8 +55,42 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+# 4e. scheduled tasks and reminders the Assistant sets up for you (schedule_task tool):
+# every minute, toolbox/scheduler.py does whatever is due (usually nothing, in a split second)
+sudo tee /etc/systemd/system/ai-scheduler.service >/dev/null <<EOF
+[Unit]
+Description=Run the Assistant's scheduled tasks that are due
+After=network-online.target ollama.service
+
+[Service]
+Type=oneshot
+User=$USER
+WorkingDirectory=$KIT/toolbox
+Environment=WORKSPACE=$WORKSPACE_DIR
+Environment=SEARXNG_URL=http://127.0.0.1:8888
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=PLANNER_MODEL=$MODEL_PLANNER
+Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
+EnvironmentFile=-$KIT/config/email.env
+ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/scheduler.py --run-due
+TimeoutStartSec=2h
+Nice=5
+EOF
+sudo tee /etc/systemd/system/ai-scheduler.timer >/dev/null <<EOF
+[Unit]
+Description=Check every minute for scheduled tasks that are due
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+EOF
+
 sudo systemctl daemon-reload
 sudo systemctl enable ai-toolbox
+sudo systemctl enable --now ai-scheduler.timer >/dev/null 2>&1 || true
 sudo systemctl restart ai-toolbox
 sleep 4
 if systemctl is-active --quiet ai-toolbox; then

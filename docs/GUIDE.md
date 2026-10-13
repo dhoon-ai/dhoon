@@ -386,10 +386,15 @@ updates the agent instead of making a second one. Reload the web page and pick
        Never invent or guess an e-mail address: use only one the user wrote, otherwise ask.
      - For stocks, use the stock_* tools and quote their numbers. For a chart, first call
        stock_save_history, then read that CSV file in run_python. Never give buy/sell advice.
+     - Weather: use weather (no place = the user's default). Calendar: calendar_events to look;
+       add or delete events only when the user asks, and confirm what changed. Turn "tomorrow
+       at 3pm" into YYYY-MM-DD HH:MM with current_datetime first.
+     - "Every morning / remind me / later" requests: schedule_task (kind "reminder" for a plain
+       message, "task" for something you must do then). Say when it runs and how to cancel it.
 
      Today is {{current_date}}. For the exact time, call current_datetime.
      ```
-3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all 13 of its tools
+3. Under **Tools** / **MCP Servers**, add **toolbox** and make sure all of its tools
    (including `ask_planner`, `search_document` and `read_document`) are selected.
    Also turn on **File Search** (a checkbox under *Capabilities*, or added with *Add Tools*),
    so you can attach documents in the chat. Leave everything else off (Web Search,
@@ -718,6 +723,63 @@ Settings are in `~/.config/ai-kit-backup/backup.env`: `BACKUP_KEEP`, `BACKUP_PAT
 `BACKUP_EXCLUDE` (e.g. `'*.mp4 downloads'`) and `BACKUP_TIME`. A backup over 95 MB is refused,
 because GitHub rejects files that big. Leave big folders out. Log: `journalctl -u ai-backup`.
 
+## Weather, calendar and scheduled tasks
+
+**Weather.** Ask *"What's the weather?"*. The first time, the Assistant asks which city (and
+Celsius or Fahrenheit) and remembers it; name any other place any time (*"weather in Pune
+this weekend"*). It uses [Open-Meteo](https://open-meteo.com): free, no account; only the
+place name and its coordinates are sent.
+
+**Calendar.** *"What's on my calendar this week?"*, *"Add dentist Thursday 9:30"*, *"Delete
+the gym on Friday"*. The Assistant shows events from every calendar you connect, together:
+
+| Calendar | Read | Add / delete | Setup |
+|---|---|---|---|
+| **Your private calendar** (default) | yes | yes | none: `~/agent-workspace/calendar/calendar.ics`, a normal calendar file you can import into Google Calendar or your phone |
+| Google Calendar, read only | yes | no | its secret iCal link in `config/calendar.env` (2 minutes) |
+| Outlook.com or any published calendar | yes | no | its ICS link in `config/calendar.env` |
+| iCloud, Nextcloud, Fastmail (CalDAV) | yes | yes | address, user and an app password in `config/calendar.env` |
+| Google Calendar, read and write | yes | yes | a one-time Google sign-in (about 15 minutes, below) |
+
+```bash
+cp config/calendar.env.example config/calendar.env
+nano config/calendar.env              # links or CalDAV details (each explained in the file)
+chmod 600 config/calendar.env
+sudo systemctl restart ai-toolbox
+runtime/venv/bin/python toolbox/calendars.py   # shows what is connected and this week's events
+```
+
+*Google Calendar with read and write* (do this on the computer itself, in its browser):
+1. Go to [console.cloud.google.com](https://console.cloud.google.com), create a project
+   (e.g. "My assistant"), then **APIs & Services → Library → Google Calendar API → Enable**.
+2. **APIs & Services → OAuth consent screen**: User type *External*, app name e.g. "My
+   assistant", your e-mail; under **Test users** add your own Google address. (It stays in
+   "Testing": only you can use it.)
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID → Desktop app**,
+   then **Download JSON** and save it as `~/ai-kit/config/google_oauth_client.json`.
+4. Run `runtime/venv/bin/python toolbox/calendars.py --google-setup`, sign in, allow access
+   to calendar events ("Google hasn't verified this app" is expected for your own test app:
+   Continue). Then `sudo systemctl restart ai-toolbox`.
+
+The access is limited to calendar events; the token stays in `runtime/google_token.json`
+(readable only by you). Google may ask you to sign in again after 7 days while the app is
+in "Testing" mode: just run step 4 again (or publish the app for personal use in step 2).
+
+**Scheduled tasks.** *"Every weekday at 7am e-mail me the weather and my calendar for the
+day"*, *"Remind me on Friday at 5pm to pay the credit card"*, *"Every Monday at 8 summarise
+the news about Shopify"*. There are two kinds:
+- a **reminder** sends you the message as it is, on time;
+- a **task** is done by the Assistant at that time, with its tools, and the answer is sent
+  to you.
+
+Results are e-mailed to you (set up e-mail first, see "Send e-mail") and saved in
+`~/agent-workspace/scheduled/`. Ask *"what's scheduled?"* or *"cancel the weather task"*.
+A timer (`ai-scheduler`) checks every minute; a task missed while the computer was off
+runs at the next check after it starts. Unattended tasks can't send other e-mails, change
+your calendar, record investments or schedule more tasks, because nobody is there to
+confirm them. A task uses the main model for a few minutes; afterwards the Assistant's
+instructions are read in advance again, so your next chat stays fast.
+
 ---
 
 ## Ask questions about your documents
@@ -873,6 +935,8 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | Restart Ollama | `sudo systemctl restart ollama` |
 | Why did a chat stop? (all logs + diagnosis) | `bash scripts/logs.sh` (`--follow` to watch live) |
 | Send a test e-mail | `bash scripts/email_test.sh` |
+| Scheduled tasks (and test one now) | `systemctl list-timers ai-scheduler.timer` / ask the Assistant "what's scheduled?" |
+| Calendars connected and this week's events | `runtime/venv/bin/python toolbox/calendars.py` |
 | Encrypted backup now / check it opens | `bash scripts/backup.sh` / `bash scripts/restore.sh --test` |
 | Every tool call the agent made | `less runtime/logs/toolbox.log` |
 | See chat website errors | `cd runtime/LibreChat && docker compose logs api --tail 50` |

@@ -38,7 +38,7 @@ MCP_DELIMITER = "_mcp_"  # LibreChat names MCP tools "<tool>_mcp_<server>"
 # as a violation that can lead to a 2-hour ban), so identify as a browser.
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0 local-ai-agent-setup"
 STARTERS = [
-    "What is today's date, and what is 17% of 2,450?",
+    "What's the weather today, and what's on my calendar this week?",
     "Search the web for the latest Ubuntu LTS release and summarise what's new, with sources.",
     "Research how to do this first, then plan it: compare three open-source backup tools for Linux, score them "
     "with run_python and save a comparison to reports/backup-plan.md.",

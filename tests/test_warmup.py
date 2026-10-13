@@ -97,4 +97,4 @@ def test_tool_list_has_no_redundant_titles():
 
     tb = importlib.reload(toolbox_server)
     schemas = json.dumps([t.input_schema for t in asyncio.run(tb.mcp.list_tools())])
-    assert '"title"' not in schemas
+    assert '"title": "' not in schemas  # a parameter called title stays
