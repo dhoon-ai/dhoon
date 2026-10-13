@@ -42,6 +42,8 @@ if ! grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollam
 fi
 
 step "Making sure the configured models are downloaded"
+# The Ollama installer and the settings above restart Ollama: wait until it answers.
+wait_for_ollama 60 || { fail "Ollama did not start: journalctl -u ollama -n 50"; exit 1; }
 for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama pull "$m"; done
 
 step "Update done"

@@ -74,6 +74,16 @@ cpu_temp() {
 }
 
 # IP address of Docker's internal bridge (containers reach the host here)
+# Wait until Ollama answers (after an install or restart it takes a few seconds). 0 = ready.
+wait_for_ollama() {
+  local _
+  for _ in $(seq 1 "${1:-60}"); do
+    curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
+
 docker_bridge_ip() {
   ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1
 }

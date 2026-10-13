@@ -15,11 +15,7 @@ has_unit() { [ -n "$(systemctl list-unit-files "$1" --no-legend 2>/dev/null)" ];
 step "Restarting the AI system"
 
 sudo systemctl restart ollama
-for _ in $(seq 1 60); do
-  curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break
-  sleep 2
-done
-if curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then ok "Ollama (the AI models)"
+if wait_for_ollama 60; then ok "Ollama (the AI models)"
 else fail "Ollama did not come back: journalctl -u ollama -n 50"; fi
 
 if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx searxng; then

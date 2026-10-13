@@ -33,3 +33,11 @@ def test_restart_brings_everything_back_in_order(tmp_path):
     assert order.index("systemctl restart ai-toolbox") > order.index("docker compose restart")
     assert "systemctl restart --no-block ai-model-preload" in order
     assert "Ollama (the AI models)" in r.stdout and "Toolbox" in r.stdout
+
+
+def test_update_waits_for_ollama_before_downloading_models():
+    """The Ollama installer restarts Ollama; `ollama pull` right after failed with
+    'could not connect to ollama server' (found by the bare-metal release test)."""
+    text = (REPO / "scripts/update.sh").read_text()
+    wait, pull = text.index("wait_for_ollama"), text.index("ollama pull")
+    assert text.index("ollama.com/install.sh") < wait < pull
