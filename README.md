@@ -1,6 +1,9 @@
-<p align="center"><img src="assets/assistant-avatar.png" alt="local-ai-agent" width="160"></p>
+<p align="center"><img src="assets/inglenook-logo.svg" alt="Inglenook" width="140"></p>
 
-# local-ai-agent
+# Inglenook
+
+*An inglenook is the warm seat built beside an old fireplace: the private corner of the house.
+Inglenook is that corner for AI: an assistant that lives at home with you.*
 
 A **100% self-hosted, open-source AI agent** for an ordinary home computer: a mini PC,
 an old desktop, a home server or a laptop. **No graphics card required.**
@@ -16,7 +19,7 @@ downloads, market data and weather your agent asks for, and the calendars you co
 **Install with one command** (Ubuntu/Debian, run as your normal user):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rahulkthakar/inglenook/main/install.sh | bash
 ```
 
 It runs the whole setup, including creating the agent, and asks only for your password
@@ -272,8 +275,8 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 ## Step-by-step install (what the one-command installer does)
 
 ```bash
-git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
-cd ~/ai-kit
+git clone https://github.com/rahulkthakar/inglenook.git ~/inglenook
+cd ~/inglenook
 bash scripts/00_check_hardware.sh      # read-only
 bash scripts/01_install_base.sh        # then log out and back in
 bash scripts/02_download_models.sh
@@ -298,7 +301,7 @@ with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#a
 
 ```
 install.sh      one-command installer (runs scripts 00 → 06)
-assets/         the agents' pictures and the script that draws them
+assets/         the Inglenook logo, the agents' pictures and the scripts that draw them
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
                 benchmark, unban, update, restart, uninstall, encrypted backup + restore
 toolbox/        the MCP server: toolbox_server.py (core) + toolset/ (the tools, one file per
@@ -306,7 +309,8 @@ toolbox/        the MCP server: toolbox_server.py (core) + toolset/ (the tools, 
                 weather, scheduler, warm-up, e-mail
 plugins/        your private add-on tools (git-ignored, see plugins/README.md)
 sandbox/        Dockerfile for the isolated Python sandbox
-config/         LibreChat, SearXNG, model and agent-instruction templates
+config/         LibreChat (with the Inglenook icons in config/branding), SearXNG, model and
+                agent-instruction templates
 docs/           beginner guide and how to add tools
 examples/       stand-alone minimal agent + prompts to try
 tests/          unit tests (no network/Docker/Ollama needed)
@@ -387,8 +391,10 @@ page address, a place name, a ticker), never your chats or files.
 | [Open-Meteo](https://open-meteo.com) | weather forecasts *(online)*, data under CC BY 4.0 | free API |
 | [age](https://age-encryption.org), [age-plugin-fido2-hmac](https://github.com/olastor/age-plugin-fido2-hmac) | encrypting backups (YubiKey optional) | BSD-3-Clause, MIT |
 | [Resend](https://resend.com), [Brevo](https://www.brevo.com) | optional e-mail sending over HTTPS *(online)* | services |
+| [CairoSVG](https://cairosvg.org) | draws the icon files from the logo (only when you re-make them) | LGPL-3.0 |
 
-Thank you to everyone who builds and maintains them.
+Thank you to everyone who builds and maintains them. Inglenook uses LibreChat as its chat
+website and shows its own name and icons there; LibreChat's name and logo belong to its authors.
 
 ## Disclaimer
 
@@ -396,4 +402,4 @@ Stock tools are for research and learning. AI output can be wrong. **Not financi
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Inglenook is one of the projects shown on [KnowReva](https://knowreva.com).

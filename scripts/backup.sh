@@ -144,12 +144,12 @@ setup() {
     if [[ "$gh_user" == *:* || "$gh_user" == /* ]]; then
       BACKUP_REPO="$gh_user"
     else
-      repo_name=$(ask "Name of the private repo [ai-kit-backup]:")
-      repo_name=${repo_name:-ai-kit-backup}
+      repo_name=$(ask "Name of the private repo [inglenook-backup]:")
+      repo_name=${repo_name:-inglenook-backup}
       BACKUP_REPO="git@$SSH_HOST:$gh_user/$repo_name.git"
       if [ ! -f "$SSH_KEY" ]; then
         mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-        ssh-keygen -q -t ed25519 -N "" -C "ai-kit-backup@$(hostname)" -f "$SSH_KEY"
+        ssh-keygen -q -t ed25519 -N "" -C "inglenook-backup@$(hostname)" -f "$SSH_KEY"
       fi
       if ! grep -q "Host $SSH_HOST" "$HOME/.ssh/config" 2>/dev/null; then
         cat >> "$HOME/.ssh/config" <<EOF
@@ -290,7 +290,7 @@ Each file in `backups/` is encrypted with age to a recovery key (kept offline) a
 set up, a YubiKey / FIDO2 security key. Without one of them the files can't be read, not by the
 git host either. `yubikey-identity.txt` is not a secret: it is useless without the physical key.
 
-Restore with the local-ai-agent kit:
+Restore with Inglenook (https://github.com/rahulkthakar/inglenook):
 
     bash scripts/restore.sh                        # newest backup, security key (touch it)
     bash scripts/restore.sh --key recovery-key.txt # with the recovery key instead
@@ -309,7 +309,7 @@ EOF
     cd "$REPO_DIR"
     git checkout -q --orphan new-main
     git add -A
-    git -c user.name="ai-kit-backup" -c user.email="backup@localhost" commit -q -m "Encrypted backups (latest $stamp)"
+    git -c user.name="inglenook-backup" -c user.email="backup@localhost" commit -q -m "Encrypted backups (latest $stamp)"
     git branch -D main >/dev/null 2>&1 || true
     git branch -m main
     git push -q -f origin main

@@ -37,7 +37,7 @@ MCP_SERVER = "toolbox"
 MCP_DELIMITER = "_mcp_"  # LibreChat names MCP tools "<tool>_mcp_<server>"
 # LibreChat rejects requests whose User-Agent isn't a recognised browser (and counts each one
 # as a violation that can lead to a 2-hour ban), so identify as a browser.
-USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0 local-ai-agent-setup"
+USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0 inglenook-setup"
 STARTERS = [
     "What's the weather today, and what's on my calendar this week?",
     "Search the web for the latest Ubuntu LTS release and summarise what's new, with sources.",

@@ -49,3 +49,32 @@ def test_installer_refuses_root(tmp_path):
         env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
     r = subprocess.run(["bash", str(REPO / "install.sh")], env=env, capture_output=True, text=True, timeout=60)
     assert r.returncode != 0 and "not as root" in r.stderr
+
+
+def _dry_run_home(tmp_path, old_install):
+    home = tmp_path / "home"
+    home.mkdir()
+    if old_install:  # installed before the Inglenook name, in ~/ai-kit
+        (home / "ai-kit" / ".git").mkdir(parents=True)
+        (home / "ai-kit" / "scripts").mkdir()
+        (home / "ai-kit" / "scripts" / "lib.sh").write_text('STATUS_REASON=""\nstep_done() { return 1; }\n')
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "id").write_text('#!/bin/bash\n[ "$1" = "-u" ] && { echo 1000; exit 0; }\nexec /usr/bin/id "$@"\n')
+    (bin_dir / "id").chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k != "INSTALL_DIR"}
+    env.update(HOME=str(home), PATH=f"{bin_dir}:{os.environ['PATH']}", INSTALL_DRY_RUN="1")
+    r = subprocess.run(["bash", str(REPO / "install.sh")], env=env, capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return home, r.stdout
+
+
+def test_new_installs_go_to_inglenook(tmp_path):
+    home, out = _dry_run_home(tmp_path, old_install=False)
+    assert f"Getting the project into {home}/inglenook" in out
+    assert "https://github.com/rahulkthakar/inglenook.git" in out
+
+
+def test_an_install_from_before_the_rename_is_updated_in_place(tmp_path):
+    home, out = _dry_run_home(tmp_path, old_install=True)
+    assert f"Getting the project into {home}/ai-kit" in out and f"git -C {home}/ai-kit pull" in out

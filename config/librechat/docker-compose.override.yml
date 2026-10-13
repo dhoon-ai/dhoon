@@ -1,8 +1,21 @@
 # Your changes on top of LibreChat's own docker-compose.yml (never edit that one).
 services:
   api:
+    environment:
+      # Inglenook branding: these win over the same names in LibreChat's .env
+      - APP_TITLE=Inglenook
+      - "CUSTOM_FOOTER=[Inglenook](https://github.com/rahulkthakar/inglenook) · your private AI, on your own computer · chat app by [LibreChat](https://librechat.ai)"
+      - HELP_AND_FAQ_URL=https://github.com/rahulkthakar/inglenook/blob/main/docs/GUIDE.md
     volumes:
       - ./librechat.yaml:/app/librechat.yaml
+      # Inglenook icons (made by assets/make_logo.py) in place of LibreChat's own
+      - ./branding/logo.svg:/app/client/dist/assets/logo.svg:ro
+      - ./branding/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
+      - ./branding/favicon-32x32.png:/app/client/dist/assets/favicon-32x32.png:ro
+      - ./branding/apple-touch-icon-180x180.png:/app/client/dist/assets/apple-touch-icon-180x180.png:ro
+      - ./branding/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
+      - ./branding/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
+      - ./branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
   rag_api:
     # lets the document-search service reach Ollama on the host for embeddings
     extra_hosts:

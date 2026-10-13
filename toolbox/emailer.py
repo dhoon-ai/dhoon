@@ -9,7 +9,7 @@ Settings come from config/email.env (the toolbox service loads it; never commit 
   EMAIL_ADDRESS=you@gmail.com   the account that sends
   EMAIL_APP_PASSWORD="abcd efgh ijkl mnop"   an app password, not your normal password
   EMAIL_ALLOWED_TO=you@gmail.com,you@outlook.com   the ONLY addresses the agent may write to
-  EMAIL_FROM_NAME="Local AI"    optional
+  EMAIL_FROM_NAME="Inglenook"   optional
   EMAIL_MAX_PER_DAY=20          optional safety limit
   EMAIL_SMTP_HOST / EMAIL_SMTP_PORT / EMAIL_SMTP_SECURITY (ssl|starttls)   only for "custom"
 
@@ -126,15 +126,21 @@ def settings() -> dict:
         "host": host,
         "port": port,
         "security": security,
-        "from_name": os.environ.get("EMAIL_FROM_NAME", "Local AI"),
+        "from_name": os.environ.get("EMAIL_FROM_NAME", "Inglenook"),
         "allowed": {a.strip().lower() for a in allowed.split(",") if a.strip()},
         "allowed_list": [a.strip() for a in allowed.split(",") if a.strip()],  # in the order you wrote them
         "max_per_day": int(os.environ.get("EMAIL_MAX_PER_DAY", "20")),
     }
 
 
+def _default_state() -> str:
+    """Today's e-mail count. Installs from before the Inglenook name keep their old file."""
+    old = Path.home() / ".local/state/local-ai-agent/email-count.json"
+    return str(old if old.exists() else Path.home() / ".local/state/inglenook/email-count.json")
+
+
 def _count_file() -> Path:
-    return Path(os.environ.get("EMAIL_STATE", str(Path.home() / ".local/state/local-ai-agent/email-count.json")))
+    return Path(os.environ.get("EMAIL_STATE", _default_state()))
 
 
 def _sent_today() -> int:
@@ -316,7 +322,7 @@ def send_test() -> str:
         f"It works! **E-mail is set up.**\n\nSent from {s['address']} through {s['host']}. "
         f"The agent may send to: {', '.join(s['allowed_list'])}."
     )
-    return send([to], "Test from your local AI agent", body)
+    return send([to], "Test from Inglenook, your private AI assistant", body)
 
 
 if __name__ == "__main__":

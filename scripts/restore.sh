@@ -4,7 +4,7 @@
 #   bash scripts/restore.sh --test              does the newest backup open? (do it monthly)
 #   bash scripts/restore.sh                     unpack the newest backup into ~/restore-<time>/
 #   bash scripts/restore.sh --apply             put everything back in place
-#   bash scripts/restore.sh --apply --only ai-kit/plugins/NAME    just one folder or file
+#   bash scripts/restore.sh --apply --only inglenook/plugins/NAME just one folder or file
 #   bash scripts/restore.sh --list              list the backups and what's inside the newest
 #
 # Options:
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
 done
 for p in "${only[@]}"; do
   p="${p#"$HOME"/}"; p="${p#\~/}"
-  case "/$p/" in */../*|//*) fail "--only takes a path inside your home folder, like ai-kit/plugins/NAME"; exit 2 ;; esac
+  case "/$p/" in */../*|//*) fail "--only takes a path inside your home folder, like inglenook/plugins/NAME"; exit 2 ;; esac
 done
 
 newest_first() {

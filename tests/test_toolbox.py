@@ -424,7 +424,7 @@ def test_wikipedia_links_use_the_official_api_with_honest_identity(tb, monkeypat
     out = tb.read_webpage("https://en.m.wikipedia.org/wiki/Rsync#History")
     assert "rsync is a utility" in out and out.startswith("[UNTRUSTED WEB CONTENT]")
     assert seen["url"].startswith("https://en.wikipedia.org/w/api.php?") and "titles=Rsync" in seen["url"]
-    assert "local-ai-agent" in seen["headers"]["User-Agent"]
+    assert "Inglenook" in seen["headers"]["User-Agent"]
 
 
 def test_wikipedia_missing_article(tb, monkeypatch):
@@ -446,7 +446,7 @@ def test_refused_page_is_retried_once_with_honest_identity(tb, monkeypatch):
 
     monkeypatch.setattr(tb, "_fetch", fetch)
     assert "Welcome, honest bot" in tb.read_webpage("https://example.org/page")
-    assert len(calls) == 2 and "local-ai-agent" in calls[1]["User-Agent"]
+    assert len(calls) == 2 and "Inglenook" in calls[1]["User-Agent"]
 
 
 def test_research_default_uses_searxng_usual_engines_once(tb, monkeypatch):

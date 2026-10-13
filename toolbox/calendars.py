@@ -95,7 +95,7 @@ def _load_local():
     if f.exists():
         return Calendar.from_ical(f.read_bytes())
     cal = Calendar()
-    cal.add("prodid", "-//local-ai-agent//calendar//EN")
+    cal.add("prodid", "-//Inglenook//calendar//EN")
     cal.add("version", "2.0")
     return cal
 
@@ -126,7 +126,7 @@ def _vevent(title, start, end, all_day, location, notes, repeat, uid=None):
     from icalendar import Event
 
     ev = Event()
-    ev.add("uid", uid or f"{uuid.uuid4()}@local-ai-agent")
+    ev.add("uid", uid or f"{uuid.uuid4()}@inglenook")
     ev.add("dtstamp", dt.datetime.now(dt.timezone.utc))
     ev.add("summary", title)
     ev.add("dtstart", start)  # local time with its time zone, so a weekly 9:00 stays 9:00 after DST
@@ -431,7 +431,7 @@ def add_event(title, start, end="", location="", notes="", repeat="", calendar="
         ev = _vevent(title, s, e, all_day, location, notes, repeat)
         if target == "caldav":
             cal = Calendar()
-            cal.add("prodid", "-//local-ai-agent//calendar//EN")
+            cal.add("prodid", "-//Inglenook//calendar//EN")
             cal.add("version", "2.0")
             cal.add_component(ev)
             _with_timezones(cal)
@@ -451,7 +451,7 @@ def add_event(title, start, end="", location="", notes="", repeat="", calendar="
 def delete_event(event_id: str) -> str:
     source, _, uid = event_id.partition(":")
     if not uid:
-        raise CalendarError("Give the event id shown by calendar_events, e.g. local:1234@local-ai-agent.")
+        raise CalendarError("Give the event id shown by calendar_events, e.g. local:1234@inglenook.")
     if source == "google":
         _google("DELETE", f"/{uid}")
     elif source == "caldav":

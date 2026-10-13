@@ -76,6 +76,9 @@ render_librechat_config() {
   sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
     "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"
   cp "$KIT/config/librechat/docker-compose.override.yml" "$LIBRECHAT_DIR/docker-compose.override.yml"
+  # Inglenook icons for the override above (copied as files, so Docker never makes folders)
+  mkdir -p "$LIBRECHAT_DIR/branding"
+  cp "$KIT"/config/branding/* "$LIBRECHAT_DIR/branding/"
 }
 
 # ---------------------------------------------------------------- install status ---

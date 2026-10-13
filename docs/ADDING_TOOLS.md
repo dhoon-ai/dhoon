@@ -52,7 +52,7 @@ bash scripts/06_create_agent.sh      # gives the new tool to the Assistant
 ## Testing a tool without the AI
 
 ```bash
-cd ~/ai-kit
+cd ~/inglenook
 runtime/venv/bin/python -c "import sys; sys.path.insert(0,'toolbox'); import toolbox_server as t; print(t.sunrise('London'))"
 ```
 

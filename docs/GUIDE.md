@@ -1,4 +1,4 @@
-# Your Private AI Agent at Home: Step-by-Step Guide
+# Inglenook: Your Private AI Assistant at Home, Step by Step
 
 Everything here is open source and runs on your own computer. Nothing needs a cloud
 account or an AI subscription.
@@ -26,7 +26,7 @@ To open a Terminal on Ubuntu: press **Ctrl + Alt + T**.
 If you're happy to let a script do every step for you, open a Terminal and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rahulkthakar/local-ai-agent/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/rahulkthakar/inglenook/main/install.sh | bash
 ```
 
 It does Steps 0 and 2–8 below automatically (about 30–90 minutes, mostly downloads). It
@@ -41,7 +41,7 @@ It shows a red box with what to do:
 
 1. Read the error just above the box.
 2. Open **another terminal** (Ctrl+Alt+T) and run the failed step by hand; the box shows
-   the exact command, e.g. `cd ~/ai-kit && bash scripts/03_searxng.sh`. Fix what it reports
+   the exact command, e.g. `cd ~/inglenook && bash scripts/03_searxng.sh`. Fix what it reports
    (see "Troubleshooting" at the end of this guide, or ask for help with the error).
 3. Run the installer again. It checks each step first, skips the ones already done, and
    continues from the step that failed.
@@ -50,7 +50,7 @@ It shows a red box with what to do:
 See what's done, then let it continue:
 
 ```bash
-cd ~/ai-kit
+cd ~/inglenook
 git pull                 # get the latest scripts
 bash scripts/status.sh   # shows [OK] / [TODO] for each step, changes nothing
 bash install.sh          # skips the [OK] steps and continues from the first [TODO]
@@ -111,8 +111,8 @@ You can override these choices later (see "Choosing different models and setting
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/rahulkthakar/local-ai-agent.git ~/ai-kit
-cd ~/ai-kit
+git clone https://github.com/rahulkthakar/inglenook.git ~/inglenook
+cd ~/inglenook
 bash scripts/00_check_hardware.sh
 ```
 
@@ -120,8 +120,12 @@ The hardware check **changes nothing**. It reports your CPU, RAM, graphics, disk
 network, and which model you'll get. Read any **[WARN]** or **[FAIL]** lines before
 continuing.
 
-From now on, every command assumes you are in the `~/ai-kit` folder. If you open a
-new Terminal, first run `cd ~/ai-kit`.
+From now on, every command assumes you are in the `~/inglenook` folder. If you open a
+new Terminal, first run `cd ~/inglenook`.
+
+> **Installed before the name Inglenook?** Your folder is `~/ai-kit`. Keep it there (the
+> toolbox and its services point to it) and use `~/ai-kit` wherever this guide says
+> `~/inglenook`. Everything else works the same.
 
 ---
 
@@ -192,7 +196,7 @@ required so you can use Docker without `sudo`.
 After logging back in, open the Terminal and check:
 
 ```bash
-cd ~/ai-kit
+cd ~/inglenook
 docker run --rm hello-world
 ollama --version
 ```
@@ -710,7 +714,7 @@ and `yubikey.txt` if you made one. Keep the stick somewhere safe, then you may d
 | List backups and what's inside | `bash scripts/restore.sh --list` |
 | Unpack to `~/restore-<time>/` to look | `bash scripts/restore.sh` |
 | Put everything back | `bash scripts/restore.sh --apply` |
-| Put back one folder | `bash scripts/restore.sh --only ai-kit/plugins/NAME` |
+| Put back one folder | `bash scripts/restore.sh --only inglenook/plugins/NAME` |
 | Without the security key | add `--key /media/usb/recovery-key.txt` |
 | On a new computer | `bash scripts/restore.sh --from https://github.com/USER/REPO.git --key …` |
 | Back up right now | `bash scripts/backup.sh` |
@@ -758,7 +762,7 @@ runtime/venv/bin/python toolbox/calendars.py   # shows what is connected and thi
    assistant", your e-mail; under **Test users** add your own Google address. (It stays in
    "Testing": only you can use it.)
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID → Desktop app**,
-   then **Download JSON** and save it as `~/ai-kit/config/google_oauth_client.json`.
+   then **Download JSON** and save it as `~/inglenook/config/google_oauth_client.json`.
 4. Run `runtime/venv/bin/python toolbox/calendars.py --google-setup`, sign in, allow access
    to calendar events ("Google hasn't verified this app" is expected for your own test app:
    Continue). Then `sudo systemctl restart ai-toolbox`.
@@ -944,7 +948,7 @@ models that list **tools** support and are *instruct* (not *thinking*) models.
 
 ## Everyday commands
 
-Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
+Run these from the `~/inglenook` folder (`cd ~/inglenook` first).
 
 | What | Command |
 |---|---|
@@ -1047,7 +1051,7 @@ browser. Lift it with `bash scripts/unban.sh`, then sign in again.
 
 **`06_create_agent.sh` says "not accepted" for toolbox tools**: the toolbox wasn't
 connected to LibreChat yet. Run `bash scripts/check.sh`, then
-`cd ~/ai-kit/runtime/LibreChat && docker compose restart api`, wait a minute, and run
+`cd ~/inglenook/runtime/LibreChat && docker compose restart api`, wait a minute, and run
 script 06 again. If it can't sign in, check the email/password, or sign up in the browser
 and run it again.
 
@@ -1062,12 +1066,12 @@ space afterwards with `ollama rm qwen3:30b-a3b`.
 
 **LibreChat keeps restarting with "EACCES: permission denied"**: Some of its
 folders are owned by root. Fix:
-`cd ~/ai-kit/runtime/LibreChat && docker compose down && sudo chown -R $(id -u):$(id -g) logs uploads images data-node skill meili_data_* && docker compose up -d`
+`cd ~/inglenook/runtime/LibreChat && docker compose down && sudo chown -R $(id -u):$(id -g) logs uploads images data-node skill meili_data_* && docker compose up -d`
 
 **The agent doesn't use tools / says it can't search**: Make sure you picked the
 **Assistant** agent (not plain Ollama), that **toolbox** is added in the Agent Builder,
 and that `check.sh` shows the toolbox OK. Then run
-`cd ~/ai-kit/runtime/LibreChat && docker compose restart api`.
+`cd ~/inglenook/runtime/LibreChat && docker compose restart api`.
 Smaller models (4b) sometimes ignore tools; use a bigger model if you have the RAM.
 
 **"model not found"**: Run `ollama list` and make sure the name in the Agent Builder matches exactly.
@@ -1087,7 +1091,7 @@ questions about your documents").
 **The agent says it can't see the attached file**: The file was attached directly with
 **+** and never indexed. Upload it in the Agent Builder under **File Search** first, then
 select it with **+**. Check indexing with
-`cd ~/ai-kit/runtime/LibreChat && docker compose logs rag_api --since 10m | grep embed`
+`cd ~/inglenook/runtime/LibreChat && docker compose logs rag_api --since 10m | grep embed`
 (you should see `/embed` lines). Or copy it into `~/agent-workspace` and ask by name.
 
 **search_document fails or says "No text found"**: Check `nomic-embed-text` is in
@@ -1104,8 +1108,8 @@ searched without OCR.
 - The website is reachable by anyone on **your home network** who has an account.
   **Never** forward port 3080 or 11434 on your router to the internet.
 - After you've created your account, you can stop others signing up: edit
-  `~/ai-kit/runtime/LibreChat/.env`, set `ALLOW_REGISTRATION=false`, then
-  `cd ~/ai-kit/runtime/LibreChat && docker compose up -d`.
+  `~/inglenook/runtime/LibreChat/.env`, set `ALLOW_REGISTRATION=false`, then
+  `cd ~/inglenook/runtime/LibreChat && docker compose up -d`.
 - The agent can only touch files in `~/agent-workspace`. Code it writes runs in a
   sandbox with no internet and no access to the rest of your computer.
 - AI makes mistakes. Check important facts, and treat stock analysis as research,
@@ -1134,10 +1138,10 @@ DRY_RUN=1 bash scripts/uninstall.sh --purge
 **Full removal, step by step:**
 
 ```bash
-cd ~/ai-kit
+cd ~/inglenook
 cp -r ~/agent-workspace ~/agent-workspace-backup   # optional backup
 bash scripts/uninstall.sh --purge                  # type YES when asked
-cd ~ && rm -rf ~/ai-kit                            # the project folder itself
+cd ~ && rm -rf ~/inglenook                            # the project folder itself
 sudo reboot
 ```
 
