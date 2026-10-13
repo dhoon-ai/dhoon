@@ -68,3 +68,10 @@ def test_ollama_is_downloaded_only_when_the_version_changes(tmp_path):
     assert "installing 0.12.7" in run(LATEST="0.12.7")  # a newer release
     assert "already the right version" in run(LATEST="0.12.7", OLLAMA_VERSION="0.12.6")  # pinned
     assert "installing 0.12.5" in run(LATEST="0.12.7", OLLAMA_VERSION="0.12.5")
+
+
+def test_update_restarts_the_chat_website_so_it_reads_new_settings():
+    """librechat.yaml is mounted as a file: `docker compose up -d` keeps the running
+    container, so new settings (e.g. memory in v1.0.1) only load after a restart."""
+    text = (REPO / "scripts/update.sh").read_text()
+    assert text.index("render_librechat_config") < text.index("docker compose restart api")

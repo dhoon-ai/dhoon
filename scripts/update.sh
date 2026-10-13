@@ -29,7 +29,8 @@ bash "$KIT/scripts/03_searxng.sh"
 step "Updating LibreChat"
 librechat_checkout   # stays on the tested version (LIBRECHAT_REF in lib.sh)
 render_librechat_config
-(cd "$LIBRECHAT_DIR" && docker compose pull && docker compose up -d)
+(cd "$LIBRECHAT_DIR" && docker compose pull && docker compose up -d \
+  && docker compose restart api >/dev/null)   # read the new librechat.yaml (up -d keeps it running)
 
 step "Updating Ollama"
 install_ollama   # downloads only when a different version is wanted
