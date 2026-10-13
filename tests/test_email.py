@@ -228,3 +228,12 @@ def test_brevo_and_friendly_api_errors(tb, monkeypatch):
     assert "address you signed up with" in tb.send_email("me@gmail.com", "x", "y")
     monkeypatch.setenv("EMAIL_API_KEY", "")
     assert "EMAIL_API_KEY is missing" in tb.send_email("me@gmail.com", "x", "y")
+
+
+def test_no_address_means_the_users_own_inbox(tb):
+    out = tb.send_email(subject="Report", body="Hello")
+    assert "sent to me@gmail.com" in out  # the first address in EMAIL_ALLOWED_TO
+    out = tb.send_email("investor@domain.com", "Report", "Hello")  # a guessed address
+    assert "Not allowed to send to investor@domain.com" in out and "with to left empty" in out
+    assert len(FakeSMTP.sent) == 1
+    assert "body is empty" in tb.send_email(subject="x")
