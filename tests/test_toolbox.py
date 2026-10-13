@@ -494,3 +494,22 @@ def test_every_tool_call_is_logged(tb, monkeypatch, tmp_path):
     text = logfile.read_text()
     assert "CALL  current_datetime" in text and "DONE  current_datetime" in text
     assert "CALL  write_file" in text and "ERROR write_file" in text and "outside the workspace" in text
+
+
+def test_price_history_drops_rows_without_prices(tb, monkeypatch):
+    import sys
+    import types
+
+    df = _fake_prices(days=5)
+    df.loc[df.index[-1], "Close"] = float("nan")  # Yahoo's empty last row (seen for .NS tickers)
+
+    class FakeTicker:
+        def __init__(self, t):
+            pass
+
+        def history(self, period, auto_adjust):
+            return df.copy()
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+    out = tb._history("RELIANCE.NS", "1mo")
+    assert len(out) == 4 and not out["Close"].isna().any()

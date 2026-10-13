@@ -678,7 +678,12 @@ def ask_planner(task: str, progress: str = "", context: str = "", research_query
 def _history(ticker: str, period: str):
     import yfinance as yf
 
-    return yf.Ticker(ticker).history(period=period, auto_adjust=True)
+    df = yf.Ticker(ticker).history(period=period, auto_adjust=True)
+    # Yahoo sometimes adds a row without prices (often today's, for NSE India tickers before or
+    # after trading). One NaN there turns every price, return and average into "nan".
+    if not df.empty and "Close" in df:
+        df = df.dropna(subset=["Close"])
+    return df
 
 
 @mcp.tool()

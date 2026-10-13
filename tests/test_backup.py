@@ -1,5 +1,6 @@
 """scripts/backup.sh + scripts/restore.sh end to end, with real age keys and a local bare git
 repo standing in for GitHub. A second X25519 key stands in for the security key."""
+
 import os
 import shutil
 import subprocess
@@ -11,13 +12,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 BACKUP = str(ROOT / "scripts" / "backup.sh")
 RESTORE = str(ROOT / "scripts" / "restore.sh")
-pytestmark = pytest.mark.skipif(not shutil.which("age") or not shutil.which("age-keygen"),
-                                reason="age not installed")
+pytestmark = pytest.mark.skipif(not shutil.which("age") or not shutil.which("age-keygen"), reason="age not installed")
 
 
 def keygen(path):
     subprocess.run(["age-keygen", "-o", str(path)], check=True, capture_output=True)
-    return [l for l in path.read_text().splitlines() if "public key" in l][0].split()[-1]
+    return [line for line in path.read_text().splitlines() if "public key" in line][0].split()[-1]
 
 
 def run(args, env, ok=True):
@@ -42,8 +42,8 @@ def kit(tmp_path):
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(remote)], check=True)
     (conf / "backup.env").write_text(
-        f"BACKUP_REPO={remote}\nBACKUP_KEEP=2\n"
-        "BACKUP_PATHS='ai-kit/plugins agent-workspace/notes missing-folder'\n")
+        f"BACKUP_REPO={remote}\nBACKUP_KEEP=2\nBACKUP_PATHS='ai-kit/plugins agent-workspace/notes missing-folder'\n"
+    )
     plug = home / "ai-kit/plugins/secret"
     plug.mkdir(parents=True)
     (plug / "tools.py").write_text("PRIVATE = 1\n")
@@ -53,8 +53,14 @@ def kit(tmp_path):
     notes = home / "agent-workspace/notes"
     notes.mkdir(parents=True)
     (notes / "a.txt").write_text("cash 123")
-    env = dict(os.environ, HOME=str(home), GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
-               GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+    env = dict(
+        os.environ,
+        HOME=str(home),
+        GIT_AUTHOR_NAME="t",
+        GIT_AUTHOR_EMAIL="t@t",
+        GIT_COMMITTER_NAME="t",
+        GIT_COMMITTER_EMAIL="t@t",
+    )
     for k in ("BACKUP_CONF", "BACKUP_REPO_DIR", "WORKSPACE_DIR", "BACKUP_MAX_MB"):
         env.pop(k, None)
     return dict(home=home, conf=conf, remote=remote, env=env, tmp=tmp_path)
@@ -75,15 +81,16 @@ def test_backup_is_encrypted_one_commit_and_pruned(kit):
     env = kit["env"]
     for _ in range(3):
         r = run([BACKUP], env)
-        time.sleep(1.1)   # backup names carry the time to the second
+        time.sleep(1.1)  # backup names carry the time to the second
     assert "Skipping ~/missing-folder" in r.stdout
     files = remote_files(kit)
     backups = [f for f in files if f.startswith("backups/")]
     assert len(backups) == 2
     assert {"README.md", "recipients.txt", "yubikey-identity.txt"} <= set(files)
     assert git("--git-dir", str(kit["remote"]), "rev-list", "--count", "main").strip() == "1"
-    blob = subprocess.run(["git", "--git-dir", str(kit["remote"]), "show", f"main:{backups[0]}"],
-                          capture_output=True, check=True).stdout
+    blob = subprocess.run(
+        ["git", "--git-dir", str(kit["remote"]), "show", f"main:{backups[0]}"], capture_output=True, check=True
+    ).stdout
     assert blob.startswith(b"age-encryption.org") and b"cash 123" not in blob and b"PRIVATE" not in blob
 
 
@@ -119,7 +126,7 @@ def test_extract_list_and_apply_everything(kit):
     assert (kit["home"] / "agent-workspace/notes/a.txt").read_text() == "cash 123"
     aside = list((kit["home"] / "agent-workspace").glob("notes.before-restore-*"))
     assert aside and (aside[0] / "a.txt").read_text() == "changed"
-    assert not list(kit["home"].glob("restore-*"))   # unencrypted copy cleaned up
+    assert not list(kit["home"].glob("restore-*"))  # unencrypted copy cleaned up
 
 
 def test_removed_plugin_comes_back_with_history_on_a_new_computer(kit):
@@ -134,8 +141,7 @@ def test_removed_plugin_comes_back_with_history_on_a_new_computer(kit):
     shutil.move(kit["conf"] / "recovery-key.txt", usb)
     shutil.rmtree(kit["conf"])
     shutil.rmtree(kit["home"] / ".local/share/ai-kit-backup")
-    r = run([RESTORE, "--from", str(kit["remote"]), "--key", str(usb),
-             "--only", "ai-kit/plugins/secret"], env)
+    r = run([RESTORE, "--from", str(kit["remote"]), "--key", str(usb), "--only", "ai-kit/plugins/secret"], env)
     assert "Restored ~/ai-kit/plugins/secret" in r.stdout
     assert (plug / "tools.py").read_text() == "PRIVATE = 1\n"
     assert "first" in git("-C", str(plug), "log", "--oneline")
