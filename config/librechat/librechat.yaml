@@ -11,7 +11,10 @@ memory:
   disabled: __MEMORY_DISABLED__
   personalize: true
   tokenLimit: 1500
-  messageWindowSize: 3
+  # Only the newest message is read for "Remember that...": LibreChat stops the memory step
+  # when the answer is finished, so on a CPU it must be quick (found in release testing).
+  messageWindowSize: 1
+  maxInputTokens: 800
   agent:
     enabled: true          # without this, LibreChat only reads memories and never saves new ones
     provider: "ollama"
