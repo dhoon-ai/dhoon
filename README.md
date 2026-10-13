@@ -313,6 +313,7 @@ config/         LibreChat (with the Dhoon icons in config/branding), SearXNG, mo
                 agent-instruction templates
 docs/           beginner guide and how to add tools
 examples/       stand-alone minimal agent + prompts to try
+site/           the Dhoon website, published with install.sh by GitHub Pages (.github/workflows/pages.yml)
 tests/          unit tests (no network/Docker/Ollama needed)
 runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
 ```

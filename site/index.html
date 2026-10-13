@@ -1,0 +1,241 @@
+<!doctype html>
+<!-- Dhoon website, published by .github/workflows/pages.yml together with install.sh. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dhoon: your private AI, with the drive to get things done</title>
+<meta name="description" content="Dhoon is a free, open-source AI assistant that runs privately on your own computer. No cloud, no subscription, no graphics card needed.">
+<meta property="og:title" content="Dhoon: your private AI assistant">
+<meta property="og:description" content="Free, open-source AI that runs on your own computer. Your files and chats stay home.">
+<meta property="og:image" content="https://raw.githubusercontent.com/dhoon-ai/dhoon/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%20role%3D%22img%22%20aria-label%3D%22Dhoon%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22bg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232e1065%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230f0a1f%22/%3E%20%3C/linearGradient%3E%20%3CradialGradient%20id%3D%22glow%22%20cx%3D%220.5%22%20cy%3D%220.6%22%20r%3D%220.5%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f97316%22%20stop-opacity%3D%220.5%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f97316%22%20stop-opacity%3D%220%22/%3E%20%3C/radialGradient%3E%20%3ClinearGradient%20id%3D%22flame%22%20x1%3D%220%22%20y1%3D%221%22%20x2%3D%220%22%20y2%3D%220%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ea580c%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23fbbf24%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22url%28%23bg%29%22/%3E%20%3Ccircle%20cx%3D%22256%22%20cy%3D%22300%22%20r%3D%22190%22%20fill%3D%22url%28%23glow%29%22/%3E%20%3Cpath%20d%3D%22M%20256%20112%20C%20314%20194%20365%20245%20350%20338%20C%20338%20409%20295%20440%20256%20440%20C%20217%20440%20174%20409%20162%20338%20C%20151%20268%20209%20237%20221%20175%20C%20236%20210%20256%20218%20264%20194%20C%20272%20167%20260%20140%20256%20112%20Z%22%20fill%3D%22url%28%23flame%29%22/%3E%20%3Cpath%20d%3D%22M%20256%20245%20C%20287%20284%20311%20315%20303%20358%20C%20297%20393%20279%20412%20256%20412%20C%20233%20412%20215%20393%20209%20358%20C%20203%20323%20236%20303%20248%20268%20C%20252%20288%20264%20288%20256%20245%20Z%22%20fill%3D%22%23fde68a%22/%3E%20%3Ccircle%20cx%3D%22256%22%20cy%3D%22377%22%20r%3D%2222%22%20fill%3D%22%23fffbeb%22/%3E%20%3C%21--%20rising%20sparks%20--%3E%20%3Ccircle%20cx%3D%22368%22%20cy%3D%22128%22%20r%3D%2214%22%20fill%3D%22%23fbbf24%22/%3E%20%3Ccircle%20cx%3D%22404%22%20cy%3D%2284%22%20r%3D%229%22%20fill%3D%22%23fde68a%22/%3E%20%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%228%22%20fill%3D%22%23fbbf24%22/%3E%20%3C/svg%3E%20">
+<style>
+  :root {
+    --bg: #0b0716; --bg2: #1e0b45; --card: #160f2e; --line: #2e2350;
+    --text: #fff7ed; --muted: #c9bfdc; --gold: #fde68a; --orange: #fb923c; --flame: #ea580c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--text); line-height: 1.6;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 20% -10%, var(--bg2), transparent 70%), var(--bg);
+    min-height: 100vh;
+  }
+  a { color: var(--gold); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; text-decoration: none; color: var(--text); }
+  .brand svg { width: 36px; height: 36px; }
+  nav a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+  nav a:hover { color: var(--text); }
+  .hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: center; padding: 48px 0 32px; }
+  .hero h1 { font-size: clamp(40px, 7vw, 68px); line-height: 1.05; margin: 0 0 16px; letter-spacing: -0.02em; }
+  .hero h1 span { background: linear-gradient(90deg, var(--gold), var(--orange)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: 19px; color: var(--muted); margin: 0 0 12px; }
+  .meaning { font-size: 15px; color: var(--muted); border-left: 3px solid var(--orange); padding-left: 12px; margin: 20px 0 0; }
+  .meaning b { color: var(--gold); font-weight: 600; }
+  .logo-big svg { width: 100%; max-width: 340px; display: block; margin: 0 auto; filter: drop-shadow(0 20px 60px rgba(234,88,12,.35)); }
+  .install { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin: 24px 0 8px; }
+  .install h2 { margin: 0 0 6px; font-size: 22px; }
+  .install p { margin: 0 0 14px; color: var(--muted); }
+  .cmd { display: flex; align-items: center; gap: 10px; background: #07040f; border: 1px solid var(--line); border-radius: 10px; padding: 12px 12px 12px 16px; }
+  .cmd code { flex: 1; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 15px; color: var(--gold); overflow-x: auto; white-space: nowrap; }
+  .cmd code::before { content: "$ "; color: var(--muted); }
+  button { cursor: pointer; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 600; color: #1a0f05; background: linear-gradient(90deg, var(--gold), var(--orange)); }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .small { font-size: 14px; color: var(--muted); margin-top: 12px; }
+  section { padding: 40px 0; }
+  section > h2 { font-size: 28px; margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .icon { font-size: 24px; margin-bottom: 8px; }
+  .privacy { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  ul.ticks { list-style: none; padding: 0; margin: 0; }
+  ul.ticks li { padding-left: 28px; position: relative; margin: 8px 0; color: var(--muted); }
+  ul.ticks li::before { content: "✓"; position: absolute; left: 0; color: var(--orange); font-weight: 700; }
+  ul.ticks li b { color: var(--text); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--gold); font-weight: 600; }
+  td { color: var(--muted); }
+  td:first-child { color: var(--text); }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  .steps li { counter-increment: s; position: relative; padding: 0 0 18px 48px; color: var(--muted); }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #1a0f05; background: linear-gradient(135deg, var(--gold), var(--orange)); }
+  .steps li b { color: var(--text); display: block; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .row { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; padding-top: 16px; }
+    .logo-big { order: -1; }
+    .logo-big svg { max-width: 160px; }
+    .grid, .privacy { grid-template-columns: 1fr; }
+    nav a { margin-left: 12px; }
+    nav a.hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="#" aria-label="Dhoon home">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2e1065"/>
+      <stop offset="1" stop-color="#0f0a1f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.6" r="0.5">
+      <stop offset="0" stop-color="#f97316" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ea580c"/>
+      <stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="300" r="190" fill="url(#glow)"/>
+  <path d="M 256 112 C 314 194 365 245 350 338 C 338 409 295 440 256 440 C 217 440 174 409 162 338 C 151 268 209 237 221 175 C 236 210 256 218 264 194 C 272 167 260 140 256 112 Z" fill="url(#flame)"/>
+  <path d="M 256 245 C 287 284 311 315 303 358 C 297 393 279 412 256 412 C 233 412 215 393 209 358 C 203 323 236 303 248 268 C 252 288 264 288 256 245 Z" fill="#fde68a"/>
+  <circle cx="256" cy="377" r="22" fill="#fffbeb"/>
+  
+  <circle cx="368" cy="128" r="14" fill="#fbbf24"/>
+  <circle cx="404" cy="84" r="9" fill="#fde68a"/>
+  <circle cx="150" cy="150" r="8" fill="#fbbf24"/></svg>Dhoon
+    </a>
+    <nav>
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="#privacy" class="hide-sm">Privacy</a>
+      <a href="https://github.com/dhoon-ai/dhoon/blob/main/docs/GUIDE.md">Guide</a>
+      <a href="https://github.com/dhoon-ai/dhoon">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1>Your private AI,<br><span>with the drive to get things done.</span></h1>
+      <p class="lead">Dhoon is a free, open-source AI assistant that runs on your own computer.
+        It searches the web, reads your documents, plans, analyses and e-mails you the results,
+        and your chats and files never leave home.</p>
+      <p class="meaning"><b>धुन (dhun)</b> means the inner spark: the drive that keeps going until
+        the work is done.</p>
+    </div>
+    <div class="logo-big"><svg viewBox="0 0 512 512" role="img" aria-label="Dhoon logo"><defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2e1065"/>
+      <stop offset="1" stop-color="#0f0a1f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.6" r="0.5">
+      <stop offset="0" stop-color="#f97316" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ea580c"/>
+      <stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="300" r="190" fill="url(#glow)"/>
+  <path d="M 256 112 C 314 194 365 245 350 338 C 338 409 295 440 256 440 C 217 440 174 409 162 338 C 151 268 209 237 221 175 C 236 210 256 218 264 194 C 272 167 260 140 256 112 Z" fill="url(#flame)"/>
+  <path d="M 256 245 C 287 284 311 315 303 358 C 297 393 279 412 256 412 C 233 412 215 393 209 358 C 203 323 236 303 248 268 C 252 288 264 288 256 245 Z" fill="#fde68a"/>
+  <circle cx="256" cy="377" r="22" fill="#fffbeb"/>
+  
+  <circle cx="368" cy="128" r="14" fill="#fbbf24"/>
+  <circle cx="404" cy="84" r="9" fill="#fde68a"/>
+  <circle cx="150" cy="150" r="8" fill="#fbbf24"/></svg></div>
+  </div>
+
+  <div class="install" id="install">
+    <h2>Install with one command</h2>
+    <p>On Ubuntu or Debian, as your normal user. It sets everything up and asks only for your password and a login for the chat app.</p>
+    <div class="cmd">
+      <code id="cmd">curl -fsSL https://dhoon-ai.github.io/dhoon/install.sh | bash</code>
+      <button type="button" id="copy" aria-label="Copy the install command">Copy</button>
+    </div>
+    <p class="small">Then open <b>http://localhost:3080</b>. New to this? The
+      <a href="https://github.com/dhoon-ai/dhoon/blob/main/docs/GUIDE.md">step-by-step guide</a> is written for beginners.
+      Want to read the script first? <a href="https://github.com/dhoon-ai/dhoon/blob/main/install.sh">Here it is</a>.</p>
+  </div>
+
+  <section id="features">
+    <h2>What Dhoon can do</h2>
+    <div class="grid">
+      <div class="card"><div class="icon">🔎</div><h3>Research the web</h3><p>Private search, reads the pages and answers with the links it used.</p></div>
+      <div class="card"><div class="icon">📄</div><h3>Your documents</h3><p>Ask questions about your PDFs and Word files, searched on your own computer.</p></div>
+      <div class="card"><div class="icon">🐍</div><h3>Files and Python</h3><p>Writes and runs Python in a safe sandbox: numbers, charts, reports.</p></div>
+      <div class="card"><div class="icon">📈</div><h3>Stocks</h3><p>Prices, history and analysis for research and learning. Not financial advice.</p></div>
+      <div class="card"><div class="icon">📅</div><h3>Calendar and weather</h3><p>Looks at and adds events, and checks the forecast for your day.</p></div>
+      <div class="card"><div class="icon">⏰</div><h3>Works on a schedule</h3><p>"Every morning at 7…": does the task and e-mails you the result.</p></div>
+    </div>
+    <p class="small">Two agents: the full <b>Assistant</b> for bigger work, and the fast <b>Quick Assistant</b> for everyday questions. You can teach it new skills with a few lines of Python.</p>
+  </section>
+
+  <section id="privacy">
+    <h2>Private by design</h2>
+    <div class="privacy">
+      <ul class="ticks">
+        <li><b>The AI runs on your computer.</b> Open models through Ollama: no AI company sees your chats.</li>
+        <li><b>Your files stay home.</b> Documents are searched locally, never uploaded.</li>
+        <li><b>No account, no subscription.</b> Free and open source (MIT licence).</li>
+      </ul>
+      <ul class="ticks">
+        <li><b>Only what you ask for goes out:</b> the web searches, pages, market data and weather the assistant fetches for you.</li>
+        <li><b>E-mail only to addresses you allow.</b> It never invents or guesses one.</li>
+        <li><b>Encrypted backups</b> if you want them, readable only with your own key.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you need</h2>
+    <table>
+      <thead><tr><th></th><th>Minimum</th><th>Recommended</th></tr></thead>
+      <tbody>
+        <tr><td>System</td><td>Ubuntu 22.04+ or Debian 12+ (64-bit)</td><td>Ubuntu LTS</td></tr>
+        <tr><td>Memory</td><td>8 GB</td><td>32–64 GB</td></tr>
+        <tr><td>Disk</td><td>15 GB free</td><td>35 GB+ SSD</td></tr>
+        <tr><td>Graphics card</td><td>Not needed</td><td>Used automatically if you have one</td></tr>
+      </tbody>
+    </table>
+    <p class="small">A mini PC, an old desktop, a home server or a laptop is enough.</p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><b>Run the install command</b>It downloads the AI models and sets up the chat app, private search and the toolbox (30–90 minutes, mostly downloads).</li>
+      <li><b>Open the chat app</b>From this computer or any device at home, at port 3080.</li>
+      <li><b>Pick an agent and ask</b>Dhoon uses its tools step by step and shows you the result.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <div class="row">
+      <span>Dhoon is open source under the MIT licence, built on
+        <a href="https://ollama.com">Ollama</a>, <a href="https://www.librechat.ai">LibreChat</a>,
+        <a href="https://github.com/searxng/searxng">SearXNG</a> and
+        <a href="https://github.com/dhoon-ai/dhoon#credits">many more</a>.</span>
+      <span>A <a href="https://knowreva.com">KnowReva</a> project</span>
+    </div>
+  </footer>
+</div>
+<script>
+  // Show the install command for wherever this page is served (github.io or your own domain).
+  if (location.protocol.startsWith("http")) {
+    document.getElementById("cmd").textContent =
+      "curl -fsSL " + new URL("install.sh", location.href).href + " | bash";
+  }
+  document.getElementById("copy").addEventListener("click", async (e) => {
+    const text = document.getElementById("cmd").textContent;
+    try { await navigator.clipboard.writeText(text); e.target.textContent = "Copied"; }
+    catch { e.target.textContent = "Select and copy"; }
+    setTimeout(() => (e.target.textContent = "Copy"), 2000);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+name: Website
+
+# Publishes site/ and install.sh with GitHub Pages, so the home page and the short install
+# command always match main:  curl -fsSL https://dhoon-ai.github.io/dhoon/install.sh | bash
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "install.sh", "assets/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put the website together
+        run: |
+          mkdir -p _site
+          cp -r site/. _site/
+          cp install.sh assets/dhoon-logo.svg assets/social-preview.png _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
