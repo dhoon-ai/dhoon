@@ -252,7 +252,12 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
   computed numbers and the model only reasons about them.
 - **Short tool outputs.** On a CPU, reading long prompts is the slow part, so every tool
   truncates and summarises.
-- **Instructions read in advance.** Before each new chat the model must read ~3,700 tokens
+- **Two agents.** The full *Assistant* has every tool; the *Quick Assistant* has only the
+  everyday ones (weather, calendar, reminders, web search, e-mail) and short instructions:
+  about 1,400 tokens to read instead of 4,500, so it answers sooner and picks tools better.
+- **Lean web pages.** Only the article text of a page is kept (trafilatura, locally), not
+  menus, footers or "related stories": fewer words for the model to read.
+- **Instructions read in advance.** Before each new chat the model must read ~4,500 tokens
   of instructions and tool descriptions (minutes on a CPU). Ollama remembers what it read, so
   the instructions stay identical all day (date only, no clock time), tool descriptions are
   trimmed, and the toolbox (which passes the chat website's requests to Ollama) keeps a copy
@@ -296,7 +301,9 @@ install.sh      one-command installer (runs scripts 00 → 06)
 assets/         the Assistant's picture and the script that draws it
 scripts/        install steps 00 → 06, status, check, logs, Ollama settings + model preload,
                 benchmark, unban, update, restart, uninstall, encrypted backup + restore
-toolbox/        the MCP server with all agent tools
+toolbox/        the MCP server: toolbox_server.py (core) + toolset/ (the tools, one file per
+                job: everyday, web, files, documents, planner, stocks, mail), calendars,
+                weather, scheduler, warm-up, e-mail
 plugins/        your private add-on tools (git-ignored, see plugins/README.md)
 sandbox/        Dockerfile for the isolated Python sandbox
 config/         LibreChat, SearXNG, model and agent-instruction templates
@@ -352,6 +359,36 @@ deletes chats, files and models; `--purge` additionally uninstalls Ollama and Do
 asks for confirmation, and `DRY_RUN=1` previews. See
 [Uninstall and start over](docs/GUIDE.md#uninstall-and-start-over).
 To add a skill, see [docs/ADDING_TOOLS.md](docs/ADDING_TOOLS.md).
+
+## Credits
+
+Built on these open-source projects and free services. Everything runs on your computer
+except the services marked *(online)*, which receive only the request itself (a search, a
+page address, a place name, a ticker), never your chats or files.
+
+| Project | What it does here | Licence |
+|---|---|---|
+| [Ollama](https://ollama.com) | runs the AI models | MIT |
+| [Qwen3](https://github.com/QwenLM/Qwen3) (Alibaba Qwen team) | the language models | Apache-2.0 |
+| [nomic-embed-text](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) | text embeddings for document search | Apache-2.0 |
+| [LibreChat](https://www.librechat.ai) | the chat website and agents | MIT |
+| [SearXNG](https://github.com/searxng/searxng) | private web search (queries public engines *(online)*) | AGPL-3.0 |
+| [Docker](https://www.docker.com) | containers for LibreChat, SearXNG and the Python sandbox | Apache-2.0 |
+| [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | the tool server protocol | MIT |
+| [trafilatura](https://github.com/adbar/trafilatura) | the article text of web pages | Apache-2.0 |
+| [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/) | reading HTML | MIT |
+| [HTTPX](https://www.python-httpx.org) | web requests | BSD-3-Clause |
+| [pypdf](https://github.com/py-pdf/pypdf), [python-docx](https://github.com/python-openxml/python-docx) | reading PDF and Word files | BSD-3-Clause, MIT |
+| [rank-bm25](https://github.com/dorianbrown/rank_bm25) | keyword search in documents | Apache-2.0 |
+| [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Matplotlib](https://matplotlib.org) | numbers and charts (also in the sandbox) | BSD-3-Clause, BSD-3-Clause, Matplotlib (PSF-based) |
+| [yfinance](https://github.com/ranaroussi/yfinance) | market data from Yahoo Finance *(online; Yahoo's terms: personal use)* | Apache-2.0 |
+| [Python-Markdown](https://python-markdown.github.io) | e-mails in HTML | BSD-3-Clause |
+| [icalendar](https://github.com/collective/icalendar), [recurring-ical-events](https://github.com/niccokunzmann/python-recurring-ical-events), [caldav](https://github.com/python-caldav/caldav) | calendars | BSD-2-Clause, LGPL-3.0-or-later, Apache-2.0 / GPL-3.0 |
+| [Open-Meteo](https://open-meteo.com) | weather forecasts *(online)*, data under CC BY 4.0 | free API |
+| [age](https://age-encryption.org), [age-plugin-fido2-hmac](https://github.com/olastor/age-plugin-fido2-hmac) | encrypting backups (YubiKey optional) | BSD-3-Clause, MIT |
+| [Resend](https://resend.com), [Brevo](https://www.brevo.com) | optional e-mail sending over HTTPS *(online)* | services |
+
+Thank you to everyone who builds and maintains them.
 
 ## Disclaimer
 

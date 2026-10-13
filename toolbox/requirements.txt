@@ -1,6 +1,10 @@
 mcp>=2.2,<3
 httpx
 beautifulsoup4
+# the article text of a web page, without menus and ads (Apache-2.0)
+trafilatura
+# keyword search for documents, combined with meaning search (Apache-2.0)
+rank-bm25
 yfinance
 pandas
 pypdf

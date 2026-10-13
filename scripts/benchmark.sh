@@ -7,6 +7,9 @@
 #   bash scripts/benchmark.sh --reset    remove the CPU-only setting again
 #   bash scripts/benchmark.sh --vulkan   also test integrated/other GPUs via llama.cpp
 #                                        Vulkan (report only; takes ~20 min to build)
+#   bash scripts/benchmark.sh --speed-settings   main model: Ollama's flash attention + compact
+#                                        chat memory (q8_0) vs without; keeps them only if faster
+#                                        (~10 min). Undo: bash scripts/benchmark.sh --speed-reset
 #
 # Why: on many mini PCs and laptops the graphics chip shares system memory and is
 # slower than the CPU; splitting a model between them can be slowest of all.
@@ -18,6 +21,7 @@ OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 BENCH_MODEL="${BENCH_MODEL:-$MODEL_FAST}"
 SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system/ollama.service.d}"
 DROPIN="$SYSTEMD_DIR/cpu-only.conf"
+SPEED_DROPIN="$SYSTEMD_DIR/speed.conf"
 RESULTS="$RUNTIME/benchmark.txt"
 MODE="apply"
 VULKAN=false
@@ -26,6 +30,8 @@ for arg in "$@"; do
     --report) MODE="report" ;;
     --reset)  MODE="reset" ;;
     --vulkan) VULKAN=true ;;
+    --speed-settings) MODE="speed" ;;
+    --speed-reset) MODE="speed-reset" ;;
     *) echo "Unknown option: $arg"; exit 2 ;;
   esac
 done
@@ -54,6 +60,10 @@ EOF
   if [ -w "$SYSTEMD_DIR" ] 2>/dev/null; then mv "$tmp" "$DROPIN"; else sudo mkdir -p "$SYSTEMD_DIR"; sudo mv "$tmp" "$DROPIN"; fi
 }
 
+drop_file() {
+  if [ -w "$SYSTEMD_DIR" ]; then rm -f "$1"; else sudo rm -f "$1"; fi
+}
+
 remove_dropin() {
   if [ -f "$DROPIN" ]; then
     if [ -w "$SYSTEMD_DIR" ]; then rm -f "$DROPIN"; else sudo rm -f "$DROPIN"; fi
@@ -73,12 +83,15 @@ fi
 # $1 = extra JSON options, e.g. ',"num_gpu":0' for CPU only.
 measure() {
   local extra="$1" body
-  # ~600-token prompt so prompt reading is measured, not just loading.
-  body=$(python3 - "$BENCH_MODEL" "$extra" <<'PY'
+  # ~600-token prompt (or $2 sentences) so prompt reading is measured, not just loading.
+  body=$(python3 - "${MEASURE_MODEL:-$BENCH_MODEL}" "$extra" "${2:-30}" <<'PY'
 import json, sys
 model, extra = sys.argv[1], sys.argv[2]
-text = ("The quick brown fox jumps over the lazy dog while the river flows past old stone "
-        "bridges and quiet villages. ") * 30
+import random
+words = int(sys.argv[3]) if len(sys.argv) > 3 else 30
+# a random start each time, so Ollama can't reuse text it read in an earlier run
+text = f"Note {random.randint(0, 10**9)}. " + ("The quick brown fox jumps over the lazy dog while the river "
+        "flows past old stone bridges and quiet villages. ") * words
 opts = json.loads('{"num_predict":128,"temperature":0,"seed":1' + extra + '}')
 print(json.dumps({"model": model, "prompt": "Summarise this text in one paragraph:\n" + text,
                   "stream": False, "keep_alive": "5m", "options": opts}))
@@ -106,6 +119,49 @@ print(f'{max(a[0],b[0]):.1f} {max(a[1],b[1]):.1f}')"
 processor() {
   ollama ps 2>/dev/null | awk -v m="$BENCH_MODEL" '$1==m {for(i=1;i<=NF;i++) if($i ~ /CPU|GPU/){print $(i-1), $i; exit}}'
 }
+
+# ---------------------------------------------------------------- speed settings ---
+if [ "$MODE" = "speed-reset" ]; then
+  step "Removing the speed settings"
+  if [ -f "$SPEED_DROPIN" ]; then drop_file "$SPEED_DROPIN"; restart_ollama; ok "Removed"; else ok "None were active"; fi
+  exit 0
+fi
+if [ "$MODE" = "speed" ]; then
+  step "Speed settings for the main model ($MODEL_MAIN): flash attention + compact chat memory"
+  curl -fs "$OLLAMA_URL/api/tags" >/dev/null || { fail "Ollama is not running: sudo systemctl start ollama"; exit 1; }
+  export MEASURE_MODEL="$MODEL_MAIN"
+  # a long prompt like the Assistant's instructions (~2,000 tokens): that's where it can help
+  long_bench() { measure "" 5 >/dev/null; measure "" 110; }
+  if [ -f "$SPEED_DROPIN" ]; then drop_file "$SPEED_DROPIN"; restart_ollama; fi
+  echo "Measuring without the settings (a few minutes)..."
+  read -r off_pp off_tg < <(long_bench)
+  echo "  without: reading ${off_pp} tok/s, writing ${off_tg} tok/s"
+  tmp=$(mktemp)
+  printf '%s\n' "# Written by scripts/benchmark.sh --speed-settings: measured faster on this PC." \
+    "# Remove with:  bash scripts/benchmark.sh --speed-reset" "[Service]" \
+    'Environment="OLLAMA_FLASH_ATTENTION=1"' 'Environment="OLLAMA_KV_CACHE_TYPE=q8_0"' > "$tmp"
+  chmod 644 "$tmp"
+  if [ -w "$SYSTEMD_DIR" ] 2>/dev/null; then mv "$tmp" "$SPEED_DROPIN"; else sudo mkdir -p "$SYSTEMD_DIR"; sudo mv "$tmp" "$SPEED_DROPIN"; fi
+  restart_ollama
+  echo "Measuring with flash attention + compact chat memory..."
+  read -r on_pp on_tg < <(long_bench)
+  echo "  with:    reading ${on_pp} tok/s, writing ${on_tg} tok/s"
+  read -r off_s on_s keep < <(python3 -c "
+off = 2000/$off_pp + 300/$off_tg
+on = 2000/$on_pp + 300/$on_tg
+print(f'{off:.0f} {on:.0f} {\"yes\" if on < off*0.95 else \"no\"}')")
+  echo "  Typical step (read 2000 tokens, write 300): without ~${off_s}s, with ~${on_s}s"
+  { echo "date: $(date -Is)"; echo "model: $MODEL_MAIN"; echo "speed_off: pp=$off_pp tg=$off_tg step=${off_s}s"
+    echo "speed_on: pp=$on_pp tg=$on_tg step=${on_s}s"; echo "kept: $keep"; } >> "$RESULTS"
+  if [ "$keep" = "yes" ]; then
+    ok "Faster with the settings: kept (undo: bash scripts/benchmark.sh --speed-reset)"
+  else
+    drop_file "$SPEED_DROPIN"; restart_ollama
+    ok "Not clearly faster on this PC (needs 5%+): settings removed, nothing changed"
+  fi
+  echo "  Results added to $RESULTS"
+  exit 0
+fi
 
 step "Benchmark: Ollama default vs CPU only (model: $BENCH_MODEL)"
 curl -fs "$OLLAMA_URL/api/tags" >/dev/null || { fail "Ollama is not running: sudo systemctl start ollama"; exit 1; }

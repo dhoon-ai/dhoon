@@ -103,3 +103,48 @@ def test_report_changes_nothing_and_reset_removes(env):
     assert Path(env["_DROPIN"]).exists()
     assert "back to its default" in run(env, server, "--reset")
     assert not Path(env["_DROPIN"]).exists()
+
+
+def fake_ollama_speed(dropin_dir, off=(25.0, 9.0), on=(32.0, 9.5)):
+    """Main-model speeds depend on whether the speed settings file is in place."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"models":[]}')
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            Handler.prompts.append(body["prompt"][:70])
+            pp, tg = on if (Path(dropin_dir) / "speed.conf").exists() else off
+            n = 2000
+            result = {"prompt_eval_count": n, "prompt_eval_duration": n / pp * 1e9,
+                      "eval_count": 128, "eval_duration": 128 / tg * 1e9}  # fmt: skip
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+
+    Handler.prompts = []
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    server.handler = Handler
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_speed_settings_kept_only_when_measured_faster(env):
+    dropins = Path(env["SYSTEMD_DIR"])
+    server = fake_ollama_speed(dropins)
+    out = run({**env, "MODEL_MAIN": "qwen3:30b"}, server, "--speed-settings")
+    assert "Faster with the settings: kept" in out
+    text = (dropins / "speed.conf").read_text()
+    assert "OLLAMA_FLASH_ATTENTION=1" in text and "OLLAMA_KV_CACHE_TYPE=q8_0" in text
+    assert len(set(server.handler.prompts)) == len(server.handler.prompts)  # every prompt new: no reuse
+    assert "Removed" in run(env, server, "--speed-reset") and not (dropins / "speed.conf").exists()
+
+    slow = fake_ollama_speed(dropins, off=(25.0, 9.0), on=(25.5, 9.0))  # only 2% faster
+    out = run({**env, "MODEL_MAIN": "qwen3:30b"}, slow, "--speed-settings")
+    assert "Not clearly faster" in out and not (dropins / "speed.conf").exists()

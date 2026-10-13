@@ -317,9 +317,11 @@ bash scripts/06_create_agent.sh
 It asks for your web-app email and password (and offers to create the account if it
 doesn't exist yet), lifts any LibreChat sign-in ban left by an earlier attempt, then creates the **Assistant** agent with the right model, all toolbox
 tools, File Search, the instructions below, a few starter prompts and its picture
-(`assets/assistant-avatar.png`; swap in your own image to change it). Running it again
-updates the agent instead of making a second one. Reload the web page and pick
-**Agents → Assistant**.
+(`assets/assistant-avatar.png`; swap in your own image to change it). It also creates the
+**Quick Assistant**: the same model with only the everyday tools (weather, calendar,
+reminders and scheduled tasks, web search, e-mail) and short instructions, so it answers
+faster (see "How fast should it be?"). Running it again updates both agents instead of making
+new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assistant**).
 
 **Manual (if you prefer clicking, or the script reports a problem):**
 
@@ -862,8 +864,14 @@ on your own PC and picks the faster option.
 
 **Why an answer can take minutes before anything happens, even "send a test e-mail":**
 before the Assistant can do anything, the model reads its instructions and the description
-of every tool, about 3,700 tokens (more with plugins). On a CPU it reads roughly 20-50 tokens
-a second, so reading it all takes 1-3 minutes, with nothing on screen meanwhile.
+of every tool, about 4,500 tokens (more with plugins). On a CPU it reads roughly 20-50 tokens
+a second, so reading it all takes 2-4 minutes, with nothing on screen meanwhile.
+
+**For everyday questions, use the "Quick Assistant"** (it is created next to the Assistant):
+the same model, but only the everyday tools (weather, calendar, reminders and scheduled
+tasks, web search, e-mail) and short instructions, about 1,400 tokens: roughly 3 times less
+to read, and fewer tools to choose from. Use the full **Assistant** for research, files,
+documents, Python, stocks and planning.
 
 So that this rarely happens, Ollama remembers what it has read, and the system has it read
 the Assistant's instructions **in advance**: the chat website talks to Ollama through the
@@ -891,6 +899,21 @@ curl -s http://127.0.0.1:11434/api/generate -d "{\"model\": \"$M\", \"prompt\": 
   when hot).
 
 With a supported graphics card, expect answers several times faster.
+
+**Try Ollama's speed settings (optional, ~10 minutes):** flash attention and a compact chat
+memory (`q8_0`) are sometimes faster on CPUs for long texts, and halve the memory a chat
+needs. Whether they help depends on the processor, so the script measures the main model with
+and without them and keeps them only if they are at least 5% faster:
+
+```bash
+bash scripts/benchmark.sh --speed-settings      # measure and keep the faster setup
+bash scripts/benchmark.sh --speed-reset         # remove them again
+```
+
+**Web pages are read lean:** the toolbox keeps only the article text of a page (with
+[trafilatura](https://github.com/adbar/trafilatura), running locally), not its menus,
+footers, cookie notices or "related stories", so the model has fewer words to read and
+cleaner facts. Pages without an article (lists, search pages) are read in full.
 
 ---
 
@@ -945,6 +968,7 @@ Run these from the `~/ai-kit` folder (`cd ~/ai-kit` first).
 | Load the main model now | `bash scripts/preload_model.sh` |
 | Remove the services (keeps data) | `bash scripts/uninstall.sh` |
 | Restart everything (when something is stuck) | `bash scripts/restart.sh` |
+| Test Ollama's speed settings on this PC | `bash scripts/benchmark.sh --speed-settings` |
 | Remove everything | see "Uninstall and start over" below |
 
 ### After a reboot (or a power cut)
@@ -1134,19 +1158,20 @@ To reinstall later, start again from Step 0.
 
 ## Next: teach your agent new skills
 
-Every skill is a Python function in `toolbox/toolbox_server.py`. To add one, copy the
-pattern of an existing tool:
+Every skill is a Python function in one of the files in `toolbox/toolset/` (one per job:
+everyday, web, files, documents, planner, stocks, mail). To add one, copy the pattern of an
+existing tool:
 
 ```python
-@mcp.tool()
+@tb.mcp.tool()
 def my_new_tool(some_input: str) -> str:
     """Describe clearly what this does and when to use it. The AI reads this."""
     ...do the work in Python...
     return "the result as short text"
 ```
 
-Then restart: `sudo systemctl restart ai-toolbox`, and in LibreChat re-open the
-Agent Builder, tick the new tool, and Save. Full details and tips are in
+Then restart: `sudo systemctl restart ai-toolbox` and run `bash scripts/06_create_agent.sh`
+to give it to the Assistant. Full details and tips are in
 [ADDING_TOOLS.md](ADDING_TOOLS.md).
 
 Ideas: check a website for changes, summarise new files in a folder, track your

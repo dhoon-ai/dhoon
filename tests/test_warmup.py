@@ -98,3 +98,21 @@ def test_tool_list_has_no_redundant_titles():
     tb = importlib.reload(toolbox_server)
     schemas = json.dumps([t.input_schema for t in asyncio.run(tb.mcp.list_tools())])
     assert '"title": "' not in schemas  # a parameter called title stays
+
+
+def test_only_the_agent_used_last_is_read_ahead(warm):
+    import os
+    import time
+
+    quick_tools = [{"type": "function", "function": {"name": "weather_mcp_toolbox"}}]
+    warm.remember(json.dumps(chat_request()).encode())  # the Assistant
+    time.sleep(0.01)
+    warm.remember(json.dumps(chat_request(tools=quick_tools)).encode())  # then the Quick Assistant
+    assert len(list(warm.WARM_DIR.glob("*.json"))) == 2
+    latest = warm.latest_per_model()
+    assert len(latest) == 1 and json.loads(latest[0].read_text())["tools"] == quick_tools
+    past = time.time() - 60
+    for f in warm.WARM_DIR.glob("*.json"):
+        os.utime(f, (past, past))
+    warm.remember(json.dumps(chat_request()).encode())  # back to the Assistant (same text)
+    assert json.loads(warm.latest_per_model()[0].read_text())["tools"] == TOOLS

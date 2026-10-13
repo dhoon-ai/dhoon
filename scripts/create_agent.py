@@ -51,13 +51,48 @@ PLUGINS = Path(os.environ.get("PLUGINS_DIR", KIT / "plugins"))  # private, git-i
 
 def toolbox_tools() -> list[str]:
     """Names of all @mcp.tool() functions in the toolbox and in private plugins."""
-    sources = [KIT / "toolbox" / "toolbox_server.py", *sorted(PLUGINS.glob("*/tools.py"))]
+    sources = [
+        KIT / "toolbox" / "toolbox_server.py",
+        *sorted((KIT / "toolbox" / "toolset").glob("*.py")),
+        *sorted(PLUGINS.glob("*/tools.py")),
+    ]
     return [t for f in sources for t in re.findall(r"@(?:tb\.)?mcp\.tool\(\)\s*\ndef (\w+)\(", f.read_text())]
 
 
 def plugin_extras(name: str) -> list[str]:
     """Text from plugins/*/<name> (instructions.md, starters.txt)."""
     return [f.read_text().strip() for f in sorted(PLUGINS.glob(f"*/{name}")) if f.read_text().strip()]
+
+
+# A second, lighter agent for everyday questions: the same model, but only these tools and
+# short instructions, so it has far less to read before answering (faster on a CPU) and
+# fewer tools to choose from.
+QUICK_NAME = "Quick Assistant"
+QUICK_TOOLS = [
+    "current_datetime", "weather", "calendar_events", "calendar_add_event", "calendar_delete_event",
+    "schedule_task", "scheduled_tasks", "cancel_scheduled_task", "web_search", "send_email",
+]  # fmt: skip
+QUICK_STARTERS = [
+    "What's the weather today, and what's on my calendar?",
+    "Every weekday at 7am, e-mail me the weather and my calendar for the day.",
+    "Remind me on Friday at 5pm to pay the credit card.",
+]
+
+
+def quick_payload(model: str) -> dict:
+    available = set(toolbox_tools())
+    return {
+        "name": QUICK_NAME,
+        "description": "Fast everyday helper: weather, calendar, reminders and scheduled tasks, quick web answers.",
+        "instructions": (KIT / "config" / "quick-instructions.md").read_text().strip(),
+        "provider": PROVIDER,
+        "model": model,
+        "tools": [f"{t}{MCP_DELIMITER}{MCP_SERVER}" for t in QUICK_TOOLS if t in available]
+        + [f"sys__server__sys{MCP_DELIMITER}{MCP_SERVER}"],
+        "model_parameters": {"max_tokens": 2048},
+        "recursion_limit": 20,
+        "conversation_starters": QUICK_STARTERS,
+    }
 
 
 def agent_payload(model: str) -> dict:
@@ -180,6 +215,41 @@ def ask(prompt: str, secret: bool = False) -> str:
         sys.exit("No terminal available: set LIBRECHAT_EMAIL and LIBRECHAT_PASSWORD.")
 
 
+def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str) -> int:
+    """Create or update one agent. Returns 1 if some tools were not accepted, else 0."""
+    name = payload["name"]
+    existing = [a for a in agents if a.get("name") == name]
+    if existing:
+        agent_id = existing[0]["id"]
+        status, data = lc.call("PATCH", f"/api/agents/{agent_id}", payload)
+        action = "Updated"
+    else:
+        status, data = lc.call("POST", "/api/agents", payload)
+        agent_id = data.get("id")
+        action = "Created"
+    if status not in (200, 201) or not agent_id or data.get("error"):
+        sys.exit(f"Could not save the agent '{name}' (status {status}): {data}")
+
+    if AVATAR.exists() and not data.get("avatar"):
+        a_status, a_data = lc.upload_avatar(agent_id, AVATAR)
+        if a_status in (200, 201) and not a_data.get("error"):
+            print(f"  Added the picture to '{name}'.")
+        else:
+            print(f"  (could not add the picture: {a_data.get('message', a_status)} - not important)")
+
+    saved = set(data.get("tools") or [])
+    missing = [t for t in payload["tools"] if t.endswith(f"{MCP_DELIMITER}{MCP_SERVER}") and t not in saved]
+    missing = [t for t in missing if not t.startswith("sys__")]
+    print(f"{action} the '{name}' agent ({agent_id}) with model {model}.")
+    print(f"  Tools: {len(saved)} saved" + (f", including File Search: {'yes' if 'file_search' in saved else 'no'}"
+                                             if "file_search" in payload["tools"] else ""))  # fmt: skip
+    if missing:
+        print(f"  WARNING: {len(missing)} toolbox tools were not accepted: {', '.join(missing)}")
+        print("  Is the toolbox running? Check: bash scripts/check.sh, then re-run this script.")
+        return 1
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--url", default=os.environ.get("LIBRECHAT_URL", "http://localhost:3080"))
@@ -216,44 +286,20 @@ def main() -> int:
     else:
         print(f"  Signed in as {email}.")
 
-    payload = agent_payload(args.model)
     status, data = lc.call("GET", "/api/agents?limit=100")
     if status != 200 or data.get("error"):
-        print(f"  (could not list existing agents: {data.get('message', status)} - creating a new one)")
+        print(f"  (could not list existing agents: {data.get('message', status)} - creating new ones)")
         data = {}
-    existing = [a for a in (data.get("data") or []) if a.get("name") == AGENT_NAME]
-
-    if existing:
-        agent_id = existing[0]["id"]
-        status, data = lc.call("PATCH", f"/api/agents/{agent_id}", payload)
-        action = "Updated"
-    else:
-        status, data = lc.call("POST", "/api/agents", payload)
-        agent_id = data.get("id")
-        action = "Created"
-    if status not in (200, 201) or not agent_id or data.get("error"):
-        sys.exit(f"Could not save the agent (status {status}): {data}")
-
-    if AVATAR.exists() and not data.get("avatar"):
-        a_status, a_data = lc.upload_avatar(agent_id, AVATAR)
-        if a_status in (200, 201) and not a_data.get("error"):
-            print("  Added the Assistant's picture.")
-        else:
-            print(f"  (could not add the picture: {a_data.get('message', a_status)} - not important)")
-
-    saved = set(data.get("tools") or [])
-    missing = [t for t in payload["tools"] if t.endswith(f"{MCP_DELIMITER}{MCP_SERVER}") and t not in saved]
-    missing = [t for t in missing if not t.startswith("sys__")]
-    print(f"{action} the '{AGENT_NAME}' agent ({agent_id}) with model {args.model}.")
-    print(f"  Tools: {len(saved)} saved, including File Search: {'yes' if 'file_search' in saved else 'no'}")
-    if missing:
-        print(f"  WARNING: {len(missing)} toolbox tools were not accepted: {', '.join(missing)}")
-        print("  Is the toolbox running? Check: bash scripts/check.sh, then re-run this script.")
+    agents = data.get("data") or []
+    problems = 0
+    for payload in (agent_payload(args.model), quick_payload(args.model)):
+        problems += save_agent(lc, payload, agents, args.model)
+    if problems:
         return 1
     marker = Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-created"  # read by status.sh
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(args.model)
-    print(f"Open {args.url}, choose Agents -> {AGENT_NAME}, and start chatting.")
+    print(f"Open {args.url}, choose Agents -> {AGENT_NAME} (everything) or {QUICK_NAME} (faster, everyday).")
     return 0
 
 

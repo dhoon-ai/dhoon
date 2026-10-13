@@ -1,27 +1,30 @@
 # Adding new skills (tools) to your agent
 
-Every skill the agent has is a Python function in `toolbox/toolbox_server.py`.
-The AI reads each function's **name**, **parameters** and **docstring** to decide
-when and how to call it. Write those for the AI, not for a programmer.
+Every skill the agent has is a Python function in one of the files in `toolbox/toolset/`
+(one file per job: `everyday.py`, `web.py`, `files.py`, `documents.py`, `planner.py`,
+`stocks.py`, `mail.py`). The AI reads each function's **name**, **parameters** and
+**docstring** to decide when and how to call it. Write those for the AI, not for a programmer.
 
 ## The pattern
 
+Add to the fitting file in `toolbox/toolset/` (or a new file there, added to `TOOLSETS` in
+`toolbox_server.py`):
+
 ```python
-@mcp.tool()
-def weather_now(city: str) -> str:
-    """Current weather for a city. Use when the user asks about weather today."""
-    r = httpx.get("https://wttr.in/" + city, params={"format": "3"}, timeout=20)
-    r.raise_for_status()
-    return r.text.strip()
+@tb.mcp.tool()
+def sunrise(city: str) -> str:
+    """Sunrise and sunset today for a city. Use when the user asks about daylight."""
+    ...do the work in Python...
+    return "Sunrise 07:24, sunset 18:35"
 ```
 
-Then:
+`tb` is the toolbox core (`import toolbox_server as tb`): shared settings and helpers such as
+`tb.WORKSPACE`, `tb.MAX_TEXT` and `tb._safe_path`. Then:
 
 ```bash
 sudo systemctl restart ai-toolbox
+bash scripts/06_create_agent.sh      # gives the new tool to the Assistant
 ```
-
-In LibreChat, open your agent in the **Agent Builder**, tick the new tool, and **Save**.
 
 ## Rules that make tools work well with small local models
 
@@ -50,7 +53,7 @@ In LibreChat, open your agent in the **Agent Builder**, tick the new tool, and *
 
 ```bash
 cd ~/ai-kit
-runtime/venv/bin/python -c "import sys; sys.path.insert(0,'toolbox'); import toolbox_server as t; print(t.weather_now('London'))"
+runtime/venv/bin/python -c "import sys; sys.path.insert(0,'toolbox'); import toolbox_server as t; print(t.sunrise('London'))"
 ```
 
 Add a test in `tests/test_toolbox.py` too, then run `pytest`.
@@ -69,7 +72,7 @@ Add a test in `tests/test_toolbox.py` too, then run `pytest`.
 ## Private tools (plugins)
 
 To keep a tool out of the public repo (personal, experimental or sensitive), make it a
-plugin instead of editing `toolbox_server.py`: a folder in `plugins/` with a `tools.py`.
+plugin instead of editing the toolbox: a folder in `plugins/` with a `tools.py`.
 Everything in `plugins/` except its README is git-ignored. See
 [plugins/README.md](../plugins/README.md) for the layout and an example.
 

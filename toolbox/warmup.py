@@ -29,8 +29,26 @@ DATE_FORMATS = [
 ]  # fmt: skip
 
 
-def _file(model: str) -> Path:
-    return WARM_DIR / ("".join(c if c.isalnum() else "_" for c in model) + ".json")
+def _file(model: str, tools: list) -> Path:
+    """One copy per agent (model + its tool list), e.g. the Assistant and the Quick Assistant."""
+    import hashlib
+
+    names = sorted(str((t.get("function") or t).get("name", "")) for t in tools if isinstance(t, dict))
+    tag = hashlib.sha1("|".join(names).encode()).hexdigest()[:8]
+    return WARM_DIR / ("".join(c if c.isalnum() else "_" for c in model) + f"-{tag}.json")
+
+
+def latest_per_model() -> list[Path]:
+    """Ollama keeps one read-ahead per model, so warm only the agent used most recently."""
+    newest: dict[str, Path] = {}
+    for f in WARM_DIR.glob("*.json") if WARM_DIR.exists() else []:
+        try:
+            model = json.loads(f.read_text())["model"]
+        except (OSError, ValueError, KeyError):
+            continue
+        if model not in newest or f.stat().st_mtime > newest[model].stat().st_mtime:
+            newest[model] = f
+    return sorted(newest.values())
 
 
 def remember(body: bytes) -> bool:
@@ -48,11 +66,12 @@ def remember(body: bytes) -> bool:
         if not system:
             return False
         saved = {"model": model, "system": system, "tools": tools, "date": dt.date.today().isoformat()}
-        f = _file(model)
+        f = _file(model, tools)
         old = json.loads(f.read_text()) if f.exists() else None
         if old and {k: old.get(k) for k in ("system", "tools", "date")} == {
             k: saved[k] for k in ("system", "tools", "date")
         }:
+            os.utime(f)  # mark this agent as the one used most recently
             return True
         WARM_DIR.mkdir(parents=True, exist_ok=True)
         tmp = f.with_suffix(".tmp")
@@ -78,7 +97,7 @@ def warm_up(transport: httpx.BaseTransport | None = None, today: dt.date | None 
     """Send every saved instructions + tools to Ollama once. Returns one line per model."""
     today = today or dt.date.today()
     out = []
-    for f in sorted(WARM_DIR.glob("*.json")) if WARM_DIR.exists() else []:
+    for f in latest_per_model():
         try:
             saved = json.loads(f.read_text())
             then = dt.date.fromisoformat(saved["date"])

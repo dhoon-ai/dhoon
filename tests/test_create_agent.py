@@ -130,8 +130,8 @@ def run(fake, *extra, email="me@example.com", password="secret123"):
 
 def test_payload_has_every_toolbox_tool_file_search_and_instructions():
     payload = create_agent.agent_payload("m:instruct")
-    src = (REPO / "toolbox/toolbox_server.py").read_text()
-    tools = re.findall(r"@mcp\.tool\(\)\s*\ndef (\w+)\(", src)
+    src = "".join(f.read_text() for f in [REPO / "toolbox/toolbox_server.py", *(REPO / "toolbox/toolset").glob("*.py")])
+    tools = re.findall(r"@(?:tb\.)?mcp\.tool\(\)\s*\ndef (\w+)\(", src)
     assert len(tools) >= 13 and "ask_planner" in tools and "search_document" in tools
     for t in tools:
         assert f"{t}_mcp_toolbox" in payload["tools"]
@@ -144,14 +144,14 @@ def test_existing_account_creates_agent_then_updates_on_rerun():
     fake = FakeLibreChat(accounts={"me@example.com": "secret123"})
     r = run(fake)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "Created the 'Assistant' agent" in r.stdout and len(fake.agents) == 1
+    assert "Created the 'Assistant' agent" in r.stdout and "Created the 'Quick Assistant' agent" in r.stdout
+    assert len(fake.agents) == 2
     assert Path(fake.runtime, ".agent-created").read_text() == "m:instruct"
     r = run(fake)
-    assert r.returncode == 0 and "Updated the 'Assistant' agent" in r.stdout
-    assert len(fake.agents) == 1  # no duplicate
+    assert r.returncode == 0 and "Updated the 'Assistant' agent" in r.stdout and "Updated the 'Quick" in r.stdout
+    assert len(fake.agents) == 2  # no duplicates
     assert fake.violations == 0  # always looked like a browser (LibreChat bans non-browsers)
-    assert fake.avatar_uploads == 1  # picture added once, not again on the re-run
-    assert "Added the Assistant's picture" in r.stdout or fake.agents["agent_1"]["avatar"]
+    assert fake.avatar_uploads == 2  # a picture for each, added once, not again on the re-run
 
 
 def test_missing_account_is_created_with_yes():
@@ -159,7 +159,7 @@ def test_missing_account_is_created_with_yes():
     r = run(fake, "--yes")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Created account me@example.com" in r.stdout and fake.accounts["me@example.com"] == "secret123"
-    assert len(fake.agents) == 1
+    assert len(fake.agents) == 2
 
 
 def test_warns_when_toolbox_tools_not_accepted():
@@ -193,3 +193,13 @@ def test_instructions_stay_the_same_all_day_so_ollama_can_reuse_them():
     text = (Path(__file__).resolve().parents[1] / "config" / "agent-instructions.md").read_text()
     assert "{{current_datetime}}" not in text and "{{iso_datetime}}" not in text
     assert text.rstrip().endswith("Today is {{current_date}}. For the exact time, call current_datetime.")
+
+
+def test_quick_assistant_is_light():
+    full, quick = create_agent.agent_payload("m"), create_agent.quick_payload("m")
+    names = {t.removesuffix("_mcp_toolbox") for t in quick["tools"]} - {"sys__server__sys"}
+    assert {"weather", "calendar_events", "schedule_task", "send_email", "web_search"} <= names
+    assert "run_python" not in names and "ask_planner" not in names and "file_search" not in quick["tools"]
+    assert len(quick["tools"]) < len(full["tools"]) / 2 and len(quick["instructions"]) < len(full["instructions"]) / 2
+    assert quick["instructions"].rstrip().endswith("For the exact time, call current_datetime.")
+    assert "{{current_datetime}}" not in quick["instructions"]

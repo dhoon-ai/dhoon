@@ -513,3 +513,59 @@ def test_price_history_drops_rows_without_prices(tb, monkeypatch):
     monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
     out = tb._history("RELIANCE.NS", "1mo")
     assert len(out) == 4 and not out["Close"].isna().any()
+
+
+ARTICLE_PAGE = (
+    "<html><head><title>Bank of Canada cuts rates</title></head><body>"
+    "<div class='cookie'>We use cookies to improve your experience. Accept all cookies</div>"
+    "<nav><a href='/'>Home</a> <a href='/markets'>Markets</a> <a href='/sports'>Sports</a></nav>"
+    "<aside>Most read: Ten celebrity homes you must see. Sign up for our newsletter today!</aside>"
+    "<article><h1>Bank of Canada cuts rates</h1>"
+    + "".join(
+        f"<p>Paragraph {i}: The Bank of Canada lowered its policy rate by a quarter point to 2.25 percent on "
+        "Wednesday, citing slowing inflation and a softer job market, and said further cuts depend on data.</p>"
+        for i in range(6)
+    )
+    + "</article><footer>Copyright 2026 Example News. Privacy policy. Terms of use. Contact us.</footer>"
+    "<div class='related'>Related: Weather this weekend; Hockey scores; Recipes for fall</div></body></html>"
+).encode()
+
+
+def test_read_webpage_keeps_the_article_and_drops_the_clutter(tb, monkeypatch):
+    pytest.importorskip("trafilatura")
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("text/html", ARTICLE_PAGE))
+    out = tb.read_webpage("https://news.example/boc")
+    assert "lowered its policy rate by a quarter point" in out
+    for clutter in ("Accept all cookies", "Sports", "celebrity homes", "Privacy policy", "Recipes for fall"):
+        assert clutter not in out
+    assert len(out) < len(tb._all_text(ARTICLE_PAGE))
+
+
+def test_read_webpage_without_an_article_falls_back_to_all_text(tb, monkeypatch):
+    page = b"<html><body><ul><li>Item one</li><li>Item two</li></ul></body></html>"
+    monkeypatch.setattr(tb, "_fetch", lambda url, headers=None: ("text/html", page))
+    assert "Item one" in tb.read_webpage("https://example.org/list")
+
+
+def test_search_document_also_finds_exact_terms(tb, monkeypatch):
+    pytest.importorskip("rank_bm25")
+    # an embedding model that can't tell these passages apart: only keyword search can
+    monkeypatch.setattr(
+        tb.httpx,
+        "post",
+        lambda url, json=None, timeout=None: FakePost({"embeddings": [[1.0, 0.0] for _ in json["input"]]}),
+    )
+    notes = "\n\n".join(
+        [
+            f"Invoice INV-{n} for office chairs was paid in full on time by the finance team."
+            for n in range(20000, 20040)
+        ]
+        + ["Invoice INV-20931 is overdue: the supplier asked for payment by Friday, with a late fee."]
+        + [
+            f"Invoice INV-{n} for printer paper was paid in full on time by the finance team."
+            for n in range(30000, 30040)
+        ]
+    )
+    (tb.WORKSPACE / "invoices.txt").write_text(notes)
+    out = tb.search_document("invoices.txt", "INV-20931 overdue", top_k=1)
+    assert "INV-20931 is overdue" in out
