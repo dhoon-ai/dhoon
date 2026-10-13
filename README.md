@@ -13,8 +13,8 @@ an old desktop, a home server or a laptop. **No graphics card required.**
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
 work with files, run Python in a sandbox, answer questions about your PDFs, Word and Excel
 files, make Excel and Word reports, analyse stocks, check the weather, manage your calendar,
-do tasks on a schedule, e-mail you the results and remember what you tell it about
-yourself**, and you can teach it new skills with a few lines of Python.
+do tasks on a schedule, e-mail you the results and remember what you ask it to
+remember**, and you can teach it new skills with a few lines of Python.
 
 Nothing is sent to an AI company. The only outside traffic is the web searches, page
 downloads, market data and weather your agent asks for, and the calendars you connect.

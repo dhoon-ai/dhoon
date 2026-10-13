@@ -2,9 +2,9 @@
 version: 1.3.17
 cache: true
 
-# Memory: the assistant remembers what you tell it about yourself (your city, family,
-# preferences) across chats. Kept in your own database on this computer. The small fast
-# model decides what to keep, next to each answer. Each person can switch it off in
+# Memory: when you say "Remember that..." (and only then), the small fast model saves it and
+# the assistant knows it in later chats. Kept in your own database on this computer; see and
+# delete memories in Settings -> Personalization. Each person can switch it off in
 # Settings -> Personalization; switch it off for everyone with MEMORY=off in
 # config/models.env (then: bash scripts/05_librechat.sh).
 memory:

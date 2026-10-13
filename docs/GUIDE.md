@@ -614,7 +614,7 @@ also covers your scheduled tasks, home city and Google sign-in from `runtime/`).
 | **Your home city** | "What's the weather?" without naming a place | Nothing to edit: the first time you ask, the Assistant asks and remembers it | — |
 | **Models, memory, context** | other models or settings than the ones picked from your RAM | `cp config/models.env.example config/models.env`, then edit ([table](#choosing-different-models-and-settings)) | the command in the table's last column |
 | **Encrypted backup** | a daily copy of your settings, plugins and workspace off this computer | `bash scripts/backup.sh --setup` ([Encrypted backup](#encrypted-backup-optional)); settings in `~/.config/ai-kit-backup/` | copy the recovery key to a USB stick |
-| **Memory** | the assistant remembering you (city, family, preferences) across chats; on by default | each person: **Settings → Personalization**; everyone: `MEMORY=off` in `config/models.env` | `bash scripts/05_librechat.sh` |
+| **Memory** | the assistant remembering things across chats when you say *"Remember that…"* (it saves nothing unasked); see and delete memories in **Settings → Personalization**; on by default | each person: **Settings → Personalization**; everyone: `MEMORY=off` in `config/models.env` | `bash scripts/05_librechat.sh` |
 | **Lock sign-up** | stopping others on your network from making an account | `runtime/LibreChat/.env`: `ALLOW_REGISTRATION=false` ([Safety](#safety)) | `cd runtime/LibreChat && docker compose up -d` |
 | **Your own tools** | new skills, kept private | a folder in `plugins/` ([ADDING_TOOLS.md](ADDING_TOOLS.md)) | `sudo systemctl restart ai-toolbox` and `bash scripts/06_create_agent.sh` |
 

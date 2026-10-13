@@ -6,7 +6,8 @@
   (chats, accounts, agents, memories) is exported to `runtime/chat-backup/` and backed up
   with the rest. `bash scripts/restore.sh --chats` puts it back. Files uploaded in chats are
   optional (`BACKUP_CHAT_UPLOADS=yes`).
-- **Memory.** The assistant remembers what you tell it about yourself across chats, using the
+- **Memory.** Say *"Remember that…"* and the assistant remembers it in later chats (it saves
+  nothing unasked; see and delete memories in Settings -> Personalization), using the
   small fast model and your own database. Each person can switch it off in Settings ->
   Personalization; `MEMORY=off` in `config/models.env` switches it off for everyone.
 - **Updates download Ollama only when needed.** `update.sh` used to download Ollama
