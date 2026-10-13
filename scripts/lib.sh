@@ -58,7 +58,7 @@ cpu_temp() {
   for z in /sys/class/thermal/thermal_zone*; do
     [ -r "$z/temp" ] || continue
     t=$(( $(cat "$z/temp" 2>/dev/null || echo -999999) / 1000 ))
-    [ "$t" -gt 0 ] && [ "$t" -lt 125 ] || continue
+    if [ "$t" -le 0 ] || [ "$t" -ge 125 ]; then continue; fi
     type=$(cat "$z/type" 2>/dev/null)
     if [ "$type" = "x86_pkg_temp" ] || [ "$type" = "cpu-thermal" ]; then echo "$t"; return; fi
     [ -n "$best" ] || best="$t"
