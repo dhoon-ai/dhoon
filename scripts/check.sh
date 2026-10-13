@@ -37,6 +37,14 @@ BRIDGE_IP=$(docker_bridge_ip)
 code=$(curl -s -o /dev/null -w "%{http_code}" "http://${BRIDGE_IP:-127.0.0.1}:$TOOLBOX_PORT/mcp")
 if [ "$code" != "000" ]; then ok "Toolbox answers on ${BRIDGE_IP}:$TOOLBOX_PORT"
 else fail "Toolbox  ->  sudo systemctl restart ai-toolbox ; journalctl -u ai-toolbox -n 50"; problems=$((problems+1)); fi
+if curl -fs "http://${BRIDGE_IP:-127.0.0.1}:$TOOLBOX_PORT/ollama/api/tags" >/dev/null 2>&1; then
+  ok "Chat website -> toolbox -> Ollama connection works"
+else fail "The toolbox can't pass chats to Ollama  ->  bash scripts/restart.sh"; problems=$((problems+1)); fi
+if ls "$RUNTIME"/warm/*.json >/dev/null 2>&1; then
+  echo "         fast first answer: the Assistant's instructions are read in advance (bash scripts/preload_model.sh)"
+else
+  echo "         fast first answer: starts after your first chat with the Assistant"
+fi
 
 if docker image inspect agent-sandbox >/dev/null 2>&1; then ok "Code sandbox image exists"
 else fail "Sandbox image missing  ->  bash scripts/04_toolbox.sh"; problems=$((problems+1)); fi

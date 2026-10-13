@@ -11,7 +11,9 @@ endpoints:
   custom:
     - name: "Ollama"                 # name must start with "ollama" so models are listed automatically
       apiKey: "ollama"
-      baseURL: "http://host.docker.internal:11434/v1/"
+      # Through the toolbox, which passes everything to Ollama unchanged and keeps a copy of
+      # the Assistant's instructions so they can be read in advance (fast first answer).
+      baseURL: "http://host.docker.internal:8001/ollama/v1/"
       models:
         default: ["__MODEL_MAIN__", "__MODEL_FAST__"]   # filled in by the install script
         fetch: true

@@ -35,7 +35,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 if ! grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
    || ! grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
-   || [ ! -f /etc/systemd/system/ai-model-preload.service ]; then
+   || [ ! -f /etc/systemd/system/ai-model-preload.service ] \
+   || [ ! -f /etc/systemd/system/ai-warmup.timer ]; then
   bash "$KIT/scripts/ollama_settings.sh"
 fi
 

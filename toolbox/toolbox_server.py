@@ -883,6 +883,76 @@ def _load_plugins() -> list[str]:
 LOADED_PLUGINS = [] if os.environ.get("TOOLBOX_NO_PLUGINS") else _load_plugins()
 
 
+# ------------------------------------------------------------------ smaller tool list ---
+# Every tool's description and parameters are read by the model before each new chat (on a
+# CPU, every token counts). The parameter "title" fields the MCP library adds ("Ticker" for
+# ticker...) say nothing the name doesn't, so they are left out.
+def _compact_schemas() -> None:
+    def strip(schema):
+        if isinstance(schema, dict):
+            if "properties" in schema:
+                schema.pop("title", None)
+                for prop in schema["properties"].values():
+                    if isinstance(prop, dict):
+                        prop.pop("title", None)
+                        strip(prop)
+            for key in ("items", "anyOf", "allOf"):
+                for sub in schema.get(key, []) if isinstance(schema.get(key), list) else [schema.get(key)]:
+                    strip(sub)
+
+    for tool in getattr(mcp, "_tool_manager", None)._tools.values() if hasattr(mcp, "_tool_manager") else []:
+        strip(getattr(tool, "parameters", None))
+
+
+_compact_schemas()
+
+
+# ------------------------------------------------------------------ Ollama pass-through ---
+# LibreChat talks to Ollama through here (baseURL .../8001/ollama/v1/), so the toolbox can
+# keep a copy of the Assistant's instructions + tool list (not the chat) for warmup.py,
+# which has Ollama read them in advance: the first answer then starts in seconds.
+import warmup  # noqa: E402  (toolbox/warmup.py)
+
+_PASS_HEADERS = ("content-type", "accept", "authorization")
+
+
+@mcp.custom_route("/ollama/{path:path}", methods=["GET", "POST"], include_in_schema=False)
+async def ollama_proxy(request):
+    from starlette.responses import Response, StreamingResponse
+
+    path = request.path_params["path"]
+    body = await request.body()
+    if request.method == "POST" and path.rstrip("/").endswith("chat/completions"):
+        warmup.remember(body)
+    client = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10), transport=_OLLAMA_TRANSPORT)
+    upstream = client.build_request(
+        request.method,
+        f"{OLLAMA_URL}/{path}",
+        params=request.query_params,
+        content=body,
+        headers={k: v for k, v in request.headers.items() if k.lower() in _PASS_HEADERS},
+    )
+    try:
+        r = await client.send(upstream, stream=True)
+    except httpx.RequestError as e:
+        await client.aclose()
+        return Response(f"Ollama is not reachable ({type(e).__name__}): sudo systemctl restart ollama", status_code=502)
+
+    async def relay():
+        try:
+            async for chunk in r.aiter_bytes():  # decoded, since content-encoding is not passed on
+                yield chunk
+        finally:
+            await r.aclose()
+            await client.aclose()
+
+    headers = {k: v for k, v in r.headers.items() if k.lower() in ("content-type", "cache-control")}
+    return StreamingResponse(relay(), status_code=r.status_code, headers=headers)
+
+
+_OLLAMA_TRANSPORT = None  # tests put a fake Ollama here
+
+
 # ------------------------------------------------------------------ start ---
 if __name__ == "__main__":
     print(f"Toolbox MCP server on http://{BIND_HOST}:{PORT}/mcp  (workspace: {WORKSPACE})")

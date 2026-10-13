@@ -38,13 +38,26 @@ PartOf=ollama.service
 Type=oneshot
 User=$USER
 ExecStart=/bin/bash $KIT/scripts/preload_model.sh
-TimeoutStartSec=900
+TimeoutStartSec=1800
 
 [Install]
 WantedBy=ollama.service
 UNIT
+# Run it again after midnight: the date in the Assistant's instructions changes then.
+sudo tee /etc/systemd/system/ai-warmup.timer >/dev/null <<UNIT
+[Unit]
+Description=Have the model read the Assistant's instructions in advance (new date)
+
+[Timer]
+OnCalendar=*-*-* 00:05
+Unit=ai-model-preload.service
+
+[Install]
+WantedBy=timers.target
+UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable ai-model-preload.service >/dev/null 2>&1 || true
+sudo systemctl enable --now ai-warmup.timer >/dev/null 2>&1 || true
 sudo systemctl restart ollama
 ok "Ollama restarted with the new settings"
 if [ "$KEEP_ALIVE" = "-1" ]; then

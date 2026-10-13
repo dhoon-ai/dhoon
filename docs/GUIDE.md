@@ -798,13 +798,22 @@ faster, and it has less computing power. A separate NVIDIA/AMD graphics card wit
 memory is different: it is usually many times faster. `scripts/benchmark.sh` measures this
 on your own PC and picks the faster option.
 
-**Why the first answer of the day takes minutes, even for "send a test e-mail":** before
-the Assistant can do anything, the model reads its instructions and the description of every
-tool, about 5,000 tokens (more with plugins). On a CPU it reads roughly 20-50 tokens a second,
-so that's 2-4 minutes, and nothing shows on screen meanwhile. Ollama keeps what it has read
-in memory, so the next messages (in this chat or a new one the same day) skip that part and
-start within seconds. The memory is reset when something else uses the main model (the
-planner, a nightly plugin job) and when the date changes. Measure your PC's reading speed:
+**Why an answer can take minutes before anything happens, even "send a test e-mail":**
+before the Assistant can do anything, the model reads its instructions and the description
+of every tool, about 3,700 tokens (more with plugins). On a CPU it reads roughly 20-50 tokens
+a second, so reading it all takes 1-3 minutes, with nothing on screen meanwhile.
+
+So that this rarely happens, Ollama remembers what it has read, and the system has it read
+the Assistant's instructions **in advance**: the chat website talks to Ollama through the
+toolbox, which keeps a copy of the instructions and tool list (never your chats), and
+`scripts/preload_model.sh` (`toolbox/warmup.py`) has the model read them after Ollama starts,
+every night after midnight (the date in the instructions changes) and after nightly plugin
+jobs. Then a new chat starts answering within seconds. It begins working after your first
+chat with the Assistant (that's when the copy is made). You still wait the full time after
+something else used the main model (for example the planner in a big task) or after you
+change tools or instructions. Run `bash scripts/preload_model.sh` by hand any time.
+
+Measure your PC's reading speed:
 
 ```bash
 M=$(bash -c 'source scripts/lib.sh; echo $MODEL_MAIN')

@@ -200,6 +200,9 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   SearXNG (Docker, localhost only) ──▶ public search engines
 ```
 
+LibreChat's requests to Ollama go through the toolbox (`/ollama/`, passed on unchanged), which
+keeps a copy of the Assistant's instructions so they can be read in advance (fast first answer).
+
 | Component | Role | License |
 |---|---|---|
 | [Ollama](https://github.com/ollama/ollama) | Runs the models | MIT |
@@ -244,6 +247,12 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
   computed numbers and the model only reasons about them.
 - **Short tool outputs.** On a CPU, reading long prompts is the slow part, so every tool
   truncates and summarises.
+- **Instructions read in advance.** Before each new chat the model must read ~3,700 tokens
+  of instructions and tool descriptions (minutes on a CPU). Ollama remembers what it read, so
+  the instructions stay identical all day (date only, no clock time), tool descriptions are
+  trimmed, and the toolbox (which passes the chat website's requests to Ollama) keeps a copy
+  that `scripts/preload_model.sh` has the model read after Ollama starts, after midnight and
+  after nightly jobs. New chats then start answering in seconds.
 - **32k context with 28+ GB RAM (16k otherwise).** Big tasks (web pages, stock data, a
   report) need ~20k tokens; when the chat doesn't fit, the model loses your request.
 - **CPU vs GPU is measured, not guessed.** `scripts/benchmark.sh` compares Ollama's default
