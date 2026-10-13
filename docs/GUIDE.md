@@ -614,6 +614,7 @@ also covers your scheduled tasks, home city and Google sign-in from `runtime/`).
 | **Your home city** | "What's the weather?" without naming a place | Nothing to edit: the first time you ask, the Assistant asks and remembers it | — |
 | **Models, memory, context** | other models or settings than the ones picked from your RAM | `cp config/models.env.example config/models.env`, then edit ([table](#choosing-different-models-and-settings)) | the command in the table's last column |
 | **Encrypted backup** | a daily copy of your settings, plugins and workspace off this computer | `bash scripts/backup.sh --setup` ([Encrypted backup](#encrypted-backup-optional)); settings in `~/.config/ai-kit-backup/` | copy the recovery key to a USB stick |
+| **Memory** | the assistant remembering you (city, family, preferences) across chats; on by default | each person: **Settings → Personalization**; everyone: `MEMORY=off` in `config/models.env` | `bash scripts/05_librechat.sh` |
 | **Lock sign-up** | stopping others on your network from making an account | `runtime/LibreChat/.env`: `ALLOW_REGISTRATION=false` ([Safety](#safety)) | `cd runtime/LibreChat && docker compose up -d` |
 | **Your own tools** | new skills, kept private | a folder in `plugins/` ([ADDING_TOOLS.md](ADDING_TOOLS.md)) | `sudo systemctl restart ai-toolbox` and `bash scripts/06_create_agent.sh` |
 
@@ -682,7 +683,8 @@ someone else. `config/email.env` is never committed and is readable only by you.
 ## Encrypted backup (optional)
 
 Back up your private files off this computer: private plugins (with their own git history),
-settings including secrets (`config/`), and the agent's workspace. The backup is **encrypted
+settings including secrets (`config/`), the agent's workspace, and **your chats** (with
+accounts, agents and their settings). The backup is **encrypted
 on your computer** before it goes to a private GitHub repo (or any git server you choose). A
 "private" repo still lives on someone else's servers. Encrypted, the host stores bytes it
 can't read.
@@ -739,6 +741,7 @@ and `yubikey.txt` if you made one. Keep the stick somewhere safe, then you may d
 | Put back one folder | `bash scripts/restore.sh --only dhoon/plugins/NAME` |
 | Without the security key | add `--key /media/usb/recovery-key.txt` |
 | On a new computer | `bash scripts/restore.sh --from https://github.com/USER/REPO.git --key …` |
+| Put your chats, accounts and agents back | `bash scripts/restore.sh --chats` |
 | Back up right now | `bash scripts/backup.sh` |
 
 What is there now is moved aside to `NAME.before-restore-<time>`, never deleted. On a new
@@ -750,6 +753,14 @@ The backup repo keeps one commit with the newest 30 backups, so it never grows f
 Settings are in `~/.config/ai-kit-backup/backup.env`: `BACKUP_KEEP`, `BACKUP_PATHS`,
 `BACKUP_EXCLUDE` (e.g. `'*.mp4 downloads'`) and `BACKUP_TIME`. A backup over 95 MB is refused,
 because GitHub rejects files that big. Leave big folders out. Log: `journalctl -u ai-backup`.
+
+**Chats.** Before each backup, the chat website's database (chats, accounts, agents, memories)
+is exported to `runtime/chat-backup/`, outside the agent's workspace so its tools can never
+read it, and goes into the encrypted backup with the rest. It is usually a few MB. Files you
+uploaded in chats are left out because they can be big; add them with
+`BACKUP_CHAT_UPLOADS=yes` in `backup.env`, or leave chats out with `BACKUP_CHATS=no`.
+`restore.sh --chats` **replaces** what the chat website has now (it asks first); afterwards
+sign in again, and run `bash scripts/06_create_agent.sh` if an agent misses tools.
 
 ## Weather, calendar and scheduled tasks
 
@@ -961,6 +972,7 @@ nano config/models.env
 | `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
 | `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory | `bash scripts/ollama_settings.sh` |
+| `MEMORY` | `on` | Memory across chats (a small model notes what you tell it about yourself, next to each answer) | `bash scripts/05_librechat.sh` |
 | `RESEARCH_ENGINES` | empty (SearXNG's usual engines) | Search engines for the "research how to do this" step | `bash scripts/04_toolbox.sh` |
 
 Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose

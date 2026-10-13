@@ -10,7 +10,7 @@ import toolbox_server as tb
 from bs4 import BeautifulSoup
 
 # ------------------------------------------------------------------ documents ---
-DOC_TYPES = {".pdf", ".docx", ".txt", ".md", ".csv", ".html", ".htm", ".json"}
+DOC_TYPES = {".pdf", ".docx", ".xlsx", ".txt", ".md", ".csv", ".html", ".htm", ".json"}
 CHUNK_CHARS, CHUNK_OVERLAP = 1200, 200
 
 
@@ -27,6 +27,16 @@ def _doc_pages(p: Path) -> list[tuple[int, str]]:
         import docx
 
         text = "\n".join(par.text for par in docx.Document(str(p)).paragraphs)
+    elif suffix == ".xlsx":  # one "page" per sheet, rows as tab-separated text
+        from openpyxl import load_workbook
+
+        wb = load_workbook(str(p), read_only=True, data_only=True)
+        pages = []
+        for i, ws in enumerate(wb.worksheets):
+            rows = ("\t".join("" if v is None else str(v) for v in row) for row in ws.iter_rows(values_only=True))
+            pages.append((i + 1, f"Sheet: {ws.title}\n" + "\n".join(r for r in rows if r.strip())))
+        wb.close()
+        return pages
     elif suffix in {".html", ".htm"}:
         text = BeautifulSoup(p.read_text(errors="replace"), "html.parser").get_text("\n")
     else:
@@ -102,7 +112,7 @@ def _hybrid_rank(chunks: list[dict], query: str, meaning: "list[float]") -> list
 
 @tb.mcp.tool()
 def search_document(path: str, query: str, top_k: int = 5) -> str:
-    """Find the passages in a document (PDF, Word, text, Markdown, HTML, CSV) in the workspace
+    """Find the passages in a document (PDF, Word, Excel, text, Markdown, HTML, CSV) in the workspace
     that best answer a question. Use this to answer questions about a document or book.
     Quote the returned passages and cite their page numbers. The first search of a large
     document takes a minute or two while it is indexed; later searches are fast.
@@ -126,7 +136,7 @@ def search_document(path: str, query: str, top_k: int = 5) -> str:
 
 @tb.mcp.tool()
 def read_document(path: str, start_page: int = 1, max_pages: int = 3) -> str:
-    """Read the text of a document (PDF, Word, text...) page by page, e.g. to summarise
+    """Read the text of a document (PDF, Word, Excel, text...) page by page, e.g. to summarise
     the start of a book or one chapter. Shows the total page count. For questions about a
     long document, prefer search_document, which finds the relevant passages."""
     p = tb._safe_path(path)

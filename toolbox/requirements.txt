@@ -9,6 +9,8 @@ yfinance
 pandas
 pypdf
 python-docx
+# reading Excel files (.xlsx) in read_document (MIT)
+openpyxl
 numpy
 markdown
 # calendars: .ics files and links, CalDAV (iCloud, Nextcloud...)

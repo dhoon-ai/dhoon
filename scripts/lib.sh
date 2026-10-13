@@ -102,7 +102,10 @@ librechat_checkout() {
 }
 
 render_librechat_config() {
+  local memory_off=false
+  [ "${MEMORY:-on}" = "off" ] && memory_off=true
   sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
+      -e "s|__MEMORY_DISABLED__|$memory_off|g" \
     "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"
   cp "$KIT/config/librechat/docker-compose.override.yml" "$LIBRECHAT_DIR/docker-compose.override.yml"
   # Dhoon icons for the override above (copied as files, so Docker never makes folders)

@@ -402,6 +402,27 @@ def test_search_document_docx_and_txt(tb, fake_embed):
     assert "Sunday" in tb.search_document("notes.txt", "when is the backup", top_k=1)
 
 
+def test_excel_files_are_read_sheet_by_sheet(tb):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.title = "Budget"
+    wb.active.append(["Item", "Amount"])
+    wb.active.append(["Rent", 1800])
+    wb.create_sheet("Notes").append(["Pay rent on the 1st"])
+    wb.save(tb.WORKSPACE / "budget.xlsx")
+    out = tb.read_document("budget.xlsx")
+    assert "2 pages in total" in out and "Sheet: Budget" in out and "Rent\t1800" in out and "Pay rent" in out
+
+
+def test_sandbox_can_make_excel_and_word_files():
+    docker = (Path(__file__).resolve().parents[1] / "sandbox/Dockerfile").read_text()
+    assert "openpyxl" in docker and "python-docx" in docker
+    import toolbox_server as tbs
+
+    assert "openpyxl" in tbs.run_python.__doc__ and "python-docx" in tbs.run_python.__doc__
+
+
 def test_document_errors(tb, fake_embed):
     assert "File not found" in tb.search_document("missing.pdf", "x")
     (tb.WORKSPACE / "photo.png").write_bytes(b"\x89PNG")

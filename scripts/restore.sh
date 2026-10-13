@@ -6,6 +6,8 @@
 #   bash scripts/restore.sh --apply             put everything back in place
 #   bash scripts/restore.sh --apply --only dhoon/plugins/NAME     just one folder or file
 #   bash scripts/restore.sh --list              list the backups and what's inside the newest
+#   bash scripts/restore.sh --chats             put the chats, accounts and agents back into the
+#                                               chat website (replaces what is there now)
 #
 # Options:
 #   --key FILE    open with this key file (your recovery-key.txt or yubikey.txt from the USB stick).
@@ -24,7 +26,8 @@ ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
 warn() { printf '  \033[1;33m[!]\033[0m    %s\n' "$*"; }
 fail() { printf '  \033[1;31m[FAIL]\033[0m %s\n' "$*" >&2; }
 
-identity="" file="" from="" mode="extract" only=()
+identity="" file="" from="" mode="extract" only=() assume_yes=false
+DOCKER="${DOCKER:-docker}"   # tests use a stand-in
 while [ $# -gt 0 ]; do
   case "$1" in
     --key|--recovery-key|--identity) identity="$2"; shift 2 ;;
@@ -33,7 +36,9 @@ while [ $# -gt 0 ]; do
     --test) mode="test"; shift ;;
     --apply) mode="apply"; shift ;;
     --list) mode="list"; shift ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    --chats) mode="chats"; shift ;;
+    --yes) assume_yes=true; shift ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     -*) fail "Unknown option $1 (see --help)"; exit 2 ;;
     *) file="$1"; shift ;;
   esac
@@ -110,6 +115,31 @@ case "$mode" in
     echo; sed -n '1,/^$/p' "$B/MANIFEST.txt"
     rm -rf "$out"
     exit 0 ;;
+  chats)
+    chats=$(find "$B/home" -path '*/runtime/chat-backup/librechat.archive.gz' 2>/dev/null | head -1)
+    if [ -z "$chats" ]; then
+      fail "This backup has no chats (made before Dhoon 1.0.1, or with BACKUP_CHATS=no)."
+      rm -rf "$out"; exit 1
+    fi
+    if ! "$DOCKER" ps --format '{{.Names}}' 2>/dev/null | grep -qx chat-mongodb; then
+      fail "The chat website isn't running. Start it first: bash scripts/05_librechat.sh"
+      rm -rf "$out"; exit 1
+    fi
+    echo "From: $(head -1 "$B/MANIFEST.txt")"
+    if ! $assume_yes; then
+      read -r -p "This REPLACES the chats, accounts and agents in the chat website now. Type YES: " answer </dev/tty
+      [ "$answer" = "YES" ] || { warn "Cancelled, nothing changed."; rm -rf "$out"; exit 1; }
+    fi
+    if "$DOCKER" exec -i chat-mongodb mongorestore --quiet --archive --gzip --drop --nsInclude 'LibreChat.*' < "$chats"; then
+      rm -rf "$out"
+      "$DOCKER" restart LibreChat >/dev/null 2>&1 || true   # forget what it had cached
+      ok "Chats, accounts and agents are back. Sign in again in the browser (wait a minute)."
+      echo "  If the agents miss tools or pictures: bash scripts/06_create_agent.sh"
+      exit 0
+    fi
+    rm -rf "$out"
+    fail "Could not load the chats into the database (see the message above)."
+    exit 1 ;;
   extract)
     ok "Unpacked into $B/home (paths as in your home folder)"
     sed -n '3,/^$/p' "$B/MANIFEST.txt"

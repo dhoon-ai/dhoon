@@ -19,7 +19,13 @@
 #   recipients.txt      public keys the backup is encrypted to
 #   recovery-key.txt    recovery SECRET key: copy it offline, then you may delete it here
 #   yubikey.txt         security-key identity (useless without the physical key)
-#   backup.env          BACKUP_REPO, BACKUP_KEEP, BACKUP_PATHS, BACKUP_EXCLUDE, BACKUP_TIME
+#   backup.env          BACKUP_REPO, BACKUP_KEEP, BACKUP_PATHS, BACKUP_EXCLUDE, BACKUP_TIME,
+#                       BACKUP_CHATS (yes/no), BACKUP_CHAT_UPLOADS (no/yes)
+#
+# Chats: before each backup, the chat website's database (chats, accounts, agents, settings)
+# is exported to runtime/chat-backup/ (outside the agent's workspace) and backed up with the
+# rest. Files uploaded in chats are left out unless BACKUP_CHAT_UPLOADS=yes (they can be big).
+# Put chats back with: bash scripts/restore.sh --chats
 set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
@@ -30,6 +36,9 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 SSH_KEY="$HOME/.ssh/ai_kit_backup"
 SSH_HOST="github-ai-kit-backup"
 MAX_MB="${BACKUP_MAX_MB:-95}"   # GitHub refuses files over 100 MB
+DOCKER="${DOCKER:-docker}"      # tests use a stand-in
+CHAT_DIR="$KIT/runtime/chat-backup"
+CHAT_FILE="$CHAT_DIR/librechat.archive.gz"
 stage=""
 # age plugins are often installed in ~/.local/bin, which the daily (systemd) run doesn't have
 export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
@@ -49,6 +58,23 @@ home_rel() {
     /*) return 1 ;;
     *) printf '%s' "$p" ;;
   esac
+}
+
+# Export the chat website's database (MongoDB inside Docker) to $CHAT_FILE. 0 = done.
+export_chats() {
+  command -v "$DOCKER" >/dev/null 2>&1 || return 1
+  "$DOCKER" ps --format '{{.Names}}' 2>/dev/null | grep -qx chat-mongodb \
+    || { warn "The chat database isn't running: chats are not in this backup"; return 1; }
+  mkdir -p "$CHAT_DIR" && chmod 700 "$CHAT_DIR"
+  if "$DOCKER" exec chat-mongodb mongodump --quiet --archive --gzip --db LibreChat > "$CHAT_FILE.tmp" \
+     && [ -s "$CHAT_FILE.tmp" ]; then
+    mv "$CHAT_FILE.tmp" "$CHAT_FILE" && chmod 600 "$CHAT_FILE"
+    ok "Chats exported ($(du -h "$CHAT_FILE" | cut -f1))"
+  else
+    rm -f "$CHAT_FILE.tmp"
+    warn "Could not export the chats (they are not in this backup)"
+    return 1
+  fi
 }
 
 default_paths() {
@@ -246,6 +272,14 @@ backup() {
   stamp=$(date +%Y-%m-%d_%H%M%S)
   for p in ${BACKUP_PATHS:-$(default_paths)}; do
     if [ -e "$HOME/$p" ]; then items+=("$p"); else warn "Skipping ~/$p (not found)"; fi
+  done
+  # the chats (and, if asked, files uploaded in chats), whatever the list above says
+  local extra=()
+  if [ "${BACKUP_CHATS:-yes}" != "no" ] && export_chats; then extra+=("$CHAT_DIR"); fi
+  [ "${BACKUP_CHAT_UPLOADS:-no}" = "yes" ] && [ -d "$KIT/runtime/LibreChat/uploads" ] && extra+=("$KIT/runtime/LibreChat/uploads")
+  for p in "${extra[@]}"; do
+    p=$(home_rel "$p") || continue
+    [[ " ${items[*]} " == *" $p "* ]] || items+=("$p")
   done
   [ ${#items[@]} -gt 0 ] || { fail "Nothing to back up (check BACKUP_PATHS in $CONF/backup.env)"; exit 1; }
   for p in __pycache__ '*.pyc' .venv venv node_modules .pytest_cache '*.before-restore-*' ${BACKUP_EXCLUDE:-}; do

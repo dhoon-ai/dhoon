@@ -151,3 +151,43 @@ def test_removed_plugin_comes_back_with_history_on_a_new_computer(kit):
 def test_only_rejects_paths_outside_home(kit):
     r = run([RESTORE, "--only", "../etc", "--key", "x"], kit["env"], ok=False)
     assert r.returncode == 2
+
+
+def test_chats_are_backed_up_and_put_back(kit):
+    """The chat database is exported before each backup (outside the workspace), travels
+    encrypted with the rest, and `restore.sh --chats` loads it back. A stand-in docker."""
+    home, env = kit["home"], kit["env"]
+    dhoon = home / "dhoon"
+    (dhoon / "scripts").mkdir(parents=True)
+    for s in ("backup.sh", "restore.sh"):
+        shutil.copy(ROOT / "scripts" / s, dhoon / "scripts" / s)
+    log = kit["tmp"] / "docker.log"
+    fake = kit["tmp"] / "docker"
+    fake.write_text(
+        "#!/bin/bash\n"
+        f'echo "$*" >> {log}\n'
+        'case "$1" in\n'
+        "  ps) echo chat-mongodb; echo LibreChat ;;\n"
+        '  exec) case "$*" in *mongodump*) printf "CHATS-ARCHIVE-1" ;; *mongorestore*) cat > '
+        + f"{kit['tmp']}/restored"
+        + " ;; esac ;;\n"
+        "esac\n"
+    )
+    fake.chmod(0o755)
+    env = dict(env, DOCKER=str(fake))
+    r = run([str(dhoon / "scripts/backup.sh")], env)
+    assert "Chats exported" in r.stdout
+    dump = dhoon / "runtime/chat-backup/librechat.archive.gz"
+    assert dump.read_bytes() == b"CHATS-ARCHIVE-1" and oct(dump.stat().st_mode)[-3:] == "600"
+    assert not (home / "agent-workspace/.chat-backup").exists()  # never where the agent's tools can read it
+
+    key = str(kit["conf"] / "recovery-key.txt")
+    assert "dhoon/runtime/chat-backup" in run([str(dhoon / "scripts/restore.sh"), "--list", "--key", key], env).stdout
+    r = run([str(dhoon / "scripts/restore.sh"), "--chats", "--yes", "--key", key], env)
+    assert "Chats, accounts and agents are back" in r.stdout
+    assert (kit["tmp"] / "restored").read_bytes() == b"CHATS-ARCHIVE-1"
+    assert "--drop" in log.read_text() and "restart LibreChat" in log.read_text()
+    assert not list(home.glob("restore-*"))  # unencrypted copy cleaned up
+
+    r = run([str(dhoon / "scripts/backup.sh")], dict(env, BACKUP_CHATS="no"))
+    assert "Chats exported" not in r.stdout

@@ -49,7 +49,8 @@ PY_PREAMBLE = "import pandas as pd, numpy as np, matplotlib.pyplot as plt\n"
 @tb.mcp.tool()
 def run_python(code: str, timeout_seconds: int = 60) -> str:
     """Run Python 3 code in an isolated sandbox and return what it prints.
-    Only pandas, numpy and matplotlib are installed, and the sandbox has NO internet: it
+    Installed: pandas, numpy, matplotlib, openpyxl (Excel: df.to_excel('x.xlsx'), read_excel)
+    and python-docx (Word: import docx). The sandbox has NO internet: it
     cannot download anything (no yfinance, no requests). Get data with the other tools
     first (e.g. stock_save_history writes prices to a CSV file), then read it here.
     Never use made-up, random or "simulated" numbers in place of real data.

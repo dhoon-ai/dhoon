@@ -74,9 +74,12 @@ if [ -f "$KIT/config/models.env" ] && grep -q '^[A-Z]' "$KIT/config/models.env";
   echo "    models:     your choices in config/models.env"
 else echo "    models:     chosen from your RAM (change in config/models.env)"; fi
 if [ -f "$HOME/.config/ai-kit-backup/backup.env" ]; then
-  if systemctl is-active --quiet ai-backup.timer 2>/dev/null; then echo "    backup:     set up, daily"
+  if systemctl is-active --quiet ai-backup.timer 2>/dev/null; then
+    echo "    backup:     set up, daily$( [ -f "$KIT/runtime/chat-backup/librechat.archive.gz" ] && echo ", chats included")"
   else echo "    backup:     set up, but not scheduled  ->  bash scripts/backup.sh --setup"; fi
 else echo "    backup:     not set up (bash scripts/backup.sh --setup)"; fi
+if [ "${MEMORY:-on}" = "off" ]; then echo "    memory:     off for everyone (MEMORY=off in config/models.env)"
+else echo "    memory:     on (each person can switch it off in Settings -> Personalization)"; fi
 reg=$(setting ALLOW_REGISTRATION "$LIBRECHAT_DIR/.env")
 if [ "$reg" = "false" ]; then echo "    sign-up:    locked"
 else echo "    sign-up:    open to anyone on your network (lock it: docs/GUIDE.md \"Safety\")"; fi

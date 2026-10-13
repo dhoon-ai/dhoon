@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.1 (2026-10)
+
+- **Your chats are backed up.** Before each encrypted backup, the chat website's database
+  (chats, accounts, agents, memories) is exported to `runtime/chat-backup/` and backed up
+  with the rest. `bash scripts/restore.sh --chats` puts it back. Files uploaded in chats are
+  optional (`BACKUP_CHAT_UPLOADS=yes`).
+- **Memory.** The assistant remembers what you tell it about yourself across chats, using the
+  small fast model and your own database. Each person can switch it off in Settings ->
+  Personalization; `MEMORY=off` in `config/models.env` switches it off for everyone.
+- **Excel and Word.** The Assistant can make `.xlsx` and `.docx` files (the code sandbox now
+  has openpyxl and python-docx) and `read_document` / `search_document` read Excel files.
+
 ## v1.0.0 (2026-10)
 
 The first release under the name **Dhoon** (from Hindi धुन, *dhun*: the inner spark, the drive

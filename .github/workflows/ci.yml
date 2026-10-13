@@ -41,5 +41,5 @@ jobs:
       - name: Build sandbox image
         run: |
           docker build -t agent-sandbox sandbox
-          echo 'import pandas, matplotlib; print("sandbox ok")' | \
+          echo 'import pandas, matplotlib, openpyxl, docx; print("sandbox ok")' | \
             docker run --rm -i --network none agent-sandbox python -

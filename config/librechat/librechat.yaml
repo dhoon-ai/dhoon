@@ -2,6 +2,20 @@
 version: 1.3.17
 cache: true
 
+# Memory: the assistant remembers what you tell it about yourself (your city, family,
+# preferences) across chats. Kept in your own database on this computer. The small fast
+# model decides what to keep, next to each answer. Each person can switch it off in
+# Settings -> Personalization; switch it off for everyone with MEMORY=off in
+# config/models.env (then: bash scripts/05_librechat.sh).
+memory:
+  disabled: __MEMORY_DISABLED__
+  personalize: true
+  tokenLimit: 1500
+  messageWindowSize: 3
+  agent:
+    provider: "ollama"
+    model: "__MODEL_FAST__"
+
 # Dhoon branding (the name, footer and icons are set in docker-compose.override.yml)
 interface:
   customWelcome: "Welcome to Dhoon, {{user.name}}. What shall we get done today?"
