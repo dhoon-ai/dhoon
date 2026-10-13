@@ -12,7 +12,7 @@ an old desktop, a home server or a laptop. **No graphics card required.**
 
 It gives you a private ChatGPT-style web app whose AI can **search the web, read pages,
 work with files, run Python in a sandbox, answer questions about your PDFs, Word and Excel
-files, make Excel and Word reports, analyse stocks, check the weather, manage your calendar,
+files, make Excel and Word reports you open with one click, analyse stocks, check the weather, manage your calendar,
 do tasks on a schedule, e-mail you the results and remember what you ask it to
 remember**, and you can teach it new skills with a few lines of Python.
 
@@ -340,6 +340,9 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
   filesystem, all capabilities dropped, and memory/CPU/process limits. It can only see
   the workspace folder.
 - **Files**: the agent can only read and write `~/agent-workspace`.
+- **Download links** for files the agent makes (port 3081, home network) are signed with a
+  key only your computer has, open one file in the workspace, expire after 7 days and never
+  run scripts; any other address gets "not found". Never port-forward 3081.
 - **Ollama and LibreChat** are reachable on your home network. Never port-forward them
   to the internet. Disable sign-ups after creating your account (see the guide).
 - **Web research for hard tasks** sends only a short, generic how-to question; e-mails,

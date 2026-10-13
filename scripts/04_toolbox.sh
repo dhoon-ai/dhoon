@@ -88,8 +88,31 @@ AccuracySec=1s
 WantedBy=timers.target
 EOF
 
+# 4f. download links for files the Assistant makes (Excel, Word, charts): the file name in
+# the chat opens the file. Links are signed, work only for files in the workspace and expire
+# after 7 days; anything else gets "not found". Home network only: never forward this port.
+sudo tee /etc/systemd/system/ai-files.service >/dev/null <<EOF
+[Unit]
+Description=Download links for files the Assistant makes
+After=network-online.target
+
+[Service]
+User=$USER
+WorkingDirectory=$KIT/toolbox
+Environment=WORKSPACE=$WORKSPACE_DIR
+Environment=FILES_PORT=$FILES_PORT
+ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/fileshare.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 sudo systemctl daemon-reload
 sudo systemctl enable ai-toolbox
+sudo systemctl enable ai-files >/dev/null 2>&1
+sudo systemctl restart ai-files
 sudo systemctl enable --now ai-scheduler.timer >/dev/null 2>&1 || true
 sudo systemctl restart ai-toolbox
 sleep 4

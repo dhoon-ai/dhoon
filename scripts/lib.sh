@@ -17,6 +17,7 @@ LIBRECHAT_GIT_URL="${LIBRECHAT_GIT_URL:-https://github.com/danny-avila/LibreChat
 SEARXNG_IMAGE="${SEARXNG_IMAGE:-searxng/searxng@sha256:ddd642cae6eac75412938fd846ddbf440a2df029cfeae8a562b8b205f4e35e25}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
+FILES_PORT="${FILES_PORT:-3081}"   # download links for created files (home network only)
 
 mkdir -p "$RUNTIME"
 
@@ -179,6 +180,7 @@ step_done() {
         || ! grep -q "^EnvironmentFile=-$KIT/config/email.env" "$SYSTEMD_ROOT/ai-toolbox.service" 2>/dev/null; then
         STATUS_REASON="toolbox settings out of date"; return 1
       fi
+      [ -f "$SYSTEMD_ROOT/ai-files.service" ] || { STATUS_REASON="download-link service missing"; return 1; }
       "$RUNTIME/venv/bin/python" -c "import mcp, pypdf, docx, numpy" 2>/dev/null \
         || { STATUS_REASON="toolbox Python packages missing or outdated"; return 1; }
       ;;

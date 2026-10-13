@@ -3,6 +3,7 @@
 import os
 import re
 import subprocess
+from pathlib import Path
 
 import toolbox_server as tb
 
@@ -37,7 +38,46 @@ def write_file(path: str, content: str) -> str:
     p = tb._safe_path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
-    return f"Saved {p.relative_to(tb.WORKSPACE)} ({len(content)} characters)."
+    return f"Saved {p.relative_to(tb.WORKSPACE)} ({len(content)} characters).{_links([p])}"
+
+
+@tb.mcp.tool()
+def file_link(path: str) -> str:
+    """A new download link for a file in the workspace, so the user can open it
+    (e.g. when an older link has expired, or for a file they put there themselves)."""
+    p = tb._safe_path(path)
+    if not p.is_file():
+        return f"No such file: {path}"
+    return _links([p]).lstrip("\n") or "Could not make a link for that file."
+
+
+def _links(files) -> str:
+    """Download links for files the user may want to open (see fileshare.py)."""
+    import fileshare
+
+    out = []
+    for p in list(files)[:5]:
+        try:
+            out.append(f"\n[{p.name}]({fileshare.make_link(p, tb.WORKSPACE)})")
+        except (ValueError, OSError):
+            continue
+    if not out:
+        return ""
+    return "\nDownload link (show it to the user exactly like this):" + "".join(out)
+
+
+def _snapshot() -> dict:
+    """Modification times of the workspace files (hidden folders skipped)."""
+    seen = {}
+    for root, dirs, names in os.walk(tb.WORKSPACE):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for n in names:
+            p = Path(root) / n
+            try:
+                seen[p] = p.stat().st_mtime_ns
+            except OSError:
+                pass
+    return seen
 
 
 # ------------------------------------------------------------------ code ---
@@ -94,6 +134,7 @@ def run_python(code: str, timeout_seconds: int = 60) -> str:
         "python",
         "-",
     ]
+    before = _snapshot()
     try:
         r = subprocess.run(
             cmd, input=PY_PREAMBLE + code, capture_output=True, text=True, timeout=max(5, min(timeout_seconds, 300))
@@ -112,4 +153,6 @@ def run_python(code: str, timeout_seconds: int = 60) -> str:
             "here: get the data with another tool first (stock_save_history for stock prices, "
             "read_webpage for pages), save it with write_file if needed, then read the file here."
         )
-    return out[-tb.MAX_TEXT :] if len(out) > tb.MAX_TEXT else out
+    out = out[-tb.MAX_TEXT :] if len(out) > tb.MAX_TEXT else out
+    made = [p for p, t in _snapshot().items() if before.get(p) != t]  # files made or changed by this run
+    return out + _links(sorted(made, key=lambda p: p.stat().st_mtime_ns, reverse=True))

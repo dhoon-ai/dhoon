@@ -15,12 +15,13 @@ if ! grep -qx "Environment=PLANNER_MODEL=$MODEL_PLANNER" /etc/systemd/system/ai-
    || ! grep -q "^Environment=RESEARCH_ENGINES=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
    || ! grep -q "^Environment=TOOLBOX_LOG=" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
    || ! grep -q "^EnvironmentFile=-$KIT/config/email.env" /etc/systemd/system/ai-toolbox.service 2>/dev/null \
-   || [ ! -f /etc/systemd/system/ai-scheduler.timer ]; then
+   || [ ! -f /etc/systemd/system/ai-scheduler.timer ] \
+   || [ ! -f /etc/systemd/system/ai-files.service ]; then
   warn "Toolbox service settings are outdated - re-running script 04"
   bash "$KIT/scripts/04_toolbox.sh"
 fi
 docker build --pull -t agent-sandbox "$KIT/sandbox"
-sudo systemctl restart ai-toolbox
+sudo systemctl restart ai-toolbox ai-files
 
 step "Updating SearXNG"
 docker pull "$SEARXNG_IMAGE"   # stays on the tested build (SEARXNG_IMAGE in lib.sh)

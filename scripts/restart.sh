@@ -33,6 +33,9 @@ fi
 
 if has_unit ai-toolbox.service; then
   sudo systemctl restart ai-toolbox && ok "Toolbox (the agent's tools and plugins)"
+  if has_unit ai-files.service; then
+    sudo systemctl restart ai-files && ok "Download links for files the Assistant makes"
+  fi
 else
   warn "The toolbox is not installed: bash scripts/04_toolbox.sh"
 fi

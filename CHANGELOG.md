@@ -15,6 +15,10 @@
   `OLLAMA_VERSION` in `config/models.env` can pin one.
 - **Excel and Word.** The Assistant can make `.xlsx` and `.docx` files (the code sandbox now
   has openpyxl and python-docx) and `read_document` / `search_document` read Excel files.
+- **Click to open created files.** When the Assistant makes a file, its name in the chat is a
+  link that opens or downloads it, also from your phone at home. Links are signed, work only
+  for that file in the workspace and expire after 7 days (new service `ai-files`, port 3081;
+  `update.sh` sets it up). The new `file_link` tool makes a fresh link.
 
 ## v1.0.0 (2026-10)
 

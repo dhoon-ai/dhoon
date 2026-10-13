@@ -40,6 +40,10 @@ else fail "Toolbox  ->  sudo systemctl restart ai-toolbox ; journalctl -u ai-too
 if curl -fs "http://${BRIDGE_IP:-127.0.0.1}:$TOOLBOX_PORT/ollama/api/tags" >/dev/null 2>&1; then
   ok "Chat website -> toolbox -> Ollama connection works"
 else fail "The toolbox can't pass chats to Ollama  ->  bash scripts/restart.sh"; problems=$((problems+1)); fi
+# a made-up link must get "not found" (404): the service runs and refuses unsigned links
+code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$FILES_PORT/f/0/x/x")
+if [ "$code" = "404" ]; then ok "Download links for created files work (port $FILES_PORT, home network only)"
+else warn "Download links for created files are off  ->  bash scripts/04_toolbox.sh"; fi
 if systemctl is-active --quiet ai-scheduler.timer 2>/dev/null; then
   n=$(grep -o '"active": true' "$RUNTIME/schedule.json" 2>/dev/null | wc -l)
   ok "Scheduled tasks: checked every minute ($n active)"

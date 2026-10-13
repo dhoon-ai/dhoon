@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "toolbox"))
 def tb(tmp_path, monkeypatch):
     """Import toolbox_server with an isolated temporary workspace."""
     monkeypatch.setenv("WORKSPACE", str(tmp_path / "ws"))
+    monkeypatch.setenv("FILES_KEY", str(tmp_path / "files.key"))  # not the real key
     import toolbox_server
 
     return importlib.reload(toolbox_server)
