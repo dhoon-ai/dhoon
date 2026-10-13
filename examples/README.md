@@ -7,7 +7,7 @@ It shows how tool calling works under the hood: the model asks for a tool,
 Python runs it, the result goes back to the model, and repeat until it answers.
 
 ```bash
-cd ~/inglenook
+cd ~/dhoon
 runtime/venv/bin/pip install openai
 runtime/venv/bin/python examples/stock_agent.py "Analyse AAPL over the last 6 months"
 ```

@@ -2,9 +2,9 @@
 version: 1.3.17
 cache: true
 
-# Inglenook branding (the name, footer and icons are set in docker-compose.override.yml)
+# Dhoon branding (the name, footer and icons are set in docker-compose.override.yml)
 interface:
-  customWelcome: "Welcome to Inglenook, {{user.name}}. What shall we work on?"
+  customWelcome: "Welcome to Dhoon, {{user.name}}. What shall we get done today?"
 
 endpoints:
   # An agent run stops after this many steps (each tool call uses about 2). The default 25

@@ -1,4 +1,4 @@
-"""Inglenook branding in LibreChat: every icon the override mounts exists and gets copied."""
+"""Dhoon branding in LibreChat: every icon the override mounts exists and gets copied."""
 
 import json
 import os
@@ -20,12 +20,12 @@ def test_every_mounted_icon_exists():
         assert (REPO / "config" / src.removeprefix("./")).is_file(), src  # else Docker makes a folder
         assert dst.startswith("/app/client/dist/") and mode == "ro"
     env = dict(e.split("=", 1) for e in api["environment"])
-    assert env["APP_TITLE"] == "Inglenook" and "|" not in env["CUSTOM_FOOTER"]  # | splits the footer
+    assert env["APP_TITLE"] == "Dhoon" and "|" not in env["CUSTOM_FOOTER"]  # | splits the footer
 
 
-def test_manifest_names_inglenook_and_lists_real_icons():
+def test_manifest_names_dhoon_and_lists_real_icons():
     m = json.loads((REPO / "config" / "branding" / "manifest.webmanifest").read_text())
-    assert m["name"] == m["short_name"] == "Inglenook"
+    assert m["name"] == m["short_name"] == "Dhoon"
     for icon in m["icons"]:
         f = REPO / "config" / "branding" / Path(icon["src"]).name
         w, h = (int(x) for x in icon["sizes"].split("x"))
@@ -38,7 +38,7 @@ def test_manifest_names_inglenook_and_lists_real_icons():
 
 def test_welcome_text_in_librechat_yaml():
     cfg = yaml.safe_load((REPO / "config" / "librechat" / "librechat.yaml").read_text())
-    assert "Inglenook" in cfg["interface"]["customWelcome"]
+    assert "Dhoon" in cfg["interface"]["customWelcome"]
 
 
 def test_render_copies_the_icons(tmp_path):

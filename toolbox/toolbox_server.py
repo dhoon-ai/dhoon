@@ -1,5 +1,5 @@
 """
-toolbox_server.py - the "hands" of Inglenook, your local AI assistant.
+toolbox_server.py - the "hands" of Dhoon, your local AI assistant.
 
 This is an MCP server (Model Context Protocol). LibreChat connects to it and lets the AI
 model call tools. This file is the shared core: settings, logging, friendly error messages,

@@ -1,4 +1,4 @@
-"""Makes the Inglenook icon set from assets/inglenook-logo.svg (original artwork, MIT).
+"""Makes the Dhoon icon set from assets/dhoon-logo.svg (original artwork, MIT).
 
   config/branding/   the icons LibreChat shows (browser tab, login page, phone home screen)
   assets/social-preview.png   the picture GitHub shows when the repo link is shared
@@ -14,9 +14,9 @@ import cairosvg
 HERE = Path(__file__).resolve().parent
 KIT = HERE.parent
 OUT = KIT / "config" / "branding"
-SVG = (HERE / "inglenook-logo.svg").read_text()
+SVG = (HERE / "dhoon-logo.svg").read_text()
 BG_RECT = '<rect width="512" height="512" rx="112" fill="url(#bg)"/>'
-assert BG_RECT in SVG, "inglenook-logo.svg changed: update BG_RECT"
+assert BG_RECT in SVG, "dhoon-logo.svg changed: update BG_RECT"
 
 
 def png(svg: str, name: str, size: int, folder: Path = OUT) -> None:
@@ -39,14 +39,14 @@ def social() -> str:
     inner = re.search(r"<svg[^>]*>(.*)</svg>", SVG, re.S).group(1)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
   <defs><linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#2a1a10"/><stop offset="1" stop-color="#120b07"/></linearGradient></defs>
+    <stop offset="0" stop-color="#1e0b45"/><stop offset="1" stop-color="#0b0716"/></linearGradient></defs>
   <rect width="1280" height="640" fill="url(#card)"/>
   <svg x="110" y="150" width="340" height="340" viewBox="0 0 512 512">{inner}</svg>
-  <g font-family="Inter, DejaVu Sans, sans-serif" fill="#f3e3c8">
-    <text x="510" y="300" font-size="112" font-weight="700">Inglenook</text>
-    <text x="514" y="372" font-size="38" fill="#e8d2ad">Your private AI assistant,</text>
-    <text x="514" y="422" font-size="38" fill="#e8d2ad">running on your own computer.</text>
-    <text x="514" y="500" font-size="26" fill="#fb923c">Local models · your files stay home · open source</text>
+  <g font-family="Inter, DejaVu Sans, sans-serif" fill="#fff7ed">
+    <text x="510" y="300" font-size="112" font-weight="700">Dhoon</text>
+    <text x="514" y="372" font-size="38" fill="#fde68a">Your private AI, with the drive</text>
+    <text x="514" y="422" font-size="38" fill="#fde68a">to get things done.</text>
+    <text x="514" y="500" font-size="26" fill="#fb923c">Runs on your own computer · open source</text>
   </g>
 </svg>"""
 

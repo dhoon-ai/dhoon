@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# One-command installer for Inglenook, your private AI assistant.
+# One-command installer for Dhoon, your private AI assistant.
 #
-#   curl -fsSL https://raw.githubusercontent.com/rahulkthakar/inglenook/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dhoon-ai/dhoon/main/install.sh | bash
 #
-# It downloads the project to ~/inglenook and runs scripts 00-06 in order: hardware check,
+# It downloads the project to ~/dhoon and runs scripts 00-06 in order: hardware check,
 # Docker + Ollama, models, private search, toolbox, LibreChat, and the Assistant agent.
 # Safe to run again: it checks each step and skips the ones already done, so it resumes
 # after a failure and continues a manual install (see scripts/status.sh). If a step fails,
 # it stops and explains how to run and fix that step by hand in another terminal.
 #
 # Options (as environment variables in front of `bash`):
-#   INSTALL_DIR=~/inglenook   where to put the project (an older install in ~/ai-kit is
+#   INSTALL_DIR=~/dhoon       where to put the project (an older install in ~/ai-kit is
 #                             found and updated there)
 #   REPO_URL=...              git URL to install from (e.g. your fork)
 #   LIBRECHAT_EMAIL / LIBRECHAT_PASSWORD   account for the web app (otherwise asked)
@@ -24,9 +24,9 @@
 
 main() {
   set -euo pipefail
-  local repo_url="${REPO_URL:-https://github.com/rahulkthakar/inglenook.git}"
-  local dir="${INSTALL_DIR:-$HOME/inglenook}"
-  # Installed before the project was called Inglenook: keep using that folder (the toolbox
+  local repo_url="${REPO_URL:-https://github.com/dhoon-ai/dhoon.git}"
+  local dir="${INSTALL_DIR:-$HOME/dhoon}"
+  # Installed before the project was called Dhoon: keep using that folder (the toolbox
   # and its services point there).
   if [ -z "${INSTALL_DIR:-}" ] && [ ! -e "$dir" ] && [ -f "$HOME/ai-kit/scripts/lib.sh" ]; then dir="$HOME/ai-kit"; fi
   local dry="${INSTALL_DRY_RUN:-}"
@@ -41,8 +41,8 @@ main() {
     if id -nG | tr ' ' '\n' | grep -qx docker; then bash "$@"; else sg docker -c "$(printf '%q ' bash "$@")"; fi
   }
 
-  say "Inglenook installer"
-  echo "This installs Inglenook, a private AI assistant, on this computer. It takes 30-90"
+  say "Dhoon installer"
+  echo "This installs Dhoon, a private AI assistant, on this computer. It takes 30-90"
   echo "minutes, mostly downloads (up to ~41 GB). You'll be asked for your password (sudo) and,"
   echo "at the end, for an email and password for the web app. Re-run the same command to resume."
 

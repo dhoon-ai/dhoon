@@ -54,7 +54,7 @@ def test_installer_refuses_root(tmp_path):
 def _dry_run_home(tmp_path, old_install):
     home = tmp_path / "home"
     home.mkdir()
-    if old_install:  # installed before the Inglenook name, in ~/ai-kit
+    if old_install:  # installed before the Dhoon name, in ~/ai-kit
         (home / "ai-kit" / ".git").mkdir(parents=True)
         (home / "ai-kit" / "scripts").mkdir()
         (home / "ai-kit" / "scripts" / "lib.sh").write_text('STATUS_REASON=""\nstep_done() { return 1; }\n')
@@ -69,10 +69,10 @@ def _dry_run_home(tmp_path, old_install):
     return home, r.stdout
 
 
-def test_new_installs_go_to_inglenook(tmp_path):
+def test_new_installs_go_to_dhoon(tmp_path):
     home, out = _dry_run_home(tmp_path, old_install=False)
-    assert f"Getting the project into {home}/inglenook" in out
-    assert "https://github.com/rahulkthakar/inglenook.git" in out
+    assert f"Getting the project into {home}/dhoon" in out
+    assert "https://github.com/dhoon-ai/dhoon.git" in out
 
 
 def test_an_install_from_before_the_rename_is_updated_in_place(tmp_path):
