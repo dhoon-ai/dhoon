@@ -109,6 +109,18 @@ wait_for_ollama() {
   return 1
 }
 
+# LibreChat needs up to a minute after a (re)start before its website answers. Wait while its
+# container is running; give up at once if it isn't (then waiting can't help).
+wait_for_librechat() {
+  local _
+  for _ in $(seq 1 "${1:-40}"); do
+    curl -fs http://localhost:3080 >/dev/null 2>&1 && return 0
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx LibreChat || return 1
+    sleep 3
+  done
+  return 1
+}
+
 docker_bridge_ip() {
   ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1
 }

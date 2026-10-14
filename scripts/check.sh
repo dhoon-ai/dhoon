@@ -65,8 +65,9 @@ fi
 if docker image inspect agent-sandbox >/dev/null 2>&1; then ok "Code sandbox image exists"
 else fail "Sandbox image missing  ->  bash scripts/04_toolbox.sh"; problems=$((problems+1)); fi
 
-if curl -fs http://localhost:3080 >/dev/null; then ok "LibreChat web UI is up (http://localhost:3080)"
-else fail "LibreChat  ->  cd $LIBRECHAT_DIR && docker compose up -d"; problems=$((problems+1)); fi
+curl -fs http://localhost:3080 >/dev/null 2>&1 || echo "         (waiting for LibreChat to finish starting, up to 2 minutes...)"
+if wait_for_librechat 40; then ok "LibreChat web UI is up (http://localhost:3080)"
+else fail "LibreChat  ->  cd $LIBRECHAT_DIR && docker compose up -d ; docker logs LibreChat --tail 30"; problems=$((problems+1)); fi
 
 # Optional settings (docs/GUIDE.md "After installing: your settings"); never counted as problems.
 setting() { sed -n "s/^$1=//p" "$2" 2>/dev/null | tail -1 | tr -d '"'"'"; }
