@@ -680,7 +680,11 @@ def main(argv=None) -> int:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            print("Another knowledge-base run is busy; try again later.")
+            print(
+                "Another knowledge-base run is busy, usually the nightly one (22:30). See it with:\n"
+                "  systemctl status ai-knowledge\n"
+                "Stop it to run this now (finished weeks are kept):  sudo systemctl stop ai-knowledge"
+            )
             return 0
     if a.rate_all:
         print("Rating the notes by independent sources (a search per item, about 1-2 minutes a week)...", flush=True)
