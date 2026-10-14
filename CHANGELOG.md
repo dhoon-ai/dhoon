@@ -12,6 +12,9 @@
   or markets are answered faster and more reliably than with a web search each time. On by
   default (`KNOWLEDGE=off` to switch off); the catch-up takes a few nights, or
   `bash scripts/knowledge.sh --catch-up`.
+- **Notes are finished or redone.** Every note ends with a completion marker written in the
+  same atomic save, so a run that errors, is stopped or loses power never leaves half a note;
+  unfinished or partial weeks (Wikipedia still missing days) are written again.
 - **Confidence from independent sources.** Every item of a weekly note gets a confidence from
   1 to 10, counted by code from how many independent sources report it: the outlets Wikipedia
   cites for it plus independent websites found by a search through your SearXNG, shown next

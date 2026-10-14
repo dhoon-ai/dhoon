@@ -145,6 +145,45 @@ def week_file(monday: dt.date) -> Path:
     return KB / "weeks" / f"{week_id(monday)}.md"
 
 
+# ------------------------------------------------------------------ finished or not ---
+# A note is finished only when its last line is the completion marker, written in the same
+# save as the note itself. Saves are atomic (a temporary file, then renamed), so a run that
+# errors, is stopped (Ctrl+C) or loses power leaves either the old file or nothing: never half
+# a note. A week whose Wikipedia page was missing days is "partial" and done again on later
+# nights, until it is complete or 10 days old (then it is taken as it is).
+MARKER = "<!-- complete:"
+_MARK_RE = re.compile(r"\n*<!-- complete:[^\n]*-->\s*$")
+DAY_HEADING = re.compile(r"^### \w{3} \d{1,2} \w{3} \d{4}$", re.M)
+
+
+def save(path: Path, text: str) -> None:
+    """Write a file atomically: the whole new text, or (if anything goes wrong) the old file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def marker(kind: str, ident: str, detail: str = "") -> str:
+    return f"{MARKER} {kind} {ident}{' | ' + detail if detail else ''} | {dt.date.today().isoformat()} -->"
+
+
+def is_complete(path: Path) -> bool:
+    """Written to the end, and (for a week) not partial."""
+    if not path.exists():
+        return False
+    last = path.read_text().rstrip().rsplit("\n", 1)[-1]
+    return last.startswith(MARKER) and "| partial" not in last
+
+
+def _without_marker(text: str) -> tuple[str, str]:
+    m = _MARK_RE.search(text)
+    return (text[: m.start()].rstrip() + "\n", m.group(0).strip()) if m else (text, "")
+
+
 # ------------------------------------------------------------------ Wikipedia ---
 def page_title(year: int, month: int) -> str:
     return f"Portal:Current_events/{calendar.month_name[month]}_{year}"
@@ -160,7 +199,9 @@ def fetch_month(year: int, month: int, today: dt.date | None = None, get=None) -
     cache = KB / ".cache" / f"{year}-{month:02d}.html"
     last_day = dt.date(year, month, calendar.monthrange(year, month)[1])
     if cache.exists() and dt.date.fromtimestamp(cache.stat().st_mtime) > last_day + dt.timedelta(days=3):
-        return cache.read_text()
+        html = cache.read_text()
+        if "current-events" in html:
+            return html
     get = get or (lambda url, params: httpx.get(url, params=params, headers=HEADERS, timeout=60))
     r = get(
         WIKI_API,
@@ -172,8 +213,9 @@ def fetch_month(year: int, month: int, today: dt.date | None = None, get=None) -
     if "error" in data:
         raise ValueError(f"Wikipedia: {data['error'].get('info', data['error'])}")
     html = data["parse"]["text"]
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(html)
+    if "current-events" not in html:  # not the page we expect (moved, empty, error page)
+        raise ValueError(f"Wikipedia's page for {calendar.month_name[month]} {year} has no daily news")
+    save(cache, html)
     return html
 
 
@@ -465,16 +507,19 @@ def write_week(
     table = market_table(monday, monday + dt.timedelta(days=6), prices(start_date(), download))
     if table:
         text = f"### World markets this week (from prices)\n{table}\n\n{text}"
+    days = len(DAY_HEADING.findall(text))
     raw = KB / "raw" / f"{week_id(monday)}.txt"  # the full text, for details (read_file)
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(text)
+    save(raw, text)
     summary = ask(WEEK_PROMPT, f"Week {week_label(monday)}\n\n{text}", post)
     summary, avg = rate(summary, text, monday, confirm)
     summary += f"\n\n{confidence_line(avg)}" if avg is not None else ""
     src = ", ".join(sources) + (" and a news search through your SearXNG" if extra else "")
     path = week_file(monday)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    sunday = monday + dt.timedelta(days=6)
+    partial = days < 7 and (today - sunday).days < 10  # Wikipedia may still add the missing days
+    done = marker("week", week_id(monday), f"days {days}/7" + (" | partial" if partial else ""))
+    save(
+        path,
         f"# World news and markets, week {week_label(monday)}\n\n{UNTRUSTED}\nSources: {src}. "
         f"Full text: knowledge/raw/{raw.name}\n\n{summary}\n"
         + (
@@ -483,6 +528,7 @@ def write_week(
             if table
             else ""
         )
+        + f"\n{done}\n",
     )
     return path
 
@@ -501,16 +547,17 @@ def _months_done(weeks_done: set[str], today: dt.date, start: dt.date) -> list[t
 
 def write_month(y: int, m: int, today: dt.date, start: dt.date, post=None, download=None) -> Path:
     mondays = [d for d in complete_weeks(today, start) if (d.year, d.month) == (y, m)]
-    notes = "\n\n".join(week_file(d).read_text() for d in mondays if week_file(d).exists())
+    notes = "\n\n".join(_without_marker(week_file(d).read_text())[0] for d in mondays if is_complete(week_file(d)))
     first, last = dt.date(y, m, 1), dt.date(y, m, calendar.monthrange(y, m)[1])
     table = market_table(first, last, prices(start, download))
     source = notes + (f"\n\nMarket moves this month:\n{table}" if table else "")
     summary = ask(MONTH_PROMPT, source, post, 350)
     path = KB / "months" / f"{y}-{m:02d}.md"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    save(
+        path,
         f"# World news and markets, {calendar.month_name[m]} {y}\n\n{UNTRUSTED}\nFrom the weekly notes.\n\n{summary}\n"
         + (f"\n## World market moves this month\n\n{table}\n" if table else "")
+        + f"\n{marker('month', f'{y}-{m:02d}', f'weeks {len(mondays)}')}\n",
     )
     return path
 
@@ -519,12 +566,17 @@ def write_overview(start: dt.date, post=None) -> Path | None:
     months = sorted((KB / "months").glob("*.md"))
     if not months:
         return None
-    notes = "\n\n".join(p.read_text() for p in months)[-60000:]
+    months = [p for p in months if is_complete(p)]
+    if not months:
+        return None
+    notes = "\n\n".join(_without_marker(p.read_text())[0] for p in months)[-60000:]
     summary = ask(OVERVIEW_PROMPT.format(start=f"{start:%B %Y}"), notes, post, 700)
     path = KB / "overview.md"
-    path.write_text(
+    save(
+        path,
         f"# What changed in the world since {start:%B %Y}\n\n{UNTRUSTED}\nFrom the monthly notes "
         f"{months[0].stem} to {months[-1].stem}. Details: knowledge/months/ and knowledge/weeks/.\n\n{summary}\n"
+        f"\n{marker('overview', f'{months[0].stem}..{months[-1].stem}')}\n",
     )
     return path
 
@@ -550,9 +602,9 @@ def rate_all(force: bool = False, search=None, max_minutes: float = 0) -> dict:
     r = {"rated": 0, "no_source": 0, "stopped_for_time": False}
     began = time.monotonic()
     for path in sorted((KB / "weeks").glob("*.md"), reverse=True):
-        note = path.read_text()
-        if "_Confidence:" in note and not force:
-            continue
+        note, done = _without_marker(path.read_text())
+        if not done or ("_Confidence:" in note and not force):
+            continue  # unfinished notes are written again by the update; rated then
         if max_minutes and (time.monotonic() - began) / 60 >= max_minutes:
             r["stopped_for_time"] = True
             break
@@ -564,7 +616,7 @@ def rate_all(force: bool = False, search=None, max_minutes: float = 0) -> dict:
         summary = re.sub(r" _\(confidence \d+/10:[^)]*\)_", "", summary)
         summary, avg = rate(summary, raw.read_text(), monday_of(path.stem), search)
         body = f"{summary}\n\n{confidence_line(avg)}" if avg is not None else summary
-        path.write_text(f"{head}\n\n{body}\n" + tail)
+        save(path, f"{head}\n\n{body}\n" + tail.rstrip("\n") + f"\n\n{done}\n")
         r["rated"] += 1
         print(f"  {path.stem}: rated (average {avg}/10)", flush=True)
     return r
@@ -583,13 +635,40 @@ def index_notes() -> int:
 
 
 # ------------------------------------------------------------------ runs ---
+def adopt_old_notes() -> dict:
+    """Notes written before the completion marker existed: a whole one gets its marker (with
+    the day count from its saved source); a cut-off or doubtful one is removed and redone."""
+    r = {"adopted": 0, "redo": 0}
+    for path in sorted((KB / "weeks").glob("*.md")):
+        text = path.read_text()
+        if MARKER in text:
+            continue
+        raw = KB / "raw" / f"{path.stem}.txt"
+        body = text.split("\nSources:", 1)[-1]
+        whole = (text.startswith("# World news") and "\nSources:" in text and raw.exists()
+                 and len(body) > 300 and "## " in body and text.rstrip()[-1:] in "._)")  # fmt: skip
+        if whole:
+            days = len(DAY_HEADING.findall(raw.read_text()))
+            save(path, text.rstrip() + f"\n\n{marker('week', path.stem, f'days {days}/7 | adopted')}\n")
+            r["adopted"] += 1
+        else:
+            path.unlink()
+            r["redo"] += 1
+    for path in sorted((KB / "months").glob("*.md")) + [KB / "overview.md"]:
+        if path.exists() and MARKER not in path.read_text():
+            path.unlink()  # cheap to redo from the weekly notes
+            r["redo"] += 1
+    return r
+
+
 def update(today: dt.date | None = None, max_minutes: float | None = None, start: str = "", **io) -> dict:
     """Write the missing weeks (newest first) within the time limit, then months and overview."""
     today = today or dt.date.today()
     first = start_date(start)
     limit = MAX_MINUTES if max_minutes is None else max_minutes
     began = time.monotonic()
-    missing = [d for d in reversed(complete_weeks(today, first)) if not week_file(d).exists()]
+    adopted = adopt_old_notes()
+    missing = [d for d in reversed(complete_weeks(today, first)) if not is_complete(week_file(d))]
     written, failed, empty, stopped = [], [], [], False
     for monday in missing:
         if limit and (time.monotonic() - began) / 60 >= limit:
@@ -605,16 +684,16 @@ def update(today: dt.date | None = None, max_minutes: float | None = None, start
             continue
         (written if path else empty).append(week_id(monday))
         print(f"  {week_id(monday)}: {'written' if path else 'no news found'}", flush=True)
-    done = {p.stem for p in (KB / "weeks").glob("*.md")}
+    done = {p.stem for p in (KB / "weeks").glob("*.md") if is_complete(p)}
     months = []
     if not stopped:
         for y, m in _months_done(done, today, first):
-            if not (KB / "months" / f"{y}-{m:02d}.md").exists():
+            if not is_complete(KB / "months" / f"{y}-{m:02d}.md"):
                 try:
                     months.append(write_month(y, m, today, first, io.get("post"), io.get("download")).stem)
                 except (httpx.HTTPError, ValueError, KeyError) as e:
                     failed.append(f"{y}-{m:02d}: {e}")
-        if months or ((KB / "months").exists() and not (KB / "overview.md").exists()):
+        if months or ((KB / "months").exists() and not is_complete(KB / "overview.md")):
             try:
                 write_overview(first, io.get("post"))
             except (httpx.HTTPError, ValueError, KeyError) as e:
@@ -624,15 +703,17 @@ def update(today: dt.date | None = None, max_minutes: float | None = None, start
         remaining = (limit - (time.monotonic() - began) / 60) if limit else 0
         if not limit or remaining > 0:
             rated = rate_all(search=io.get("confirm"), max_minutes=max(remaining, 0.01) if limit else 0)
-    left = len([d for d in complete_weeks(today, first) if not week_file(d).exists()])
+    left = len([d for d in complete_weeks(today, first) if not is_complete(week_file(d))])
     return {"written": written, "months": months, "failed": failed, "no_news": empty, "left": left,
-            "stopped_for_time": stopped, "confidence": rated}  # fmt: skip
+            "stopped_for_time": stopped, "confidence": rated, "old_notes": adopted}  # fmt: skip
 
 
 def status(today: dt.date | None = None) -> str:
     today = today or dt.date.today()
     first = start_date()
-    weeks = sorted(p.stem for p in (KB / "weeks").glob("*.md"))
+    all_weeks = sorted((KB / "weeks").glob("*.md"))
+    weeks = sorted(p.stem for p in all_weeks if is_complete(p))
+    unfinished = sorted(p.stem for p in all_weeks if not is_complete(p))
     total = len(complete_weeks(today, first))
     months = sorted(p.stem for p in (KB / "months").glob("*.md"))
     lines = [
@@ -640,7 +721,12 @@ def status(today: dt.date | None = None) -> str:
         f"  weeks:    {len(weeks)} of {total} since {first:%B %Y}"
         + (f" (newest {weeks[-1]}, oldest {weeks[0]})" if weeks else ""),
         f"  months:   {len(months)}" + (f" ({months[0]} to {months[-1]})" if months else ""),
-        f"  overview: {'yes' if (KB / 'overview.md').exists() else 'not yet'}",
+        f"  overview: {'yes' if is_complete(KB / 'overview.md') else 'not yet'}",
+        *(
+            [f"  unfinished: {', '.join(unfinished[:8])} (partial or cut off: written again on the next run)"]
+            if unfinished
+            else []
+        ),  # fmt: skip
         "  covers:   world news events and market events",
     ]
     scores = [int(x) for p in (KB / "weeks").glob("*.md") for x in re.findall(r"confidence (\d+)/10", p.read_text())]

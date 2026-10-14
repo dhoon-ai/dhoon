@@ -291,3 +291,74 @@ def test_prompt_has_no_example_date_to_copy():
     import news_kb
 
     assert not re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", news_kb.WEEK_PROMPT)
+
+
+# ---------------------------------------------------------------- finished or not ---
+def test_a_note_counts_only_when_written_to_the_end(kb):
+    calls = {"wiki": [], "ai": [], "search": []}
+    io = fake_io(calls)
+    path = kb.write_week(dt.date(2025, 3, 3), dt.date(2025, 4, 8), io["get"], io["search"], io["post"],
+                         io["download"], io["confirm"])  # fmt: skip
+    last = path.read_text().rstrip().splitlines()[-1]
+    assert last.startswith("<!-- complete: week 2025-W10 | days 7/7 |") and kb.is_complete(path)
+    path.write_text(path.read_text()[:300])  # cut off, e.g. by a power cut with an older version
+    assert not kb.is_complete(path)
+    r = kb.update(today=dt.date(2025, 3, 17), max_minutes=0, start="2025-03", **io)
+    assert "2025-W10" in r["written"] and kb.is_complete(path)  # done again
+
+
+def test_an_error_while_saving_leaves_no_half_file(kb, monkeypatch):
+    p = kb.KB / "weeks" / "x.md"
+    kb.save(p, "old and whole")
+
+    def boom(*a):
+        raise KeyboardInterrupt  # Ctrl+C at the worst moment
+
+    monkeypatch.setattr(kb.os, "replace", boom)
+    with pytest.raises(KeyboardInterrupt):
+        kb.save(p, "new but never finished")
+    assert p.read_text() == "old and whole"
+
+
+def test_a_week_with_missing_days_is_done_again_later(kb):
+    calls = {"wiki": [], "ai": [], "search": []}
+    io = fake_io(calls)
+
+    def get_without_weekend(url, params):  # Wikipedia doesn't have Sat 8 and Sun 9 Mar yet
+        r = io["get"](url, params)
+        html = r.data["parse"]["text"]
+        for d in (8, 9):
+            html = html.replace(f'id="2025_March_{d}"', 'id="x"').replace(f">2025-03-0{d}<", "><")
+            html = html.replace(f"March {d}, 2025", "")
+        return Resp({"parse": {"text": html}})
+
+    path = kb.write_week(dt.date(2025, 3, 3), dt.date(2025, 3, 11), get_without_weekend, io["search"], io["post"],
+                         io["download"], io["confirm"])  # fmt: skip
+    assert "days 5/7 | partial" in path.read_text() and not kb.is_complete(path)
+    assert "unfinished: 2025-W10" in kb.status()
+    late = kb.write_week(dt.date(2025, 3, 3), dt.date(2025, 3, 25), get_without_weekend, io["search"], io["post"],
+                         io["download"], io["confirm"])  # fmt: skip
+    assert "days 5/7 |" in late.read_text() and kb.is_complete(late)  # 10+ days later: taken as it is
+
+
+def test_bad_cached_page_is_fetched_again(kb):
+    calls = {"wiki": [], "ai": [], "search": []}
+    io = fake_io(calls)
+    cache = kb.KB / ".cache" / "2025-03.html"
+    kb.save(cache, "<html>Error</html>")
+    html = kb.fetch_month(2025, 3, dt.date(2025, 6, 1), io["get"])
+    assert "current-events" in html and calls["wiki"] == ["Portal:Current_events/March_2025"]
+    with pytest.raises(ValueError, match="no daily news"):
+        kb.fetch_month(2025, 4, dt.date(2025, 6, 1), lambda u, p: Resp({"parse": {"text": "<p>moved</p>"}}))
+
+
+def test_notes_from_before_the_marker_are_kept_or_redone(kb):
+    calls = {"wiki": [], "ai": [], "search": []}
+    io = fake_io(calls)
+    kb.update(today=dt.date(2025, 3, 17), max_minutes=0, start="2025-03", **io)
+    whole, cut = kb.KB / "weeks" / "2025-W10.md", kb.KB / "weeks" / "2025-W09.md"
+    whole.write_text(kb._without_marker(whole.read_text())[0])  # as an older version wrote it
+    cut.write_text(cut.read_text()[:250])
+    r = kb.adopt_old_notes()
+    assert r == {"adopted": 1, "redo": 1}  # W09 was cut off: removed, written again next run
+    assert "| adopted |" in whole.read_text() and kb.is_complete(whole) and not cut.exists()

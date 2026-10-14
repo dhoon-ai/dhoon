@@ -935,6 +935,13 @@ bash scripts/knowledge.sh --week 2025-W10       # write one week again
 bash scripts/knowledge.sh --rate-all            # add confidence to notes that have none (searches only, no AI)
 ```
 
+**Finished or not.** A note counts only when its last line is the completion marker
+(`<!-- complete: week 2025-W10 | days 7/7 | ... -->`), saved together with the note. Saves are
+atomic, so an error, Ctrl+C or a power cut leaves the old file or nothing, never half a note;
+anything unfinished is simply written again on the next run. A week whose Wikipedia page was
+still missing days is marked *partial* and done again until it is complete (or 10 days old).
+`bash scripts/knowledge.sh` lists unfinished weeks.
+
 **How sure can you be?** The market tables are computed from prices. Every item of a weekly
 summary gets a **confidence from 1 to 10**, counted by code from how many **independent
 sources** report it: the news outlets Wikipedia cites for it ("(Reuters)", "(DW)") plus
