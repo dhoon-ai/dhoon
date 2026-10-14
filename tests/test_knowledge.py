@@ -2,6 +2,7 @@
 
 import datetime as dt
 import importlib
+import re
 import sys
 from pathlib import Path
 
@@ -276,7 +277,8 @@ def test_check_all_fixes_notes_written_before_the_fact_check(kb):
     assert "77.7%" not in bad.read_text() and "_Fact check:" in bad.read_text()  # rewritten from its source
     assert "_Fact check: passed" in good.read_text() and good.read_text().count("_Fact check") == 1
     calls["ai"].clear()
-    assert kb.check_all(post=io["post"])["checked"] == 0 and calls["ai"] == []  # done once
+    again = kb.check_all(post=io["post"])
+    assert again["rewritten"] == 0 and calls["ai"] == []  # marked notes are re-checked by code only, no AI loop
     assert "passed the fact check" in kb.status()
 
 
@@ -311,4 +313,23 @@ def test_every_bullet_dated_the_same_day_is_caught():
     wrong = factcheck.check("- Mar 4: The European Central Bank cut rates to 2.5%.", src, mon, sun)
     assert wrong == ["date Mar 4 doesn't match the source (that story isn't on that day)"]
     prompt = __import__("news_kb").WEEK_PROMPT
-    assert 'e.g. "Mar 4' not in prompt and "never reuse one date" in prompt
+    assert not re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", prompt)  # no example date to copy
+
+
+def test_a_wrong_month_is_put_right_by_code():
+    import factcheck
+
+    # found on the NUC: the model wrote "Mar 15" for a story under "### Tue 15 Sep 2026"
+    src = ("### Mon 14 Sep 2026\n- Japan holds an election.\n\n### Tue 15 Sep 2026\n 2026-2027 El Niño event\n"
+           "  - The Panama Canal Authority reduces daily ship transits through the canal from 36 to 32 as "
+           "below-average rainfall and a strengthening El Niño lower water levels. (DW)\n")  # fmt: skip
+    mon, sun = dt.date(2026, 9, 14), dt.date(2026, 9, 20)
+    line = "- **Mar 15:** The Panama Canal Authority reduces daily ship transits from 36 to 32 due to El Niño."
+    assert "date Mar 15 is outside Sep 14 - Sep 20" in factcheck.check(line, src, mon, sun)
+    fixed, n = factcheck.fix_dates(line, src, mon, sun)
+    assert n == 1 and fixed.startswith("- **Sep 15:** The Panama Canal") and factcheck.check(fixed, src, mon, sun) == []
+    wrong_day, n = factcheck.fix_dates("- Mon 14 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun)
+    assert n == 1 and wrong_day.startswith("- Tue 15 Sep: The Panama Canal")  # weekday fixed too
+    same, n = factcheck.fix_dates("- Tue 15 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun)
+    assert n == 0  # already right
+    assert factcheck.check("- Tue 15 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun) == []

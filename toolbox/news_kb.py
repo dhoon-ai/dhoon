@@ -95,9 +95,9 @@ Write Markdown, under 450 words, with these headings (leave out a heading if not
    use the market table for numbers)
 ## World news   (conflicts, elections and politics, diplomacy, laws)
 ## Disasters and health
-Start each bullet with the date of the day it is listed under in the text: the "### Tue 4 Mar 2025"
-heading above it becomes "Mar 4:", the "### Fri 7 Mar 2025" heading "Mar 7:". Every bullet gets
-its own day; never reuse one date for all. Market figures: no date. No introduction, no conclusion."""
+Start each bullet with the day it is listed under, copied from its "### " heading without the
+year: a heading "### <weekday> <day> <month> <year>" gives "<weekday> <day> <month>:". Every
+bullet gets the day of its own heading. Market figures: no date. No introduction, no conclusion."""
 
 MONTH_PROMPT = """Summarise one month of world news for a personal knowledge base, from the weekly
 notes below. World news events and market events only. Use only their facts; keep names,
@@ -304,13 +304,20 @@ RETRY = (
 )
 
 
+def _fix(text: str, source: str, first, last) -> str:
+    """Wrong dates are put right by code when the story is on exactly one day of the source."""
+    return factcheck.fix_dates(text, source, first, last)[0] if first and last else text
+
+
 def checked_summary(system: str, user: str, source: str, first=None, last=None, post=None, words: int = 450):
     """Summary + fact check; one rewrite if something isn't in the source; what still isn't is
     marked. Returns (text with its fact-check line, number of problems left)."""
-    summary = ask(system, user, post, words)
+    summary = _fix(ask(system, user, post, words), source, first, last)
     problems = factcheck.check(summary, source, first, last)
     if problems:
-        summary = ask(system, user + RETRY.format(problems="; ".join(problems[:12])), post, words)
+        summary = _fix(
+            ask(system, user + RETRY.format(problems="; ".join(problems[:12])), post, words), source, first, last
+        )
     marked, n = factcheck.mark(summary, source, first, last)
     return f"{marked}\n\n{factcheck.footer(n)}", n
 
@@ -458,14 +465,17 @@ def _rebuild(head: str, summary: str, tail: str) -> str:
 
 
 def check_all(force: bool = False, post=None, max_minutes: float = 0) -> dict:
-    """Fact-check the notes that have not been checked yet (or all, with force). A note with
-    problems is written again from its saved source; what still fails is marked."""
-    r = {"checked": 0, "passed": 0, "rewritten": 0, "still_marked": 0, "no_source": 0, "stopped_for_time": False}
+    """Fact-check the notes that have not passed yet (all of them with force). Code first puts
+    wrong dates right; a note that still has problems is written again by the AI from its saved
+    source, once (with force: again). What still fails stays marked ⚠."""
+    r = {"checked": 0, "passed": 0, "dates_fixed": 0, "rewritten": 0, "still_marked": 0, "no_source": 0,
+         "stopped_for_time": False}  # fmt: skip
     began = time.monotonic()
     for path in sorted((KB / "weeks").glob("*.md")):
         note = path.read_text()
-        if "_Fact check:" in note and not force:
+        if "_Fact check: passed" in note and not force:
             continue
+        ai_done = "_Fact check:" in note and not force  # marked earlier: the AI already had its try
         if max_minutes and (time.monotonic() - began) / 60 >= max_minutes:
             r["stopped_for_time"] = True
             break
@@ -477,10 +487,18 @@ def check_all(force: bool = False, post=None, max_minutes: float = 0) -> dict:
         monday = monday_of(path.stem)
         sunday = monday + dt.timedelta(days=6)
         head, summary, tail = _split_note(note)
+        summary = re.sub(r" ⚠ not in source:.*$", "", summary, flags=re.M)  # check again from scratch
+        summary, fixed = factcheck.fix_dates(summary, source, monday, sunday)
         r["checked"] += 1
+        r["dates_fixed"] += fixed
         if not factcheck.check(summary, source, monday, sunday):
             path.write_text(_rebuild(head, f"{summary}\n\n{factcheck.footer(0)}", tail))
             r["passed"] += 1
+            continue
+        if ai_done:  # only code this time (no nightly AI rewrites of the same note)
+            marked, n = factcheck.mark(summary, source, monday, sunday)
+            path.write_text(_rebuild(head, f"{marked}\n\n{factcheck.footer(n)}", tail))
+            r["still_marked"] += 1
             continue
         try:
             summary, n = checked_summary(

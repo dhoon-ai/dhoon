@@ -18,7 +18,12 @@ _NUM = re.compile(r"(?<![\w.])[-+−]?[$₹€£]?\d[\d,]*(?:\.\d+)?(?:%| ?pts?\
 _MONTHS = {
     m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)
 }
-_DATE = re.compile(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? (\d{1,2})\b")
+_MON = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?"
+_WEEKDAY = r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?,? "
+# "Mar 15", "15 Sep" and "Tue 15 Sep" (the weekday is part of the date, so a fix can change it)
+_DATE = re.compile(
+    rf"\b(?:(?P<m1>{_MON}) (?P<d1>\d{{1,2}})(?!\d)|(?P<wd>{_WEEKDAY})?(?P<d2>\d{{1,2}}) (?P<m2>{_MON}))(?![a-z])"
+)
 _NAME = re.compile(r"\b[A-Z][a-zA-Z'’\-]{3,}\b")
 # capitalised words that are not claims: headings, months, days, sentence starters
 _COMMON = set(
@@ -53,10 +58,15 @@ def _found(v: float, values: list[float]) -> bool:
     return any(abs(v - s) <= tol for s in values)
 
 
+def _month_day(m) -> tuple[int, int]:
+    mon = m.group("m1") or m.group("m2")
+    return _MONTHS[mon[:3].lower()], int(m.group("d1") or m.group("d2"))
+
+
 def _dates(text: str, first: dt.date, last: dt.date) -> list[tuple[str, dt.date | None]]:
     out = []
     for m in _DATE.finditer(text):
-        month, day = _MONTHS[m.group(1)[:3].lower()], int(m.group(2))
+        month, day = _month_day(m)
         when = None
         for year in {first.year, last.year}:
             try:
@@ -130,24 +140,61 @@ def day_sections(source: str) -> dict[dt.date, str]:
     return out
 
 
+def _supported_on(text: str, day_text: str) -> bool | None:
+    """Does that day's source text have this story? None if the line has nothing to compare."""
+    rest = _DATE.sub(" ", text)
+    names = [w for w, _ in _names(rest) if w.lower() not in _COMMON]
+    nums = [v for v in (_value(t) for t in _NUM.findall(rest)) if v is not None and v > 12]
+    if not names and not nums:
+        return None
+    low, values = day_text.lower(), _source_values(day_text)
+    return any(_name_found(w, False, low) for w in names) or any(_found(v, values) for v in nums)
+
+
 def _wrong_days(text: str, first: dt.date, last: dt.date, days: dict) -> list[str]:
     """Dates whose day in the source doesn't have this story (e.g. every bullet dated Mar 4)."""
     if not days:
         return []
     out = []
     for s, d in _dates(text, first, last):
-        if not d:
-            continue
-        day = days.get(d, "")
-        rest = _DATE.sub(" ", text)
-        names = [w for w, st in _names(rest) if w.lower() not in _COMMON]
-        nums = [v for v in (_value(t) for t in _NUM.findall(rest)) if v is not None and v > 12]
-        if not names and not nums:
-            continue
-        low, values = day.lower(), _source_values(day)
-        if not any(_name_found(w, False, low) for w in names) and not any(_found(v, values) for v in nums):
+        if d and _supported_on(text, days.get(d, "")) is False:
             out.append(f"date {s} doesn't match the source (that story isn't on that day)")
     return out
+
+
+def fix_dates(text: str, source: str, first: dt.date, last: dt.date) -> tuple[str, int]:
+    """Put the right date on lines whose date is wrong, when the story is on exactly one day of
+    the source (plain code, no AI). Returns (text, how many dates were fixed)."""
+    days = day_sections(source)
+    if not days:
+        return text, 0
+    fixed, out = 0, []
+    for line in text.splitlines():
+        for m in list(_DATE.finditer(line)):
+            month, day = _month_day(m)
+            here = [d for y in {first.year, last.year} for d in [_safe_date(y, month, day)] if d and first <= d <= last]
+            if here and _supported_on(line, days.get(here[0], "")) is not False:
+                continue  # right (or nothing to compare)
+            options = [d for d, t in days.items() if _supported_on(line, t)]
+            if len(options) != 1:
+                continue
+            c = options[0]
+            if m.group("m1"):
+                new = f"{c:%b} {c.day}"
+            else:
+                new = (f"{c:%a} " if m.group("wd") else "") + f"{c.day} {c:%b}"
+            line = line[: m.start()] + new + line[m.end() :]
+            fixed += 1
+            break  # one date per line; positions changed
+        out.append(line)
+    return "\n".join(out), fixed
+
+
+def _safe_date(y: int, m: int, d: int) -> dt.date | None:
+    try:
+        return dt.date(y, m, d)
+    except ValueError:
+        return None
 
 
 def check(text: str, source: str, first: dt.date | None = None, last: dt.date | None = None) -> list[str]:
