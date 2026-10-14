@@ -15,10 +15,10 @@ This script fills the gap, on this computer:
          ~/agent-workspace/knowledge/weeks/2025-W10.md
      then each finished month (knowledge/months/2025-03.md) and an overview of everything
      since KNOWLEDGE_START (knowledge/overview.md).
-  5. Fact-checks each note with plain code (factcheck.py): every number, date and name must be
-     in the source. A note that fails is written again; what still fails is marked "⚠ not
-     in source". Once a month a quiz (20 masked facts from the sources) measures how often
-     the Assistant answers from the notes correctly, says it doesn't know, or gets it wrong.
+  5. Rates every item of a weekly note with a confidence from 1 to 10 by how many independent
+     sources report it: the news outlets Wikipedia cites for it, plus independent websites that
+     report the same event in a search through your SearXNG (counted by code, not the AI).
+     Each item shows its confidence and those sources.
   6. Indexes the notes, so the Assistant's search_knowledge tool finds them in about a second.
 
 The ai-knowledge timer runs `news_kb.py --update` every night at 22:30: it writes the weeks
@@ -44,9 +44,6 @@ import time
 from pathlib import Path
 
 import httpx
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import factcheck  # noqa: E402  (toolbox/factcheck.py: every number, date and name must be in the source)
 
 KIT = Path(__file__).resolve().parents[1]
 WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
@@ -298,28 +295,111 @@ def ask(system: str, user: str, post=None, max_words: int = 450, min_chars: int 
     return text
 
 
-RETRY = (
-    "\n\nYour previous draft had things that are NOT in the text above: {problems}. Write the note "
-    "again using only facts, numbers, dates and names that appear in the text."
+# ------------------------------------------------------------------ confidence ---
+# How sure can you be that an item is right? Code counts the independent sources that report
+# it: the outlets Wikipedia cites for it ("(Reuters)", "(DW)") and independent websites whose
+# search result names the same people, places and numbers. 1 source 5/10, 2 sources 7/10,
+# 3 sources 9/10, 4 or more 10/10; not found in the week's Wikipedia text: 2 points less.
+_CAP = re.compile(r"\b[A-Z][a-zA-Z'’\-]{3,}\b")
+_FIG = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?%?")
+_OUTLET = re.compile(r"\(([A-Z][^()]{1,40})\)")
+_SKIP_WORDS = set(
+    """
+    january february march april june july august september october november december
+    monday tuesday wednesday thursday friday saturday sunday markets market economy world news
+    other disasters health stories this that there their these those when where while with from
+    after before over under into about also more most some many much first last next week month
+    year government president prime minister officials police court report reports according
+    says said international national federal state states united
+    """.split()
 )
+SEARCH_PAUSE = float(os.environ.get("KNOWLEDGE_SEARCH_PAUSE", "1"))  # seconds between searches
 
 
-def _fix(text: str, source: str, first, last) -> str:
-    """Wrong dates are put right by code when the story is on exactly one day of the source."""
-    return factcheck.fix_dates(text, source, first, last)[0] if first and last else text
+def _terms(text: str) -> list[str]:
+    """Distinctive words of an item: names and figures (at most 6)."""
+    date = r"^\W*(?:\*\*)?(?:[A-Z][a-z]{2},? )?(?:\d{1,2} [A-Z][a-z]{2}|[A-Z][a-z]{2} \d{1,2})(?:\*\*)?:?(?:\*\*)?"
+    text = re.sub(date, "", text)  # its date
+    names = [w for w in _CAP.findall(text) if w.lower() not in _SKIP_WORDS]
+    figures = [x for x in _FIG.findall(text) if len(x.replace(",", "")) >= 2 and not re.fullmatch(r"(19|20)\d\d", x)]
+    return list(dict.fromkeys(names + figures))[:6]
 
 
-def checked_summary(system: str, user: str, source: str, first=None, last=None, post=None, words: int = 450):
-    """Summary + fact check; one rewrite if something isn't in the source; what still isn't is
-    marked. Returns (text with its fact-check line, number of problems left)."""
-    summary = _fix(ask(system, user, post, words), source, first, last)
-    problems = factcheck.check(summary, source, first, last)
-    if problems:
-        summary = _fix(
-            ask(system, user + RETRY.format(problems="; ".join(problems[:12])), post, words), source, first, last
-        )
-    marked, n = factcheck.mark(summary, source, first, last)
-    return f"{marked}\n\n{factcheck.footer(n)}", n
+def _has(text: str, term: str) -> bool:
+    low = text.lower()
+    t = term.lower()
+    return t in low or (len(t) > 5 and t[:5] in low)
+
+
+def _outlet_key(name: str) -> str:
+    name = re.sub(r"^(www\.|m\.|edition\.|news\.)", "", name.lower())
+    return re.sub(r"[^a-z0-9]", "", re.split(r"[.\s]", name)[0]) or name
+
+
+def _cited(terms: list[str], raw: str) -> tuple[bool, list[str]]:
+    """Is the item in the week's Wikipedia text, and which outlets are cited there for it?"""
+    need = min(2, len(terms))
+    lines = [x for x in raw.splitlines() if x.strip().startswith("-") and sum(_has(x, t) for t in terms) >= need]
+    outlets = [o.strip() for x in lines for o in _OUTLET.findall(x) if len(o.split()) <= 4]
+    return bool(lines), list(dict.fromkeys(outlets))
+
+
+def _confirming_sites(terms: list[str], when: str, search) -> list[str]:
+    """Independent websites whose search result reports the same thing (names and figures)."""
+    if len(terms) < 2:
+        return []
+    try:
+        results = search(" ".join(terms[:5]) + f" {when}").get("results", [])[:10]
+    except (httpx.HTTPError, ValueError):
+        return []
+    sites = []
+    for x in results:
+        host = re.sub(r"^www\.", "", re.sub(r"^https?://", "", x.get("url") or "").split("/")[0].lower())
+        text = f"{x.get('title') or ''} {x.get('content') or ''}"
+        if host and "wikipedia.org" not in host and sum(_has(text, t) for t in terms) >= 2:
+            sites.append(host)
+    return list(dict.fromkeys(sites))
+
+
+def confidence(in_wikipedia: bool, sources: int) -> int:
+    if sources == 0:
+        return 2 if in_wikipedia else 1
+    return max(1, min(10, 3 + 2 * sources - (0 if in_wikipedia else 2)))
+
+
+def _general_search(q: str) -> dict:
+    time.sleep(SEARCH_PAUSE)  # be gentle with the public search engines behind SearXNG
+    return httpx.get(f"{SEARXNG_URL}/search", params={"q": q, "format": "json"}, timeout=30).json()
+
+
+def rate(summary: str, raw: str, monday: dt.date, search=None) -> tuple[str, float | None]:
+    """Each bullet with "(confidence N/10: sources)". Returns (text, average confidence)."""
+    search = search or _general_search
+    when = f"{monday:%B %Y}"
+    out, scores = [], []
+    for line in summary.splitlines():
+        terms = _terms(line) if line.lstrip().startswith(("-", "*")) and not line.startswith("#") else []
+        if not terms or "confidence " in line:
+            out.append(line)
+            continue
+        in_wiki, outlets = _cited(terms, raw)
+        sites = _confirming_sites(terms, when, search)
+        independent = {}
+        for name in outlets + sites:
+            independent.setdefault(_outlet_key(name), name)
+        c = confidence(in_wiki, len(independent))
+        scores.append(c)
+        shown = ", ".join(list(independent.values())[:4]) or ("Wikipedia only" if in_wiki else "no source found")
+        out.append(f"{line.rstrip()} _(confidence {c}/10: {shown})_")
+    avg = round(sum(scores) / len(scores), 1) if scores else None
+    return "\n".join(out), avg
+
+
+def confidence_line(avg: float | None) -> str:
+    if avg is None:
+        return ""
+    return (f"_Confidence: each item is rated 1-10 by how many independent sources report it (outlets "
+            f"Wikipedia cites + independent websites found by a search); average {avg}/10._")  # fmt: skip
 
 
 # ------------------------------------------------------------------ markets ---
@@ -372,7 +452,9 @@ def market_table(first: dt.date, last: dt.date, data: dict) -> str:
     return "| Market | Close | Change |\n|---|---|---|\n" + "\n".join(rows)
 
 
-def write_week(monday: dt.date, today: dt.date, get=None, search=None, post=None, download=None) -> Path | None:
+def write_week(
+    monday: dt.date, today: dt.date, get=None, search=None, post=None, download=None, confirm=None
+) -> Path | None:
     """Summarise one week into knowledge/weeks/<week>.md. None if there was no news."""
     text, sources = week_text(monday, today, get)
     if not text.strip():
@@ -386,8 +468,9 @@ def write_week(monday: dt.date, today: dt.date, get=None, search=None, post=None
     raw = KB / "raw" / f"{week_id(monday)}.txt"  # the full text, for details (read_file)
     raw.parent.mkdir(parents=True, exist_ok=True)
     raw.write_text(text)
-    sunday = monday + dt.timedelta(days=6)
-    summary, _ = checked_summary(WEEK_PROMPT, f"Week {week_label(monday)}\n\n{text}", text, monday, sunday, post)
+    summary = ask(WEEK_PROMPT, f"Week {week_label(monday)}\n\n{text}", post)
+    summary, avg = rate(summary, text, monday, confirm)
+    summary += f"\n\n{confidence_line(avg)}" if avg is not None else ""
     src = ", ".join(sources) + (" and a news search through your SearXNG" if extra else "")
     path = week_file(monday)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -422,7 +505,7 @@ def write_month(y: int, m: int, today: dt.date, start: dt.date, post=None, downl
     first, last = dt.date(y, m, 1), dt.date(y, m, calendar.monthrange(y, m)[1])
     table = market_table(first, last, prices(start, download))
     source = notes + (f"\n\nMarket moves this month:\n{table}" if table else "")
-    summary, _ = checked_summary(MONTH_PROMPT, source, source, first, last, post, 350)
+    summary = ask(MONTH_PROMPT, source, post, 350)
     path = KB / "months" / f"{y}-{m:02d}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -437,7 +520,7 @@ def write_overview(start: dt.date, post=None) -> Path | None:
     if not months:
         return None
     notes = "\n\n".join(p.read_text() for p in months)[-60000:]
-    summary, _ = checked_summary(OVERVIEW_PROMPT.format(start=f"{start:%B %Y}"), notes, notes, None, None, post, 700)
+    summary = ask(OVERVIEW_PROMPT.format(start=f"{start:%B %Y}"), notes, post, 700)
     path = KB / "overview.md"
     path.write_text(
         f"# What changed in the world since {start:%B %Y}\n\n{UNTRUSTED}\nFrom the monthly notes "
@@ -446,36 +529,30 @@ def write_overview(start: dt.date, post=None) -> Path | None:
     return path
 
 
-# ------------------------------------------------------------------ fact check of existing notes ---
+# ------------------------------------------------------------------ rating notes written earlier ---
 def _split_note(note: str) -> tuple[str, str, str]:
-    """(head up to the Sources/From line, the AI summary, the computed market table part)."""
-    i = max(note.find("\nSources:"), note.find("\nFrom the"))
+    """(head up to the Sources line, the AI summary, the computed market table part)."""
+    i = note.find("\nSources:")
     j = note.find("\n\n", max(i, 0))
     head, rest = (note[:j], note[j + 2 :]) if j >= 0 else (note, "")
     tail = ""
     k = rest.find("\n## World market moves")
     if k >= 0:
         rest, tail = rest[:k], rest[k:]
-    rest = re.sub(r"\n*_Fact check:[^\n]*_\s*$", "", rest.strip())
+    rest = re.sub(r" ⚠ not in source:[^\n]*", "", rest)  # from the earlier fact check (removed)
+    rest = re.sub(r"\n*_(Fact check|Confidence):[^\n]*_\s*$", "", rest.strip())
     return head, rest.strip(), tail
 
 
-def _rebuild(head: str, summary: str, tail: str) -> str:
-    return f"{head}\n\n{summary}\n" + (tail if tail.startswith("\n") else ("\n" + tail if tail else ""))
-
-
-def check_all(force: bool = False, post=None, max_minutes: float = 0) -> dict:
-    """Fact-check the notes that have not passed yet (all of them with force). Code first puts
-    wrong dates right; a note that still has problems is written again by the AI from its saved
-    source, once (with force: again). What still fails stays marked ⚠."""
-    r = {"checked": 0, "passed": 0, "dates_fixed": 0, "rewritten": 0, "still_marked": 0, "no_source": 0,
-         "stopped_for_time": False}  # fmt: skip
+def rate_all(force: bool = False, search=None, max_minutes: float = 0) -> dict:
+    """Rate the weekly notes that have no confidence yet (all of them with force). Searches only,
+    no AI. Notes from the earlier fact check lose its marks."""
+    r = {"rated": 0, "no_source": 0, "stopped_for_time": False}
     began = time.monotonic()
-    for path in sorted((KB / "weeks").glob("*.md")):
+    for path in sorted((KB / "weeks").glob("*.md"), reverse=True):
         note = path.read_text()
-        if "_Fact check: passed" in note and not force:
+        if "_Confidence:" in note and not force:
             continue
-        ai_done = "_Fact check:" in note and not force  # marked earlier: the AI already had its try
         if max_minutes and (time.monotonic() - began) / 60 >= max_minutes:
             r["stopped_for_time"] = True
             break
@@ -483,131 +560,14 @@ def check_all(force: bool = False, post=None, max_minutes: float = 0) -> dict:
         if not raw.exists():
             r["no_source"] += 1
             continue
-        source = raw.read_text()
-        monday = monday_of(path.stem)
-        sunday = monday + dt.timedelta(days=6)
         head, summary, tail = _split_note(note)
-        summary = re.sub(r" ⚠ not in source:.*$", "", summary, flags=re.M)  # check again from scratch
-        summary, fixed = factcheck.fix_dates(summary, source, monday, sunday)
-        r["checked"] += 1
-        r["dates_fixed"] += fixed
-        if not factcheck.check(summary, source, monday, sunday):
-            path.write_text(_rebuild(head, f"{summary}\n\n{factcheck.footer(0)}", tail))
-            r["passed"] += 1
-            continue
-        if ai_done:  # only code this time (no nightly AI rewrites of the same note)
-            marked, n = factcheck.mark(summary, source, monday, sunday)
-            path.write_text(_rebuild(head, f"{marked}\n\n{factcheck.footer(n)}", tail))
-            r["still_marked"] += 1
-            continue
-        try:
-            summary, n = checked_summary(
-                WEEK_PROMPT, f"Week {week_label(monday)}\n\n{source}", source, monday, sunday, post
-            )
-        except (httpx.HTTPError, ValueError, KeyError) as e:
-            print(f"  {path.stem}: could not rewrite ({e})", flush=True)
-            continue
-        path.write_text(_rebuild(head, summary, tail))
-        r["rewritten"] += 1
-        r["still_marked"] += 1 if n else 0
-        print(f"  {path.stem}: rewritten{' (some lines marked)' if n else ''}", flush=True)
-    for path in sorted((KB / "months").glob("*.md")) + ([KB / "overview.md"] if (KB / "overview.md").exists() else []):
-        note = path.read_text()
-        if "_Fact check:" in note and not force:
-            continue
-        head, summary, tail = _split_note(note)
-        if path.name == "overview.md":
-            source = "\n\n".join(p.read_text() for p in sorted((KB / "months").glob("*.md")))
-        else:
-            y, m = (int(x) for x in path.stem.split("-"))
-            source = "\n\n".join(p.read_text() for p in sorted((KB / "weeks").glob("*.md"))
-                                  if monday_of(p.stem).year == y and monday_of(p.stem).month == m) + tail  # fmt: skip
-        marked, n = factcheck.mark(summary, source)
-        path.write_text(_rebuild(head, f"{marked}\n\n{factcheck.footer(n)}", tail))
-        r["checked"] += 1
-        r["passed" if not n else "still_marked"] += 1
+        summary = re.sub(r" _\(confidence \d+/10:[^)]*\)_", "", summary)
+        summary, avg = rate(summary, raw.read_text(), monday_of(path.stem), search)
+        body = f"{summary}\n\n{confidence_line(avg)}" if avg is not None else summary
+        path.write_text(f"{head}\n\n{body}\n" + tail)
+        r["rated"] += 1
+        print(f"  {path.stem}: rated (average {avg}/10)", flush=True)
     return r
-
-
-def check_one(week: str) -> str:
-    """A week's summary line by line, each with what the source supports (for your spot check)."""
-    path, raw = KB / "weeks" / f"{week}.md", KB / "raw" / f"{week}.txt"
-    if not path.exists():
-        return f"No note for {week} yet."
-    if not raw.exists():
-        return f"No saved source for {week} (written before sources were kept): bash scripts/knowledge.sh --week {week}"
-    monday = monday_of(week)
-    source = raw.read_text()
-    _, summary, _ = _split_note(path.read_text())
-    out = [f"{week_label(monday)}: each line of the summary against its source ({raw})", ""]
-    for line in summary.splitlines():
-        if not line.strip() or line.startswith("_Fact check"):
-            continue
-        clean = re.sub(r" ⚠ not in source:.*$", "", line)
-        problems = [] if line.startswith("#") else factcheck.check(clean, source, monday, monday + dt.timedelta(days=6))
-        out.append(("   " if line.startswith("#") else ("✓  " if not problems else "⚠  ")) + clean)
-        out += [f"      - {p}" for p in problems]
-    out += ["", f"Read the source to compare: less {raw}"]
-    return "\n".join(out)
-
-
-# ------------------------------------------------------------------ monthly quiz ---
-QUIZ_PROMPT = """Answer from the passages only. The user gives a sentence from the news with one number
-replaced by ___. Reply with just that number. If the passages don't contain it, reply exactly: unknown"""
-
-
-def _quiz_items(n: int, seed: int) -> list[dict]:
-    import random
-
-    rng = random.Random(seed)
-    items = []
-    weeks = [p.stem for p in sorted((KB / "weeks").glob("*.md")) if (KB / "raw" / f"{p.stem}.txt").exists()]
-    rng.shuffle(weeks)
-    for week in weeks:
-        lines = [x.strip(" -") for x in (KB / "raw" / f"{week}.txt").read_text().splitlines()
-                 if x.strip().startswith("-") and len(x.split()) >= 7]  # fmt: skip
-        rng.shuffle(lines)
-        for line in lines:
-            nums = factcheck.unsupported_numbers(line, "")  # every checkable number in the line
-            nums = [t for t in nums if not re.fullmatch(r"(19|20)\d\d", t)]
-            if nums:
-                answer = nums[0]
-                items.append({"week": week, "question": line.replace(answer, "___", 1), "answer": answer})
-                break
-        if len(items) >= n:
-            break
-    return items
-
-
-def quiz(n: int = 20, post=None, retrieve=None, today: dt.date | None = None) -> dict:
-    """Masked facts from the sources, answered with the knowledge-base search and scored by code:
-    right, "unknown" (the notes don't have it: fine) or wrong (made up: what matters)."""
-    today = today or dt.date.today()
-    if retrieve is None:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import toolbox_server  # noqa: F401
-        from toolset import knowledge
-
-        def retrieve(q):
-            return knowledge.search_knowledge(q, top_k=3)
-
-    result = {"date": today.isoformat(), "asked": 0, "right": 0, "unknown": 0, "wrong": 0, "wrong_examples": []}
-    for item in _quiz_items(n, seed=today.year * 100 + today.month):
-        passages = retrieve(f"{item['week']} {item['question']}")
-        reply = ask(QUIZ_PROMPT, f"Passages:\n{passages}\n\nSentence (week {item['week']}): {item['question']}",
-                    post, 20, min_chars=1)  # fmt: skip
-        result["asked"] += 1
-        got = factcheck._NUM.search(reply)
-        want = factcheck._value(item["answer"])
-        if "unknown" in reply.lower() or not got:
-            result["unknown"] += 1
-        elif want is not None and factcheck._found(want, [factcheck._value(got.group(0)) or -1]):
-            result["right"] += 1
-        else:
-            result["wrong"] += 1
-            result["wrong_examples"].append({**item, "reply": reply[:80]})
-    (KB / "quality.json").write_text(json.dumps(result, indent=1))
-    return result
 
 
 def index_notes() -> int:
@@ -636,7 +596,9 @@ def update(today: dt.date | None = None, max_minutes: float | None = None, start
             stopped = True
             break
         try:
-            path = write_week(monday, today, io.get("get"), io.get("search"), io.get("post"), io.get("download"))
+            path = write_week(
+                monday, today, io.get("get"), io.get("search"), io.get("post"), io.get("download"), io.get("confirm")
+            )
         except (httpx.HTTPError, ValueError, KeyError) as e:
             failed.append(f"{week_id(monday)}: {e}")
             print(f"  {week_id(monday)}: failed ({e})", flush=True)
@@ -657,21 +619,14 @@ def update(today: dt.date | None = None, max_minutes: float | None = None, start
                 write_overview(first, io.get("post"))
             except (httpx.HTTPError, ValueError, KeyError) as e:
                 failed.append(f"overview: {e}")
-    checked = {}
-    if not stopped:  # notes written before the fact check existed, or by an older version
+    rated = {}
+    if not stopped:  # notes written by an older version, without confidence
         remaining = (limit - (time.monotonic() - began) / 60) if limit else 0
         if not limit or remaining > 0:
-            checked = check_all(post=io.get("post"), max_minutes=max(remaining, 0.01) if limit else 0)
+            rated = rate_all(search=io.get("confirm"), max_minutes=max(remaining, 0.01) if limit else 0)
     left = len([d for d in complete_weeks(today, first) if not week_file(d).exists()])
     return {"written": written, "months": months, "failed": failed, "no_news": empty, "left": left,
-            "stopped_for_time": stopped, "fact_check": checked}  # fmt: skip
-
-
-def quiz_due(today: dt.date) -> bool:
-    q = KB / "quality.json"
-    if len(list((KB / "weeks").glob("*.md"))) < 8:
-        return False
-    return not q.exists() or json.loads(q.read_text()).get("date", "")[:7] != today.isoformat()[:7]
+            "stopped_for_time": stopped, "confidence": rated}  # fmt: skip
 
 
 def status(today: dt.date | None = None) -> str:
@@ -688,17 +643,12 @@ def status(today: dt.date | None = None) -> str:
         f"  overview: {'yes' if (KB / 'overview.md').exists() else 'not yet'}",
         "  covers:   world news events and market events",
     ]
-    notes = [p.read_text() for p in (KB / "weeks").glob("*.md")]
-    if notes:
-        passed = sum("_Fact check: passed" in t for t in notes)
-        marked = sum("_Fact check:" in t and "_Fact check: passed" not in t for t in notes)
-        lines.append(f"  checked:  {passed} weeks passed the fact check, {marked} with lines marked ⚠, "
-                     f"{len(notes) - passed - marked} not checked yet")  # fmt: skip
-    q = KB / "quality.json"
-    if q.exists():
-        r = json.loads(q.read_text())
-        lines.append(f"  quiz:     {r['date']}: {r['right']} right, {r['unknown']} not in the notes, "
-                     f"{r['wrong']} wrong (made up) of {r['asked']}")  # fmt: skip
+    scores = [int(x) for p in (KB / "weeks").glob("*.md") for x in re.findall(r"confidence (\d+)/10", p.read_text())]
+    if scores:
+        high = sum(x >= 7 for x in scores)
+        low = sum(x <= 3 for x in scores)
+        lines.append(f"  confidence: {len(scores)} items, average {sum(scores) / len(scores):.1f}/10; "
+                     f"{high} confirmed by 2+ sources (7+), {low} with little support (3 or less)")  # fmt: skip
     return "\n".join(lines)
 
 
@@ -710,17 +660,12 @@ def main(argv=None) -> int:
     p.add_argument("--catch-up", action="store_true", help="write every missing week now, no time limit")
     p.add_argument("--week", help="write (again) one week, e.g. 2025-W10")
     p.add_argument("--preview", metavar="WEEK", help="show what Wikipedia has for a week (no AI, nothing saved)")
-    p.add_argument("--check-all", action="store_true", help="fact-check notes not checked yet; rewrite failing ones")
-    p.add_argument("--recheck", action="store_true", help="with --check-all: check every note again")
-    p.add_argument("--check", metavar="WEEK", help="show a week's summary line by line against its source")
-    p.add_argument("--quiz", action="store_true", help="run the quiz now (20 masked facts, scored by code)")
+    p.add_argument("--rate-all", action="store_true", help="add confidence to notes that have none (searches only)")
+    p.add_argument("--rerate", action="store_true", help="with --rate-all: rate every note again")
     p.add_argument("--status", action="store_true")
     a = p.parse_args(argv)
     if a.status:
         print(status())
-        return 0
-    if a.check:
-        print(check_one(a.check))
         return 0
     if a.preview:
         text, sources = week_text(monday_of(a.preview))
@@ -737,15 +682,11 @@ def main(argv=None) -> int:
         except OSError:
             print("Another knowledge-base run is busy; try again later.")
             return 0
-    if a.check_all:
-        print("Fact-checking the notes (notes that fail are written again by the AI)...", flush=True)
-        r = check_all(force=a.recheck)
+    if a.rate_all:
+        print("Rating the notes by independent sources (a search per item, about 1-2 minutes a week)...", flush=True)
+        r = rate_all(force=a.rerate)
         index_notes()
         print(json.dumps(r, indent=1))
-        return 0
-    if a.quiz:
-        r = quiz()
-        print(json.dumps(r, indent=1, ensure_ascii=False))
         return 0
     if a.week:
         path = write_week(monday_of(a.week), dt.date.today())
@@ -756,11 +697,6 @@ def main(argv=None) -> int:
         print(f"Knowledge base: writing missing weeks since {start_date():%B %Y} (newest first)...", flush=True)
         r = update(max_minutes=0 if a.catch_up else None)
         n = index_notes()
-        if a.update and not r["stopped_for_time"] and quiz_due(dt.date.today()):
-            try:
-                r["quiz"] = quiz()
-            except Exception as e:  # noqa: BLE001 - a measurement, never a reason to fail the night
-                r["quiz"] = f"failed ({e})"
         print(json.dumps({**r, "indexed_notes": n}, indent=1))
         if r["left"]:
             print(f"{r['left']} weeks still to do: the nightly run continues, or: bash scripts/knowledge.sh --catch-up")

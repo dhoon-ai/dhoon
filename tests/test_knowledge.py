@@ -84,7 +84,16 @@ def fake_io(calls):
         calls["search"].append(q)
         return {"results": [{"title": f"{q} headline", "content": "snippet"}]}
 
-    return {"get": get, "post": post, "download": download, "search": search}
+    def confirm(q):  # the general search used to count independent sources
+        calls.setdefault("confirm", []).append(q)
+        return {"results": [
+            {"url": "https://www.reuters.com/a", "title": "Bank of Canada cuts rate to 2.75%", "content": ""},
+            {"url": "https://apnews.com/b", "title": "Canada central bank lowers rate", "content": "Bank of Canada 2.75%"},
+            {"url": "https://en.wikipedia.org/wiki/x", "title": "Bank of Canada 2.75%", "content": ""},
+            {"url": "https://example.org/c", "title": "Unrelated story", "content": "nothing"},
+        ]}  # fmt: skip
+
+    return {"get": get, "post": post, "download": download, "search": search, "confirm": confirm}
 
 
 def test_parse_keeps_news_and_markets_but_not_sports(kb):
@@ -220,116 +229,65 @@ def test_timer_and_settings_are_wired_up():
     assert "search_knowledge" in instructions
 
 
-# ---------------------------------------------------------------- fact check ---
-def test_factcheck_numbers_dates_and_names():
-    import factcheck
-
-    src = "- The Bank of Canada cuts its rate to 2.75%.\n| TSX (Canada) | 24,567.89 | -5.0% |\n- Mark Carney visits Delhi in 2025."
-    mon, sun = dt.date(2025, 3, 3), dt.date(2025, 3, 9)
-    assert factcheck.check("- Mar 4: The Bank of Canada cut its rate to 2.75%.", src, mon, sun) == []
-    assert factcheck.check("- The TSX closed at 24,568 after it fell 5.0%.", src, mon, sun) == []  # rounding, sign
-    assert factcheck.check("- Canadian leader Mark Carney went to Delhi.", src, mon, sun) == []  # "Canad" stem
-    assert factcheck.check("- Mar 5: 3 ministers met in 2025.", src, mon, sun) == []  # small counts, known year
-    bad = factcheck.check("- Mar 12: The Bank of Canada cut to 2.5%; Justin Trudeau spoke in 2024.", src, mon, sun)
-    assert "number 2.5% is not in the source" in bad and "number 2024 is not in the source" in bad
-    assert "date Mar 12 is outside Mar 03 - Mar 09" in bad and "name Justin is not in the source" in bad
-    text, n = factcheck.mark("## Top stories\n- Rates cut to 2.75%.\n- Rates cut to 3.1%.", src)
-    assert n == 1 and text.splitlines()[1] == "- Rates cut to 2.75%." and text.endswith("⚠ not in source: number 3.1%")
-    assert "passed" in factcheck.footer(0) and "2 items not found" in factcheck.footer(2)
-
-
-def test_a_made_up_number_gets_one_rewrite_then_is_marked(kb):
+# ---------------------------------------------------------------- confidence from independent sources ---
+def test_items_get_a_confidence_from_independent_sources(kb):
     calls = {"wiki": [], "ai": [], "search": []}
     io = fake_io(calls)
-    replies = iter(["## Top stories\n- Mar 4: The Bank of Canada cut its rate to 2.35%.",
-                    "## Top stories\n- Mar 4: The Bank of Canada cut its rate to 2.75%."])  # fmt: skip
-
-    def post(body):
-        calls["ai"].append(body["messages"][1]["content"])
-        return Resp({"message": {"content": next(replies)}})
-
-    path = kb.write_week(dt.date(2025, 3, 3), dt.date(2025, 4, 8), io["get"], io["search"], post, io["download"])
+    path = kb.write_week(dt.date(2025, 3, 3), dt.date(2025, 4, 8), io["get"], io["search"], io["post"], io["download"],
+                         io["confirm"])  # fmt: skip
     note = path.read_text()
-    assert "2.75%" in note and "2.35%" not in note and "_Fact check: passed" in note
-    assert "NOT in the text above: number 2.35% is not in the source" in calls["ai"][1]
-    replies = iter(["## Top stories\n- Mar 4: Rates fell to 1.9%.\n- Mar 12: The Bank of Canada cuts to 2.75%."] * 2)
-    path = kb.write_week(dt.date(2025, 3, 10), dt.date(2025, 4, 8), io["get"], io["search"], post, io["download"])
-    note = path.read_text()
-    assert "- Mar 4: Rates fell to 1.9%. ⚠ not in source: number 1.9%, date Mar 4" in note
-    assert "_Fact check: 2 items not found in the source, marked ⚠._" in note
-    assert "## World market moves this week" in note  # the computed table stays
-    out = kb.check_one("2025-W11")
-    assert "⚠  - Mar 4: Rates fell to 1.9%." in out and "✓  - Mar 12: The Bank of Canada" in out
+    # cited by Wikipedia (CBC) + reuters.com + apnews.com; Wikipedia itself and unrelated sites don't count
+    assert (
+        "- Mar 4: The Bank of Canada cut its rate to 2.75%. _(confidence 9/10: CBC, reuters.com, apnews.com)_" in note
+    )
+    assert "_Confidence: each item is rated 1-10" in note and "average 9.0/10" in note
+    assert calls["confirm"] == ["Bank Canada 2.75% March 2025"]
+    assert "## Top stories" in note and "confidence" not in note.split("## Top stories")[0]
+    assert "confidence: 1 items, average 9.0/10; 1 confirmed by 2+ sources" in kb.status()
 
 
-def test_check_all_fixes_notes_written_before_the_fact_check(kb):
+def test_confidence_scale():
+    import news_kb as kb
+
+    assert kb.confidence(False, 0) == 1 and kb.confidence(True, 0) == 2
+    assert [kb.confidence(True, n) for n in (1, 2, 3, 4, 9)] == [5, 7, 9, 10, 10]
+    assert kb.confidence(False, 1) == 3  # not in the week's Wikipedia text: 2 points less
+    assert kb._terms("- **Tue 15 Sep:** The Panama Canal Authority cuts transits from 36 to 32.") == [
+        "Panama", "Canal", "Authority", "36", "32"]  # fmt: skip
+    assert kb._outlet_key("Reuters") == kb._outlet_key("www.reuters.com") == "reuters"
+
+
+def test_items_nobody_else_reports_get_a_low_score(kb):
+    raw = "### Tue 4 Mar 2025\n- Germany holds an election. (DW)\n"
+    rated, avg = kb.rate("## Top stories\n- Tue 4 Mar: Germany holds an election.\n- Tue 4 Mar: Atlantis rises 77 metres.",
+                         raw, dt.date(2025, 3, 3), search=lambda q: {"results": []})  # fmt: skip
+    lines = rated.splitlines()
+    assert lines[0] == "## Top stories"
+    assert lines[1].endswith("_(confidence 5/10: DW)_") and lines[2].endswith("_(confidence 1/10: no source found)_")
+    assert avg == 3.0
+    broken = kb.rate("- Tue 4 Mar: Germany holds an election.", raw, dt.date(2025, 3, 3),
+                     search=lambda q: (_ for _ in ()).throw(kb.httpx.ConnectError("SearXNG down")))  # fmt: skip
+    assert broken[0].endswith("_(confidence 5/10: DW)_")  # search down: Wikipedia's citations still count
+
+
+def test_rate_all_adds_confidence_and_removes_old_fact_check_marks(kb):
     calls = {"wiki": [], "ai": [], "search": []}
     io = fake_io(calls)
-    kb.update(today=dt.date(2025, 3, 24), max_minutes=0, start="2025-03", **io)
-    good, bad = kb.KB / "weeks" / "2025-W10.md", kb.KB / "weeks" / "2025-W11.md"
-    for p, line in ((good, "- Mar 4: The Bank of Canada cuts its rate to 2.75%."), (bad, "- Mar 11: Rates hit 77.7%.")):
-        head, _, tail = kb._split_note(p.read_text())
-        p.write_text(kb._rebuild(head, "## Top stories\n" + line, tail))  # as an older version wrote it
+    kb.update(today=dt.date(2025, 3, 17), max_minutes=0, start="2025-03", **io)
+    p = kb.KB / "weeks" / "2025-W10.md"
+    head, summary, tail = kb._split_note(p.read_text())
+    old = "## Top stories\n- Mar 4: The Bank of Canada cut its rate to 2.75%. ⚠ not in source: date Mar 4\n\n_Fact check: 1 item._"
+    p.write_text(f"{head}\n\n{old}\n{tail}")  # as the removed fact check left it
     calls["ai"].clear()
-    r = kb.check_all(post=io["post"])
-    assert r["passed"] >= 1 and r["rewritten"] == 1
-    assert calls["ai"] and all(c.startswith("Week 2025-W11") for c in calls["ai"])  # only the bad one goes to the AI
-    assert "77.7%" not in bad.read_text() and "_Fact check:" in bad.read_text()  # rewritten from its source
-    assert "_Fact check: passed" in good.read_text() and good.read_text().count("_Fact check") == 1
-    calls["ai"].clear()
-    again = kb.check_all(post=io["post"])
-    assert again["rewritten"] == 0 and calls["ai"] == []  # marked notes are re-checked by code only, no AI loop
-    assert "passed the fact check" in kb.status()
+    r = kb.rate_all(search=io["confirm"])
+    text = p.read_text()
+    assert r["rated"] == 1 and calls["ai"] == []  # searches only, no AI
+    assert "⚠" not in text and "Fact check" not in text and "(confidence 9/10" in text
+    assert "## World market moves this week" in text  # the computed table is kept
+    assert kb.rate_all(search=io["confirm"])["rated"] == 0  # done once
 
 
-def test_quiz_scores_right_unknown_and_wrong(kb):
-    calls = {"wiki": [], "ai": [], "search": []}
-    io = fake_io(calls)
-    kb.update(today=dt.date(2025, 4, 8), max_minutes=0, start="2025-03", **io)
-    answers = iter(["2.75", "unknown", "3.1"] + ["2.75"] * 20)
+def test_prompt_has_no_example_date_to_copy():
+    import news_kb
 
-    def post(body):
-        return Resp({"message": {"content": next(answers)}})
-
-    r = kb.quiz(5, post=post, retrieve=lambda q: "passages", today=dt.date(2025, 4, 8))
-    assert r["asked"] == 5 and (r["right"], r["unknown"], r["wrong"]) == (3, 1, 1)
-    assert r["wrong_examples"][0]["question"].count("___") == 1 and r["wrong_examples"][0]["answer"] == "2.75%"
-    assert "quiz:     2025-04-08: 3 right, 1 not in the notes, 1 wrong (made up) of 5" in kb.status()
-    assert not kb.quiz_due(dt.date(2025, 5, 2))  # needs 8+ weekly notes (there are 6)
-    for i in range(3):
-        (kb.KB / "weeks" / f"2024-W{40 + i}.md").write_text("x")
-    assert not kb.quiz_due(dt.date(2025, 4, 20)) and kb.quiz_due(dt.date(2025, 5, 2))  # once a month
-
-
-def test_every_bullet_dated_the_same_day_is_caught():
-    import factcheck
-
-    src = ("### Tue 4 Mar 2025\n- Germany holds an election.\n\n### Thu 6 Mar 2025\n"
-           "- The European Central Bank cuts rates to 2.5%.\n### Headlines from a news search this week\n- x")  # fmt: skip
-    mon, sun = dt.date(2025, 3, 3), dt.date(2025, 3, 9)
-    assert set(factcheck.day_sections(src)) == {dt.date(2025, 3, 4), dt.date(2025, 3, 6)}
-    assert factcheck.check("- Mar 4: Germany holds an election.", src, mon, sun) == []
-    assert factcheck.check("- Mar 6: The European Central Bank cut rates to 2.5%.", src, mon, sun) == []
-    wrong = factcheck.check("- Mar 4: The European Central Bank cut rates to 2.5%.", src, mon, sun)
-    assert wrong == ["date Mar 4 doesn't match the source (that story isn't on that day)"]
-    prompt = __import__("news_kb").WEEK_PROMPT
-    assert not re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", prompt)  # no example date to copy
-
-
-def test_a_wrong_month_is_put_right_by_code():
-    import factcheck
-
-    # found on the NUC: the model wrote "Mar 15" for a story under "### Tue 15 Sep 2026"
-    src = ("### Mon 14 Sep 2026\n- Japan holds an election.\n\n### Tue 15 Sep 2026\n 2026-2027 El Niño event\n"
-           "  - The Panama Canal Authority reduces daily ship transits through the canal from 36 to 32 as "
-           "below-average rainfall and a strengthening El Niño lower water levels. (DW)\n")  # fmt: skip
-    mon, sun = dt.date(2026, 9, 14), dt.date(2026, 9, 20)
-    line = "- **Mar 15:** The Panama Canal Authority reduces daily ship transits from 36 to 32 due to El Niño."
-    assert "date Mar 15 is outside Sep 14 - Sep 20" in factcheck.check(line, src, mon, sun)
-    fixed, n = factcheck.fix_dates(line, src, mon, sun)
-    assert n == 1 and fixed.startswith("- **Sep 15:** The Panama Canal") and factcheck.check(fixed, src, mon, sun) == []
-    wrong_day, n = factcheck.fix_dates("- Mon 14 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun)
-    assert n == 1 and wrong_day.startswith("- Tue 15 Sep: The Panama Canal")  # weekday fixed too
-    same, n = factcheck.fix_dates("- Tue 15 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun)
-    assert n == 0  # already right
-    assert factcheck.check("- Tue 15 Sep: The Panama Canal Authority cuts transits to 32.", src, mon, sun) == []
+    assert not re.search(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b", news_kb.WEEK_PROMPT)

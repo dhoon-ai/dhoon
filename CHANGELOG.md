@@ -12,12 +12,10 @@
   or markets are answered faster and more reliably than with a web search each time. On by
   default (`KNOWLEDGE=off` to switch off); the catch-up takes a few nights, or
   `bash scripts/knowledge.sh --catch-up`.
-- **Fact check, by code.** Every note the AI writes is checked against its source (new
-  `toolbox/factcheck.py`, no AI): each number, date and name must be there and each bullet's
-  date must be the right day. Failing notes are written again; what still fails is marked
-  "⚠ not in source". `knowledge.sh --check-all` checks older notes, `--check <week>` shows a
-  week line by line, and a monthly quiz (20 hidden facts, scored by code) counts how often the
-  Assistant answers from the notes right, "unknown" or wrong.
+- **Confidence from independent sources.** Every item of a weekly note gets a confidence from
+  1 to 10, counted by code from how many independent sources report it: the outlets Wikipedia
+  cites for it plus independent websites found by a search through your SearXNG, shown next
+  to the item. `knowledge.sh --rate-all` rates notes written before.
 
 ## v1.0.1 (2026-10)
 
