@@ -48,6 +48,9 @@ weeks=$(find "$WORKSPACE_DIR/knowledge/weeks" -name '*.md' 2>/dev/null | wc -l)
 if [ "$KNOWLEDGE" = "off" ]; then echo "         knowledge base of world news and markets: off (KNOWLEDGE=off)"
 elif systemctl is-active --quiet ai-knowledge.timer 2>/dev/null; then
   ok "Knowledge base of world news and markets: $weeks weeks so far, updated every night (bash scripts/knowledge.sh)"
+  quiz=$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print("%s right, %s not in the notes, %s wrong (made up) of %s (%s)" % (r["right"], r["unknown"], r["wrong"], r["asked"], r["date"]))' \
+    "$WORKSPACE_DIR/knowledge/quality.json" 2>/dev/null) || quiz=""
+  [ -n "$quiz" ] && echo "         monthly quiz: $quiz"
 else warn "Knowledge base of world news and markets is not scheduled  ->  bash scripts/04_toolbox.sh"; fi
 if systemctl is-active --quiet ai-scheduler.timer 2>/dev/null; then
   n=$(grep -o '"active": true' "$RUNTIME/schedule.json" 2>/dev/null | wc -l)

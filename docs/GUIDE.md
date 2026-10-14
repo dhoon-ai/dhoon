@@ -932,7 +932,21 @@ bash scripts/knowledge.sh                       # what it has so far
 bash scripts/knowledge.sh --catch-up            # do the whole catch-up now (a few hours; Ctrl+C to stop, run again to continue)
 bash scripts/knowledge.sh --preview 2025-W10    # what Wikipedia has for one week (no AI, saves nothing)
 bash scripts/knowledge.sh --week 2025-W10       # write one week again
+bash scripts/knowledge.sh --check-all           # fact-check notes not checked yet (rewrites failing ones)
+bash scripts/knowledge.sh --check 2025-W10      # spot check: each summary line against its source
+bash scripts/knowledge.sh --quiz                # 20 masked facts, scored by code
 ```
+
+**How you can trust it.** The market tables are computed from prices. Everything the AI
+writes is **fact-checked by plain code** (no AI) before it is saved: every number, date and
+name in a summary must be in its source, and each bullet's date must be a day that has that
+story. A note that fails is written again with the problems listed; anything still wrong is
+kept but marked **⚠ not in source**, and the note ends with its result (*Fact check:
+passed*). Once a month a **quiz** takes 20 facts from the sources, hides one number in each
+and asks the Assistant through `search_knowledge`. Code scores the answers: *right*, *not in
+the notes* (fine: summaries are short) or **wrong** (made up). `bash scripts/check.sh` and
+`bash scripts/knowledge.sh` show the latest result; the number to watch is *wrong*. And now
+and then, spot-check a week yourself with `--check`.
 
 Try: *"What happened with interest rates in Canada and the US in 2025?"* or *"How did world
 markets move in April 2025, and why?"*

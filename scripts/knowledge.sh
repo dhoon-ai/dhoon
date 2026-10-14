@@ -7,6 +7,9 @@
 #                                               stop with Ctrl+C, it continues where it stopped)
 #   bash scripts/knowledge.sh --preview 2025-W10   what Wikipedia has for one week (no AI, saves nothing)
 #   bash scripts/knowledge.sh --week 2025-W10      write one week again
+#   bash scripts/knowledge.sh --check-all          fact-check notes not checked yet (rewrites failing ones)
+#   bash scripts/knowledge.sh --check 2025-W10     your spot check: each summary line against its source
+#   bash scripts/knowledge.sh --quiz               20 masked facts, scored by code (also monthly by itself)
 #
 # Every night at 22:30 the ai-knowledge timer adds missing weeks by itself.
 set -euo pipefail
