@@ -43,7 +43,7 @@ SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "agent-sandbox")
 MAX_TEXT = 8000  # keep tool output small: the CPU reads every character
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 # ask_planner uses the same fast Instruct model as the agent (no slow "thinking" model).
-PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
+PLANNER_MODEL = os.environ.get("PLANNER_MODEL", "gemma4:26b")
 PLANNER_TIMEOUT = int(os.environ.get("PLANNER_TIMEOUT", "300"))  # seconds (LibreChat waits 600)
 # For hard tasks ask_planner can first ask a search engine how such a task is usually done.
 # Only a short, generic question is sent (personal details are removed, see _redact).

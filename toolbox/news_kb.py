@@ -50,7 +50,7 @@ WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace"
 KB = Path(os.environ.get("KNOWLEDGE_DIR", str(WORKSPACE / "knowledge")))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
-MODEL = os.environ.get("KNOWLEDGE_MODEL") or os.environ.get("PLANNER_MODEL", "qwen3:30b-a3b-instruct-2507-q4_K_M")
+MODEL = os.environ.get("KNOWLEDGE_MODEL") or os.environ.get("PLANNER_MODEL", "gemma4:26b")
 START = os.environ.get("KNOWLEDGE_START", "2024-10")
 # What the knowledge base is about: world news events and market events, nothing else
 NEWS_SEARCHES = ["world news", "stock markets", "global economy"]  # recent headlines (last week only)

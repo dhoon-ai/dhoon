@@ -31,12 +31,13 @@ mkdir -p "$RUNTIME"
 # shellcheck source=/dev/null
 [ -f "$KIT/config/models.env" ] && source "$KIT/config/models.env"
 
-# We use Qwen3 "Instruct 2507" models: they answer directly instead of "thinking"
-# first. Thinking models often never emit the tool call (it gets stuck inside the
-# hidden reasoning), and the long reasoning is very slow on a CPU.
+# Main model: Google's Gemma 4 26B (a mixture of experts, ~4B active, so fast on a CPU) with
+# 28+ GB RAM: in our tests on a CPU-only i7 it wrote twice as fast as Qwen3 30B and invented no
+# numbers. Smaller machines use Qwen3 4B "Instruct 2507". We avoid "thinking" models: they often
+# never emit the tool call (it gets stuck inside the hidden reasoning) and are very slow on a CPU.
 RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1024/1024}' /proc/meminfo)
 if [ -z "${MODEL_MAIN:-}" ]; then
-  if [ "$RAM_GB" -ge 28 ]; then MODEL_MAIN="qwen3:30b-a3b-instruct-2507-q4_K_M"   # MoE, ~19 GB, ~3B active: best
+  if [ "$RAM_GB" -ge 28 ]; then MODEL_MAIN="gemma4:26b"                           # MoE, ~17 GB, ~4B active: best
   else                          MODEL_MAIN="qwen3:4b-instruct-2507-q4_K_M"        # ~2.5 GB
   fi
 fi
@@ -173,6 +174,8 @@ step_done() {
         || { STATUS_REASON="Ollama settings out of date (context length)"; return 1; }
       grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (keep-alive)"; return 1; }
+      grep -q "OLLAMA_MAX_LOADED_MODELS=" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
+        || { STATUS_REASON="Ollama settings out of date (models in memory)"; return 1; }
       getent group docker | grep -qw "$USER" || { STATUS_REASON="$USER not in the docker group"; return 1; }
       ;;
     2)

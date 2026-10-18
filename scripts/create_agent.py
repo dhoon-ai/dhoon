@@ -8,7 +8,7 @@ File Search, the agent instructions from config/agent-instructions.md and a few
 example conversation starters. Running it again updates the existing agent.
 
 Usage (normally via scripts/06_create_agent.sh):
-    python3 scripts/create_agent.py --model qwen3:30b-a3b-instruct-2507-q4_K_M
+    python3 scripts/create_agent.py --model gemma4:26b
 Credentials: --email/--password, or LIBRECHAT_EMAIL/LIBRECHAT_PASSWORD, or asked.
 Only Python's standard library is used.
 """
@@ -271,7 +271,7 @@ def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str, a
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--url", default=os.environ.get("LIBRECHAT_URL", "http://localhost:3080"))
-    p.add_argument("--model", required=True, help="main Instruct model, e.g. qwen3:30b-a3b-instruct-2507-q4_K_M")
+    p.add_argument("--model", required=True, help="main Instruct model, e.g. gemma4:26b")
     p.add_argument("--email", default=os.environ.get("LIBRECHAT_EMAIL"))
     p.add_argument("--password", default=os.environ.get("LIBRECHAT_PASSWORD"))
     p.add_argument("--yes", action="store_true", help="create the account without asking if it doesn't exist")

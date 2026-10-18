@@ -53,7 +53,7 @@ see [After installing: your settings](docs/GUIDE.md#after-installing-your-settin
 
 | Your RAM | Agent model (runs tools and plans) | Total download | Disk to have free |
 |---|---|---|---|
-| **28 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | ~22 GB | 35 GB |
+| **28 GB or more** | `gemma4:26b` (about 17 GB) | ~22 GB | 35 GB |
 | **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | ~3 GB | 15 GB |
 
 Every machine also gets two small helper models (included in the totals above):
@@ -260,7 +260,7 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 
 - **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
   `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait
-  for the 19 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
+  for the 17 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
 - **Model sized to RAM**, preferring a mixture-of-experts model when memory allows:
   it has the knowledge of a large model at the speed of a small one.
 - **Tools do the maths.** Small local models make arithmetic mistakes, so tools return

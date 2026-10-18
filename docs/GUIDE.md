@@ -87,8 +87,13 @@ The computer should stay switched on whenever you want to use the agent.
 
 | Your RAM | Agent model (runs tools and plans) | Total download | Disk to have free |
 |---|---|---|---|
-| **28 GB or more** | `qwen3:30b-a3b-instruct-2507-q4_K_M` (19 GB) | ~22 GB | 35 GB |
+| **28 GB or more** | `gemma4:26b` (about 17 GB) | ~22 GB | 35 GB |
 | **8–27 GB** | `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) | ~3 GB | 15 GB |
+
+Why Gemma 4: on a CPU-only Intel i7 with 64 GB, the same news stories written from the same
+pages took Gemma 4 26B about 7 minutes against 14 for Qwen3 30B, with no invented numbers (Qwen3:
+5 in 3 stories). To stay on Qwen3, put `MODEL_MAIN=qwen3:30b-a3b-instruct-2507-q4_K_M` in
+`config/models.env` and run `bash scripts/update.sh`.
 
 Every machine also gets two small helper models (included in the totals above):
 `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
@@ -226,7 +231,7 @@ downloads **all three** for you:
 
 | Role | Used by | Example (28 GB+ RAM) |
 |---|---|---|
-| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools and plans big tasks (`ask_planner`) | `qwen3:30b-a3b-instruct-2507-q4_K_M` |
+| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools and plans big tasks (`ask_planner`) | `gemma4:26b` |
 | **Fast** (Instruct) | quick questions, chat titles | `qwen3:4b-instruct-2507-q4_K_M` |
 | **Embeddings** | searching documents you upload | `nomic-embed-text` |
 
@@ -336,7 +341,7 @@ new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assi
 2. Click **Create new agent** and fill in:
    - **Name:** `Assistant`
    - **Model / Provider:** `Local AI` (Ollama) → your **main model**, the *instruct* one that
-     `02_download_models.sh` chose (e.g. `qwen3:30b-a3b-instruct-2507-q4_K_M`). Don't pick a
+     `02_download_models.sh` chose (e.g. `gemma4:26b`). Don't pick a
      *thinking* model: they often stop before calling a tool.
    - **Instructions:** paste this (it's also in `config/agent-instructions.md`):
 

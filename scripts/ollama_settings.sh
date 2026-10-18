@@ -20,6 +20,9 @@ sudo mkdir -p /etc/systemd/system/ollama.service.d
   echo "Environment=\"OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\""
   echo "Environment=\"OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\""
   echo 'Environment="OLLAMA_NUM_PARALLEL=1"'
+  # at most the main and the small model at once: loading a third big model (another writer
+  # being tried, say) unloads one instead of running out of memory
+  echo 'Environment="OLLAMA_MAX_LOADED_MODELS=2"'
   if mountpoint -q /data; then
     sudo mkdir -p /data/ollama
     sudo chown -R ollama:ollama /data/ollama 2>/dev/null || true
