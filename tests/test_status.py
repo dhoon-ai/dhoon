@@ -31,7 +31,7 @@ def half_installed(tmp_path):
     root = tmp_path / "systemd"
     (root / "ollama.service.d").mkdir(parents=True)
     (root / "ollama.service.d" / "override.conf").write_text(
-        '[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\nEnvironment="OLLAMA_KEEP_ALIVE=-1"\nEnvironment="OLLAMA_MAX_LOADED_MODELS=2"\n'
+        '[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\nEnvironment="OLLAMA_KEEP_ALIVE=-1"\nEnvironment="OLLAMA_MAX_LOADED_MODELS=2"\nEnvironment="OLLAMA_NUM_PARALLEL=2"\n'
     )
     return {
         **os.environ,
@@ -42,6 +42,7 @@ def half_installed(tmp_path):
         "USER": "tester",
         "CONTEXT_LENGTH": "32768",
         "KEEP_ALIVE": "-1",
+        "NUM_PARALLEL": "2",
     }
 
 

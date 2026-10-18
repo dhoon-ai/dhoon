@@ -11,6 +11,10 @@
 - **At most two models in memory.** Ollama keeps the main and the small model loaded
   (`OLLAMA_MAX_LOADED_MODELS=2`); loading a third big model unloads one instead of the kernel
   stopping Ollama for lack of memory.
+- **Quick Assistant on the small fast model.** Everyday questions (weather, calendar,
+  reminders) answer in seconds, even while the main model is busy with a long job.
+- **Two requests at once** with 28+ GB RAM (`NUM_PARALLEL=2`): a chat no longer waits behind a
+  background job (a plugin writing a report, say).
 - **Upgrading:** `bash scripts/update.sh` downloads Gemma 4 and says when the agents still use
   the old model; then `bash scripts/06_create_agent.sh` and each plugin's `install.sh`. When
   `ollama ps` shows only Gemma 4 and Qwen3 4B, `ollama rm qwen3:30b-a3b-instruct-2507-q4_K_M`

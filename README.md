@@ -277,6 +277,10 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 - **Two agents.** The full *Assistant* has every tool; the *Quick Assistant* has only the
   everyday ones (weather, calendar, reminders, web search, e-mail) and short instructions:
   about 1,400 tokens to read instead of 4,500, so it answers sooner and picks tools better.
+  It runs on the small fast model, so it answers in seconds even while the main model is busy
+  with a long job.
+- **Two requests at once** (28+ GB RAM, `OLLAMA_NUM_PARALLEL=2`): a chat is never stuck
+  behind a long background job such as a plugin writing a report.
 - **Lean web pages.** Only the article text of a page is kept (trafilatura, locally), not
   menus, footers or "related stories": fewer words for the model to read.
 - **Instructions read in advance.** Before each new chat the model must read ~4,500 tokens

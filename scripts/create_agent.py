@@ -271,7 +271,8 @@ def save_agent(lc: "LibreChat", payload: dict, agents: list[dict], model: str, a
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--url", default=os.environ.get("LIBRECHAT_URL", "http://localhost:3080"))
-    p.add_argument("--model", required=True, help="main Instruct model, e.g. gemma4:26b")
+    p.add_argument("--model", required=True, help="main model, e.g. gemma4:26b (the Assistant)")
+    p.add_argument("--fast-model", default="", help="small fast model for the Quick Assistant (default: --model)")
     p.add_argument("--email", default=os.environ.get("LIBRECHAT_EMAIL"))
     p.add_argument("--password", default=os.environ.get("LIBRECHAT_PASSWORD"))
     p.add_argument("--yes", action="store_true", help="create the account without asking if it doesn't exist")
@@ -310,8 +311,10 @@ def main() -> int:
         data = {}
     agents = data.get("data") or []
     problems = 0
-    for payload, avatar in ((agent_payload(args.model), AVATAR), (quick_payload(args.model), QUICK_AVATAR)):
-        problems += save_agent(lc, payload, agents, args.model, avatar)
+    fast = args.fast_model or args.model
+    for payload, model, avatar in ((agent_payload(args.model), args.model, AVATAR),
+                                   (quick_payload(fast), fast, QUICK_AVATAR)):
+        problems += save_agent(lc, payload, agents, model, avatar)
     if problems:
         return 1
     marker = Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-created"  # read by status.sh

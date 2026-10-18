@@ -231,8 +231,8 @@ downloads **all three** for you:
 
 | Role | Used by | Example (28 GB+ RAM) |
 |---|---|---|
-| **Agent** (main model) | both agents you chat with (Assistant and Quick Assistant); runs the tools and plans big tasks (`ask_planner`) | `gemma4:26b` |
-| **Fast** (Instruct) | chat titles, memory, quick checks by plugins | `qwen3:4b-instruct-2507-q4_K_M` |
+| **Agent** (main model) | the Assistant you chat with; runs the tools and plans big tasks (`ask_planner`) | `gemma4:26b` |
+| **Fast** (Instruct) | the Quick Assistant, chat titles, memory, quick checks by plugins | `qwen3:4b-instruct-2507-q4_K_M` |
 | **Embeddings** | searching documents you upload | `nomic-embed-text` |
 
 You never have to download any of them by hand. To check they're all there, run
@@ -1062,6 +1062,7 @@ nano config/models.env
 | `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
 | `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory (at most two at once: the main and the small model) | `bash scripts/ollama_settings.sh` |
+| `NUM_PARALLEL` | `2` with 28+ GB RAM, else `1` | Requests a model answers at once, so a chat doesn't wait behind a long job | `bash scripts/ollama_settings.sh` |
 | `MEMORY` | `off` (the installer asks) | Memory across chats: when you say *"Remember that…"*, a small model saves it for later chats | `bash scripts/05_librechat.sh` |
 | `KNOWLEDGE` | `on` | Knowledge base of world news and market events since the models' training | `bash scripts/04_toolbox.sh` |
 | `KNOWLEDGE_START` | `2024-10` | First month of the knowledge base (around the models' training cutoff) | `bash scripts/04_toolbox.sh` |

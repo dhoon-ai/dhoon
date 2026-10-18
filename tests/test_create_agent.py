@@ -222,3 +222,11 @@ def test_an_agent_with_an_old_picture_gets_its_own_once():
     assert fake.avatar_uploads == 2  # and not again
     given = json.loads(Path(fake.runtime, ".agent-avatars.json").read_text())
     assert given["agent_1"] != given["agent_2"]  # two different pictures
+
+
+def test_quick_assistant_runs_on_the_fast_model():
+    fake = FakeLibreChat(accounts={"me@example.com": "secret123"})
+    r = run(fake, "--fast-model", "small:instruct")
+    assert r.returncode == 0, r.stdout + r.stderr
+    models = {a["name"]: a["model"] for a in fake.agents.values()}
+    assert models == {"Assistant": "m:instruct", "Quick Assistant": "small:instruct"}

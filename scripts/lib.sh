@@ -54,6 +54,11 @@ fi
 # How long Ollama keeps a model in memory after its last use. -1 = forever (pinned), so the
 # agent never waits for the 19 GB model to load again. Machines with less RAM free it after
 # 30 minutes so other programs get the memory back.
+# How many requests one model answers at once. 2 with 28+ GB RAM: a chat is not stuck behind a
+# long background job (a newsroom draft); each costs memory for its own context.
+if [ -z "${NUM_PARALLEL:-}" ]; then
+  if [ "$RAM_GB" -ge 28 ]; then NUM_PARALLEL=2; else NUM_PARALLEL=1; fi
+fi
 if [ -z "${KEEP_ALIVE:-}" ]; then
   if [ "$RAM_GB" -ge 28 ]; then KEEP_ALIVE=-1; else KEEP_ALIVE=30m; fi
 fi
@@ -176,6 +181,8 @@ step_done() {
         || { STATUS_REASON="Ollama settings out of date (keep-alive)"; return 1; }
       grep -q "OLLAMA_MAX_LOADED_MODELS=" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (models in memory)"; return 1; }
+      grep -q "OLLAMA_NUM_PARALLEL=$NUM_PARALLEL\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
+        || { STATUS_REASON="Ollama settings out of date (requests at once)"; return 1; }
       getent group docker | grep -qw "$USER" || { STATUS_REASON="$USER not in the docker group"; return 1; }
       ;;
     2)

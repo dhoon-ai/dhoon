@@ -5,6 +5,7 @@
 #    (never forward port 11434 on your router)
 #  - context window from CONTEXT_LENGTH (scripts/lib.sh picks it from your RAM)
 #  - keep models in memory: forever with 28+ GB RAM, else 30 minutes (KEEP_ALIVE)
+#  - answer 2 requests at once with 28+ GB RAM (NUM_PARALLEL), so a chat never waits for a long job
 #  - load the main model right after Ollama starts (ai-model-preload service), so the
 #    first chat after a reboot doesn't wait for it
 #  - store models on /data if that disk exists (docs/GUIDE.md step 1.2)
@@ -19,7 +20,7 @@ sudo mkdir -p /etc/systemd/system/ollama.service.d
   echo 'Environment="OLLAMA_HOST=0.0.0.0:11434"'
   echo "Environment=\"OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\""
   echo "Environment=\"OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\""
-  echo 'Environment="OLLAMA_NUM_PARALLEL=1"'
+  echo "Environment=\"OLLAMA_NUM_PARALLEL=$NUM_PARALLEL\""
   # at most the main and the small model at once: loading a third big model (another writer
   # being tried, say) unloads one instead of running out of memory
   echo 'Environment="OLLAMA_MAX_LOADED_MODELS=2"'
