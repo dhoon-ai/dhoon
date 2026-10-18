@@ -1,7 +1,20 @@
 # Changelog
 
-## v1.1.0 (unreleased)
+## v1.1.0 (2026-10-18)
 
+- **Gemma 4 is the main model** on computers with 28 GB of RAM or more (`gemma4:26b`, about
+  17 GB, a mixture of experts with ~4B parameters used per word). Both agents, the planner,
+  the knowledge base, the scheduler and plugins use it. On a CPU-only Intel i7 with 64 GB it
+  wrote the same news stories, from the same pages, in half the time of Qwen3 30B and invented
+  no numbers. Smaller computers keep Qwen3 4B; the small Qwen3 4B stays the fast helper.
+  To stay on Qwen3: `MODEL_MAIN=qwen3:30b-a3b-instruct-2507-q4_K_M` in `config/models.env`.
+- **At most two models in memory.** Ollama keeps the main and the small model loaded
+  (`OLLAMA_MAX_LOADED_MODELS=2`); loading a third big model unloads one instead of the kernel
+  stopping Ollama for lack of memory.
+- **Upgrading:** `bash scripts/update.sh` downloads Gemma 4 and says when the agents still use
+  the old model; then `bash scripts/06_create_agent.sh` and each plugin's `install.sh`. When
+  `ollama ps` shows only Gemma 4 and Qwen3 4B, `ollama rm qwen3:30b-a3b-instruct-2507-q4_K_M`
+  frees 19 GB.
 - **Knowledge base of world news and markets.** The models know the world only up to their
   training (late 2024). Every night Dhoon now adds short weekly notes of world news events and
   market events since then (`~/agent-workspace/knowledge/`): world news from Wikipedia's

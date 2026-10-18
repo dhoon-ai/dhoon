@@ -60,14 +60,18 @@ Every machine also gets two small helper models (included in the totals above):
 `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
 `nomic-embed-text` (0.3 GB) for searching your documents (`search_document`).
 
-**Only *Instruct* models.** Qwen3 also comes as *Thinking* models, but on a CPU their long
-hidden reasoning is slow, and they often plan a tool call in their thoughts and then stop
-without making it. So everything here (chatting, running tools and planning big tasks)
-uses the fast **Instruct** model. For really hard tasks, the planner can look up on the
-web how such a task is usually done (see below), which helps more than slow thinking.
+**Why Gemma 4.** Google's Gemma 4 26B is a *mixture-of-experts* model: 26B parameters, but
+only about 4B are used per word, so it runs at usable speed on a CPU. On a CPU-only Intel i7
+with 64 GB it wrote the same news stories, from the same pages, in half the time of the
+previous default Qwen3 30B (7 against 14 minutes) and invented no numbers (Qwen3: 5 in 3
+stories). To stay on Qwen3, put `MODEL_MAIN=qwen3:30b-a3b-instruct-2507-q4_K_M` in
+`config/models.env`.
 
-The 30B models are *mixture-of-experts*: 30B parameters, but only ~3B are used per token,
-so they run at usable speed on a CPU. Override any choice (models, context window, keep-alive, research engines) in
+**No *thinking* models.** Models that "think" before answering are slow on a CPU and often
+plan a tool call in their thoughts and then stop without making it. So everything here
+(chatting, running tools and planning big tasks) uses a model that answers directly. For
+really hard tasks, the planner can look up on the web how such a task is usually done (see
+below), which helps more than slow thinking. Override any choice (models, context window, keep-alive, research engines) in
 `config/models.env` (copy `config/models.env.example`); see
 [Choosing different models and settings](docs/GUIDE.md#choosing-different-models-and-settings).
 
@@ -76,9 +80,9 @@ so they run at usable speed on a CPU. Override any choice (models, context windo
 ```mermaid
 flowchart TD
     U["You (browser)"] --> LC["LibreChat web chat"]
-    LC --> A["Assistant agent<br/>Instruct model<br/>answers and runs tools"]
+    LC --> A["Assistant agent<br/>main model<br/>answers and runs tools"]
     A -->|"simple task: calls tools directly"| T["toolbox"]
-    A -->|"big task: ask_planner"| P["Planner<br/>same Instruct model<br/>next steps, no tools"]
+    A -->|"big task: ask_planner"| P["Planner<br/>same main model<br/>next steps, no tools"]
     P -.->|"hard task only: generic how-to question,<br/>personal details removed"| G["Web search<br/>via your SearXNG"]
     P -->|"checklist + next steps"| A
     T --> W["web_search + read_webpage<br/>via SearXNG"]
@@ -91,7 +95,7 @@ flowchart TD
 ### Planning big tasks in rounds
 
 Small requests are answered directly. Big ones are planned in short rounds, all by the
-same local Instruct model:
+same local main model:
 
 1. **The Assistant reads your request and decides**, like a database query optimizer
    picking the cheapest plan: if it needs only 1–2 tool calls, it does them straight away
@@ -151,7 +155,7 @@ If the chosen engines find nothing, the toolbox retries once with all engines.
 ```mermaid
 sequenceDiagram
     participant You
-    participant A as Assistant (Instruct model)
+    participant A as Assistant (main model)
     participant P as ask_planner (same model)
     participant G as Web search via SearXNG
     participant T as Toolbox tools
@@ -185,7 +189,7 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
         ▼
   ┌──────────────┐      ┌─────────────────────────────┐
   │  LibreChat   │─────▶│  Ollama (on the host)       │
-  │  (Docker)    │      │  Instruct: agent + fast     │
+  │  (Docker)    │      │  Gemma 4 agent + Qwen3 fast │
   │  chat UI,    │      │  (also plans big tasks)     │
   │  agents, RAG │      │  nomic-embed-text           │
   └──────┬───────┘      └──────────────▲──────────────┘
@@ -207,7 +211,7 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │  cancel_scheduled_task (run by ai-scheduler timer)  │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
-  │  ask_planner ──▶ Instruct model in Ollama ──────────┘
+  │  ask_planner ──▶ main model in Ollama ─────────────┘
   └──────┬──────────────────────────────────────────────┘
          │
          ▼
@@ -223,7 +227,8 @@ keeps a copy of the Assistant's instructions so they can be read in advance (fas
 | [LibreChat](https://github.com/danny-avila/LibreChat) | Web UI, agents, document chat | MIT |
 | [SearXNG](https://github.com/searxng/searxng) | Private meta-search engine | AGPL-3.0 |
 | [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | Tool server protocol | MIT |
-| [Qwen3](https://huggingface.co/Qwen) | Open-weight models | Apache-2.0 |
+| [Gemma 4](https://ai.google.dev/gemma) | Main open-weight model (28+ GB RAM) | Apache-2.0 |
+| [Qwen3](https://huggingface.co/Qwen) | Small and fast open-weight models | Apache-2.0 |
 | yfinance, pandas, httpx, BeautifulSoup | Tools | Apache-2.0 / BSD / MIT |
 
 The models are *open-weight* (free to download and use; training data not public).
@@ -261,6 +266,8 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 - **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
   `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait
   for the 17 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
+- **At most two models in memory** (`OLLAMA_MAX_LOADED_MODELS=2`): the main model and the
+  small one. Loading a third big model unloads one instead of running out of memory.
 - **Model sized to RAM**, preferring a mixture-of-experts model when memory allows:
   it has the knowledge of a large model at the speed of a small one.
 - **Tools do the maths.** Small local models make arithmetic mistakes, so tools return
@@ -301,7 +308,7 @@ bash scripts/benchmark.sh              # optional: keeps CPU-only if that's fast
 ```
 
 Then open `http://localhost:3080` and pick **Agents → Assistant**. Script 06 sets the agent
-up with the main Instruct model, every toolbox tool, File Search, the instructions in
+up with the main model, every toolbox tool, File Search, the instructions in
 [`config/agent-instructions.md`](config/agent-instructions.md) and some starter prompts
 ([manual way](docs/GUIDE.md#step-8--create-your-general-purpose-agent)).
 
@@ -393,7 +400,8 @@ page address, a place name, a ticker), never your chats or files.
 | Project | What it does here | Licence |
 |---|---|---|
 | [Ollama](https://ollama.com) | runs the AI models | MIT |
-| [Qwen3](https://github.com/QwenLM/Qwen3) (Alibaba Qwen team) | the language models | Apache-2.0 |
+| [Gemma 4](https://ai.google.dev/gemma) (Google DeepMind) | the main language model (28+ GB RAM) | Apache-2.0 |
+| [Qwen3](https://github.com/QwenLM/Qwen3) (Alibaba Qwen team) | the small, fast model (and the main one under 28 GB) | Apache-2.0 |
 | [nomic-embed-text](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) | text embeddings for document search | Apache-2.0 |
 | [LibreChat](https://www.librechat.ai) | the chat website and agents | MIT |
 | [SearXNG](https://github.com/searxng/searxng) | private web search (queries public engines *(online)*) | AGPL-3.0 |

@@ -6,7 +6,7 @@ account or an AI subscription.
 **What you will end up with**
 
 - A ChatGPT-style website at `http://<your-computer>:3080`, usable from any device at home.
-- A local AI "brain" (Qwen3 models running in Ollama).
+- A local AI "brain" (Gemma 4 and Qwen3 models running in Ollama).
 - An agent that can: search the web, read web pages, read/write files in one folder,
   run Python code in a safe sandbox, chat with your documents, and analyse stocks.
 
@@ -99,11 +99,11 @@ Every machine also gets two small helper models (included in the totals above):
 `qwen3:4b-instruct-2507-q4_K_M` (2.5 GB) for quick questions and chat titles, and
 `nomic-embed-text` (0.3 GB) for searching your documents.
 
-**Only *Instruct* models.** Qwen3 also comes as *Thinking* models, but on a CPU their long
-hidden reasoning is slow, and they often plan a tool call in their thoughts and then stop
-without making it. So everything (chatting, running tools and planning big tasks) uses
-the fast **Instruct** model. For really hard tasks the planner can look up on the web how
-such a task is usually done (see "Planning big tasks" below).
+**No *thinking* models.** Models that "think" before answering are slow on a CPU and often
+plan a tool call in their thoughts and then stop without making it. So everything (chatting,
+running tools and planning big tasks) uses a model that answers directly. For really hard
+tasks the planner can look up on the web how such a task is usually done (see "Planning big
+tasks" below).
 
 | Your RAM | What to expect on a CPU |
 |---|---|
@@ -231,8 +231,8 @@ downloads **all three** for you:
 
 | Role | Used by | Example (28 GB+ RAM) |
 |---|---|---|
-| **Agent** (Instruct) | the Assistant agent you chat with; runs the tools and plans big tasks (`ask_planner`) | `gemma4:26b` |
-| **Fast** (Instruct) | quick questions, chat titles | `qwen3:4b-instruct-2507-q4_K_M` |
+| **Agent** (main model) | both agents you chat with (Assistant and Quick Assistant); runs the tools and plans big tasks (`ask_planner`) | `gemma4:26b` |
+| **Fast** (Instruct) | chat titles, memory, quick checks by plugins | `qwen3:4b-instruct-2507-q4_K_M` |
 | **Embeddings** | searching documents you upload | `nomic-embed-text` |
 
 You never have to download any of them by hand. To check they're all there, run
@@ -340,7 +340,7 @@ new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assi
    then open the **Agent Builder** panel on the right side).
 2. Click **Create new agent** and fill in:
    - **Name:** `Assistant`
-   - **Model / Provider:** `Local AI` (Ollama) → your **main model**, the *instruct* one that
+   - **Model / Provider:** `Local AI` (Ollama) → your **main model**, the one that
      `02_download_models.sh` chose (e.g. `gemma4:26b`). Don't pick a
      *thinking* model: they often stop before calling a tool.
    - **Instructions:** paste this (it's also in `config/agent-instructions.md`):
@@ -508,7 +508,7 @@ book with quotes and page numbers, and save them to reports/alice-lessons.md.*
 ## Planning big tasks (ask_planner)
 
 Small requests are answered directly. Big ones are planned in short rounds, all by the
-same local Instruct model:
+same local main model:
 
 1. **The Assistant reads your request and decides**, like a database query optimizer
    picking the cheapest plan: if it needs only 1–2 tool calls, it does them straight away
@@ -568,7 +568,7 @@ If the chosen engines find nothing, the toolbox retries once with all engines.
 ```mermaid
 sequenceDiagram
     participant You
-    participant A as Assistant (Instruct model)
+    participant A as Assistant (main model)
     participant P as ask_planner (same model)
     participant G as Web search via SearXNG
     participant T as Toolbox tools
@@ -603,6 +603,13 @@ recent news for both, and save a report to reports/compare.md."*
 Each planning round is one quick call to the same model the Assistant already has in
 memory (usually well under a minute on a CPU). To see it in action, try **Level 7** in
 Step 9.
+
+**Upgrading to v1.1 (Gemma 4)?** `bash scripts/update.sh` downloads Gemma 4 and points the
+toolbox, planner and knowledge base at it (unless `config/models.env` sets `MODEL_MAIN`), and
+says when the agents still use the old model: then run `bash scripts/06_create_agent.sh` (it
+asks for your chat login) and re-run each plugin's `install.sh`. Check with `ollama ps`: only
+`gemma4:26b` and `qwen3:4b-instruct-2507-q4_K_M` should be loaded. When all is well, free
+19 GB with `ollama rm qwen3:30b-a3b-instruct-2507-q4_K_M`.
 
 **Upgrading from an older version that had a "Thinking" planner model?** It is no longer
 used. Free its disk space with `ollama rm qwen3:30b-a3b-thinking-2507-q4_K_M` (or
@@ -1049,12 +1056,12 @@ nano config/models.env
 
 | Setting | Default | What it does | Then run |
 |---|---|---|---|
-| `MODEL_MAIN` | 30B Instruct with 28+ GB RAM, else 4B | The agent's model (runs tools and plans) | `bash scripts/02_download_models.sh`, `bash scripts/update.sh`, `bash scripts/06_create_agent.sh` |
+| `MODEL_MAIN` | `gemma4:26b` with 28+ GB RAM, else Qwen3 4B Instruct | The agent's model (runs tools and plans) | `bash scripts/02_download_models.sh`, `bash scripts/update.sh`, `bash scripts/06_create_agent.sh` |
 | `MODEL_FAST` | `qwen3:4b-instruct-2507-q4_K_M` | Quick questions, chat titles | same as above |
 | `MODEL_EMBED` | `nomic-embed-text` | Document search | same as above |
 | `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
-| `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory | `bash scripts/ollama_settings.sh` |
+| `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory (at most two at once: the main and the small model) | `bash scripts/ollama_settings.sh` |
 | `MEMORY` | `off` (the installer asks) | Memory across chats: when you say *"Remember that…"*, a small model saves it for later chats | `bash scripts/05_librechat.sh` |
 | `KNOWLEDGE` | `on` | Knowledge base of world news and market events since the models' training | `bash scripts/04_toolbox.sh` |
 | `KNOWLEDGE_START` | `2024-10` | First month of the knowledge base (around the models' training cutoff) | `bash scripts/04_toolbox.sh` |
@@ -1062,7 +1069,7 @@ nano config/models.env
 | `RESEARCH_ENGINES` | empty (SearXNG's usual engines) | Search engines for the "research how to do this" step | `bash scripts/04_toolbox.sh` |
 
 Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose
-models that list **tools** support and are *instruct* (not *thinking*) models.
+models that list **tools** support and answer directly (*instruct*, not *thinking* models).
 
 ---
 
