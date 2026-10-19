@@ -27,7 +27,9 @@ if curl -fsS --max-time 900 "$OLLAMA_URL/api/generate" \
   py="$RUNTIME/venv/bin/python"; [ -x "$py" ] || py=python3
   # Only the models the agents use now (after a model change, an old model's saved copy would
   # load that model for minutes and push the main one out); the main model last, so it stays.
-  WARM_MODELS="$MODEL_MAIN $MODEL_FAST" "$py" "$KIT/toolbox/warmup.py" || true
+  # Read into every request slot (NUM_PARALLEL), so a chat that comes in while a long job uses
+  # one slot doesn't read the instructions again for minutes. Kept until the slot reads other text.
+  WARM_MODELS="$MODEL_MAIN $MODEL_FAST" WARM_PARALLEL="$NUM_PARALLEL" "$py" "$KIT/toolbox/warmup.py" || true
 else
   fail "Could not load $MODEL_MAIN (is it downloaded? ollama list)"
   exit 1

@@ -9,6 +9,11 @@ toolbox_server.py) and keeps a copy of the latest instructions + tool list here 
 chat itself). `python3 toolbox/warmup.py` sends that same text to Ollama again, so it is
 already read when you open a chat: after Ollama starts (with the model preload), after the
 date changes and after nightly jobs that used the model for something else.
+
+Ollama answers WARM_PARALLEL requests at once (NUM_PARALLEL, 2 with 28+ GB RAM), each in its
+own slot with its own memory of what it read. So the same text is sent that many times at
+once: every slot has it read, and a chat that arrives while a long job uses one slot still
+starts in seconds in the other. What a slot has read stays until it reads something else.
 """
 
 import datetime as dt
@@ -106,9 +111,20 @@ def _redate(text: str, then: dt.date, today: dt.date) -> str:
     return text
 
 
+def _slots() -> int:
+    try:
+        return max(1, min(int(os.environ.get("WARM_PARALLEL", "1")), 8))
+    except ValueError:
+        return 1
+
+
 def warm_up(transport: httpx.BaseTransport | None = None, today: dt.date | None = None) -> list[str]:
-    """Send every saved instructions + tools to Ollama once. Returns one line per model."""
+    """Send every saved instructions + tools to Ollama, once per slot, all at the same time
+    (so each lands in its own slot). Returns one line per model."""
+    from concurrent.futures import ThreadPoolExecutor
+
     today = today or dt.date.today()
+    slots = _slots()
     out = []
     for f in latest_per_model():
         try:
@@ -126,11 +142,17 @@ def warm_up(transport: httpx.BaseTransport | None = None, today: dt.date | None 
                 "stream": False,
             }
             start = time.monotonic()
-            with httpx.Client(transport=transport, timeout=httpx.Timeout(1800, connect=10)) as client:
-                client.post(f"{OLLAMA_URL}/v1/chat/completions", json=body).raise_for_status()
+
+            def send(_, body=body):
+                with httpx.Client(transport=transport, timeout=httpx.Timeout(3600, connect=10)) as client:
+                    client.post(f"{OLLAMA_URL}/v1/chat/completions", json=body).raise_for_status()
+
+            with ThreadPoolExecutor(max_workers=slots) as pool:
+                list(pool.map(send, range(slots)))  # raises the first error, if any
+            where = f"in all {slots} slots, " if slots > 1 else ""
             out.append(
                 f"{saved['model']}: instructions and {len(saved['tools'])} tools read in advance "
-                f"({time.monotonic() - start:.0f} s)"
+                f"({where}{time.monotonic() - start:.0f} s)"
             )
         except Exception as e:  # noqa: BLE001
             out.append(f"{f.stem}: not warmed up ({type(e).__name__}: {e})")

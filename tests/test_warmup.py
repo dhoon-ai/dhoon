@@ -122,7 +122,11 @@ def test_only_the_models_in_use_are_warmed_and_the_main_one_last(warm, monkeypat
     import json as _json
     import os as _os
 
-    for model, age in (("gemma4:26b", 3), ("qwen3:30b-a3b-instruct-2507-q4_K_M", 1), ("qwen3:4b-instruct-2507-q4_K_M", 2)):
+    for model, age in (
+        ("gemma4:26b", 3),
+        ("qwen3:30b-a3b-instruct-2507-q4_K_M", 1),
+        ("qwen3:4b-instruct-2507-q4_K_M", 2),
+    ):
         f = warm.WARM_DIR / (model.replace(":", "_") + ".json")
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(_json.dumps({"model": model, "system": [], "tools": [], "date": "2026-10-18"}))
@@ -132,3 +136,26 @@ def test_only_the_models_in_use_are_warmed_and_the_main_one_last(warm, monkeypat
     assert order == ["qwen3:4b-instruct-2507-q4_K_M", "gemma4:26b"]  # the old 30b model is left alone
     monkeypatch.delenv("WARM_MODELS")
     assert len(warm.latest_per_model()) == 3  # run by hand without the list: everything, as before
+
+
+def test_every_request_slot_gets_the_instructions(warm, monkeypatch):
+    import threading
+
+    warm.remember(json.dumps(chat_request()).encode())
+    monkeypatch.setenv("WARM_PARALLEL", "2")
+    seen, both_in = [], threading.Barrier(2, timeout=5)
+
+    def ollama(request):
+        seen.append(json.loads(request.content)["messages"][0]["content"])
+        both_in.wait()  # only returns when the two requests are in Ollama at the same time
+        return httpx.Response(200, json={"choices": [{"message": {"content": "H"}}]})
+
+    lines = warm.warm_up(httpx.MockTransport(ollama))
+    assert len(seen) == 2 and seen[0] == seen[1]
+    assert "(in all 2 slots," in lines[0]
+    monkeypatch.setenv("WARM_PARALLEL", "1")
+    seen.clear()
+    assert (
+        "slots" not in warm.warm_up(httpx.MockTransport(lambda r: (seen.append(1), httpx.Response(200, json={}))[1]))[0]
+    )
+    assert len(seen) == 1

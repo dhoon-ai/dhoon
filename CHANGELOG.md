@@ -2,6 +2,11 @@
 
 ## v1.1.1 (unreleased)
 
+- **Fast first answer in every request slot.** With two requests at once (28+ GB RAM), the
+  preload now has the model read the Assistant's instructions and tools in both slots, so a
+  chat that arrives while a long job uses one slot still starts in seconds instead of reading
+  them again for minutes. They stay read until the slot reads something else.
+
 - **Searches no longer unload the main model.** With at most two models in memory, every
   document or knowledge-base search loaded the small embedding model and pushed the main model
   out, so the next answer waited for 17 GB to load again. Now three fit
