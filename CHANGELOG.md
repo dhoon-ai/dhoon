@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.1 (unreleased)
+
+- **Searches no longer unload the main model.** With at most two models in memory, every
+  document or knowledge-base search loaded the small embedding model and pushed the main model
+  out, so the next answer waited for 17 GB to load again. Now three fit
+  (`OLLAMA_MAX_LOADED_MODELS=3`: main, small, and the 0.3 GB embedding model); `update.sh`
+  applies it.
+
 ## v1.1.0 (2026-10-18)
 
 - **Gemma 4 is the main model** on computers with 28 GB of RAM or more (`gemma4:26b`, about

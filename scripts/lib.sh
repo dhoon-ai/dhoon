@@ -179,7 +179,7 @@ step_done() {
         || { STATUS_REASON="Ollama settings out of date (context length)"; return 1; }
       grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (keep-alive)"; return 1; }
-      grep -q "OLLAMA_MAX_LOADED_MODELS=" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
+      grep -q "OLLAMA_MAX_LOADED_MODELS=3\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (models in memory)"; return 1; }
       grep -q "OLLAMA_NUM_PARALLEL=$NUM_PARALLEL\"" "$SYSTEMD_ROOT/ollama.service.d/override.conf" \
         || { STATUS_REASON="Ollama settings out of date (requests at once)"; return 1; }

@@ -266,8 +266,9 @@ Details: [Troubleshooting in the guide](docs/GUIDE.md#troubleshooting).
 - **Main model pinned in memory** (28+ GB RAM): `OLLAMA_KEEP_ALIVE=-1` plus an
   `ai-model-preload` service that loads it whenever Ollama starts, so answers never wait
   for the 17 GB model to load again. Change with `KEEP_ALIVE` in `config/models.env`.
-- **At most two models in memory** (`OLLAMA_MAX_LOADED_MODELS=2`): the main model and the
-  small one. Loading a third big model unloads one instead of running out of memory.
+- **At most three models in memory** (`OLLAMA_MAX_LOADED_MODELS=3`): the main model, the small
+  one and the tiny embedding model that every document and knowledge-base search uses (0.3 GB).
+  Loading another big model unloads one instead of running out of memory.
 - **Model sized to RAM**, preferring a mixture-of-experts model when memory allows:
   it has the knowledge of a large model at the speed of a small one.
 - **Tools do the maths.** Small local models make arithmetic mistakes, so tools return

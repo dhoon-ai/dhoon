@@ -39,7 +39,7 @@ install_ollama   # downloads only when a different version is wanted
 
 if ! grep -q "OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
    || ! grep -q "OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
-   || ! grep -q "OLLAMA_MAX_LOADED_MODELS=" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
+   || ! grep -q "OLLAMA_MAX_LOADED_MODELS=3\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
    || ! grep -q "OLLAMA_NUM_PARALLEL=$NUM_PARALLEL\"" /etc/systemd/system/ollama.service.d/override.conf 2>/dev/null \
    || [ ! -f /etc/systemd/system/ai-model-preload.service ] \
    || [ ! -f /etc/systemd/system/ai-warmup.timer ]; then

@@ -21,9 +21,10 @@ sudo mkdir -p /etc/systemd/system/ollama.service.d
   echo "Environment=\"OLLAMA_CONTEXT_LENGTH=$CONTEXT_LENGTH\""
   echo "Environment=\"OLLAMA_KEEP_ALIVE=$KEEP_ALIVE\""
   echo "Environment=\"OLLAMA_NUM_PARALLEL=$NUM_PARALLEL\""
-  # at most the main and the small model at once: loading a third big model (another writer
-  # being tried, say) unloads one instead of running out of memory
-  echo 'Environment="OLLAMA_MAX_LOADED_MODELS=2"'
+  # the main model, the small one and the tiny embedding model (0.3 GB, used by every document and
+  # knowledge-base search) at once; loading another big model (another writer being tried, say)
+  # unloads one instead of running out of memory. With 2, each search unloaded the main model.
+  echo 'Environment="OLLAMA_MAX_LOADED_MODELS=3"'
   if mountpoint -q /data; then
     sudo mkdir -p /data/ollama
     sudo chown -R ollama:ollama /data/ollama 2>/dev/null || true
