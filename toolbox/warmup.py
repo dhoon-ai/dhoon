@@ -38,16 +38,29 @@ def _file(model: str, tools: list) -> Path:
     return WARM_DIR / ("".join(c if c.isalnum() else "_" for c in model) + f"-{tag}.json")
 
 
-def latest_per_model() -> list[Path]:
-    """Ollama keeps one read-ahead per model, so warm only the agent used most recently."""
+def wanted_models() -> list[str]:
+    """The models the agents use now (WARM_MODELS, set by preload_model.sh from MODEL_MAIN and
+    MODEL_FAST): the main model last, so it is the one Ollama keeps in memory longest. Empty: all."""
+    return [m for m in os.environ.get("WARM_MODELS", "").split() if m]
+
+
+def latest_per_model(models: list[str] | None = None) -> list[Path]:
+    """Ollama keeps one read-ahead per model, so warm only the agent used most recently. Copies
+    for models the agents no longer use (after a model change) are left alone: loading an old
+    model would take minutes and push the main model out of memory."""
+    models = wanted_models() if models is None else models
     newest: dict[str, Path] = {}
     for f in WARM_DIR.glob("*.json") if WARM_DIR.exists() else []:
         try:
             model = json.loads(f.read_text())["model"]
         except (OSError, ValueError, KeyError):
             continue
+        if models and model not in models:
+            continue
         if model not in newest or f.stat().st_mtime > newest[model].stat().st_mtime:
             newest[model] = f
+    if models:  # WARM_MODELS lists the main model first; it is warmed last
+        return [newest[m] for m in reversed(models) if m in newest]
     return sorted(newest.values())
 
 

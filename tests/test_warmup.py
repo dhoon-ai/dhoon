@@ -116,3 +116,19 @@ def test_only_the_agent_used_last_is_read_ahead(warm):
         os.utime(f, (past, past))
     warm.remember(json.dumps(chat_request()).encode())  # back to the Assistant (same text)
     assert json.loads(warm.latest_per_model()[0].read_text())["tools"] == TOOLS
+
+
+def test_only_the_models_in_use_are_warmed_and_the_main_one_last(warm, monkeypatch):
+    import json as _json
+    import os as _os
+
+    for model, age in (("gemma4:26b", 3), ("qwen3:30b-a3b-instruct-2507-q4_K_M", 1), ("qwen3:4b-instruct-2507-q4_K_M", 2)):
+        f = warm.WARM_DIR / (model.replace(":", "_") + ".json")
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(_json.dumps({"model": model, "system": [], "tools": [], "date": "2026-10-18"}))
+        _os.utime(f, (1000 - age, 1000 - age))
+    monkeypatch.setenv("WARM_MODELS", "gemma4:26b qwen3:4b-instruct-2507-q4_K_M")
+    order = [_json.loads(f.read_text())["model"] for f in warm.latest_per_model()]
+    assert order == ["qwen3:4b-instruct-2507-q4_K_M", "gemma4:26b"]  # the old 30b model is left alone
+    monkeypatch.delenv("WARM_MODELS")
+    assert len(warm.latest_per_model()) == 3  # run by hand without the list: everything, as before

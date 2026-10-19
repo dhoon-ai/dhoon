@@ -25,7 +25,9 @@ if curl -fsS --max-time 900 "$OLLAMA_URL/api/generate" \
   # Also have it read the Assistant's instructions and tool list in advance (saved by the
   # toolbox from your last chat), so the first answer starts in seconds, not minutes.
   py="$RUNTIME/venv/bin/python"; [ -x "$py" ] || py=python3
-  "$py" "$KIT/toolbox/warmup.py" || true
+  # Only the models the agents use now (after a model change, an old model's saved copy would
+  # load that model for minutes and push the main one out); the main model last, so it stays.
+  WARM_MODELS="$MODEL_MAIN $MODEL_FAST" "$py" "$KIT/toolbox/warmup.py" || true
 else
   fail "Could not load $MODEL_MAIN (is it downloaded? ollama list)"
   exit 1
