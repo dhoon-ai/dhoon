@@ -312,8 +312,10 @@ def main() -> int:
     agents = data.get("data") or []
     problems = 0
     fast = args.fast_model or args.model
-    for payload, model, avatar in ((agent_payload(args.model), args.model, AVATAR),
-                                   (quick_payload(fast), fast, QUICK_AVATAR)):
+    for payload, model, avatar in (
+        (agent_payload(args.model), args.model, AVATAR),
+        (quick_payload(fast), fast, QUICK_AVATAR),
+    ):
         problems += save_agent(lc, payload, agents, model, avatar)
     if problems:
         return 1
