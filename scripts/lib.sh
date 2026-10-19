@@ -28,8 +28,10 @@ mkdir -p "$RUNTIME"
 # ---- Models ----
 # Your own choices go in config/models.env (copy config/models.env.example).
 # Anything not set there is picked automatically from the amount of RAM.
+# (MODELS_ENV: another file; the tests use an empty one, so your own choices never change them)
+MODELS_ENV="${MODELS_ENV:-$KIT/config/models.env}"
 # shellcheck source=/dev/null
-[ -f "$KIT/config/models.env" ] && source "$KIT/config/models.env"
+[ -f "$MODELS_ENV" ] && source "$MODELS_ENV"
 
 # Main model: Google's Gemma 4 26B (a mixture of experts, ~4B active, so fast on a CPU) with
 # 28+ GB RAM: in our tests on a CPU-only i7 it wrote twice as fast as Qwen3 30B and invented no
