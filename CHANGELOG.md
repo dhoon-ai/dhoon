@@ -2,6 +2,16 @@
 
 ## v1.1.1 (unreleased)
 
+- **Official economic numbers** (`economic_data`): Bank of Canada, Statistics Canada and FRED,
+  with dates and links, instead of numbers from news articles.
+- **Economic calendar** (`economic_calendar`): upcoming central-bank decisions and data releases
+  for Canada, the US, India, Europe and Australia, refreshed weekly; a date is kept only if it is
+  written in the search result. Your own dates in `calendar/my-dates.json`.
+- **Background jobs take turns** (`toolbox/heavy.py`): one heavy job at a time, and they pause
+  between steps while you chat, so answers stay fast with several nightly jobs.
+- **One confidence scale** (`toolbox/sources.py`) and a **knowledge-base inbox** where plugins
+  add their own checked public stories.
+
 - **Fast first answer in every request slot.** With two requests at once (28+ GB RAM), the
   preload now has the model read the Assistant's instructions and tools in both slots, so a
   chat that arrives while a long job uses one slot still starts in seconds instead of reading

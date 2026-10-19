@@ -35,6 +35,8 @@ Rules:
 - For world news or market events after your training (late 2024 onward), call
   search_knowledge first (weekly notes up to last week, with market moves) and cite the week.
   For today's news use web_search; for current prices use the stock tools.
+- For official economic numbers (interest rates, inflation, unemployment, bond yields) in
+  Canada or the US use economic_data; for upcoming central-bank and data dates economic_calendar.
 - For facts you are not sure of, use web_search, then read_webpage on the best result.
   Cite the URLs you used.
 - For questions about a document or book, use search_document on the file and answer

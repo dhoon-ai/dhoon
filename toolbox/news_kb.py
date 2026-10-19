@@ -45,6 +45,11 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import econ_calendar  # noqa: E402  (the shared calendar of economic events, refreshed weekly here)
+import heavy  # noqa: E402  (one heavy background job at a time, chats first)
+import sources  # noqa: E402  (one confidence scale for everything that counts sources)
+
 KIT = Path(__file__).resolve().parents[1]
 WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
 KB = Path(os.environ.get("KNOWLEDGE_DIR", str(WORKSPACE / "knowledge")))
@@ -374,8 +379,7 @@ def _has(text: str, term: str) -> bool:
 
 
 def _outlet_key(name: str) -> str:
-    name = re.sub(r"^(www\.|m\.|edition\.|news\.)", "", name.lower())
-    return re.sub(r"[^a-z0-9]", "", re.split(r"[.\s]", name)[0]) or name
+    return sources.outlet_key(name)
 
 
 def _cited(terms: list[str], raw: str) -> tuple[bool, list[str]]:
@@ -403,10 +407,8 @@ def _confirming_sites(terms: list[str], when: str, search) -> list[str]:
     return list(dict.fromkeys(sites))
 
 
-def confidence(in_wikipedia: bool, sources: int) -> int:
-    if sources == 0:
-        return 2 if in_wikipedia else 1
-    return max(1, min(10, 3 + 2 * sources - (0 if in_wikipedia else 2)))
+def confidence(in_wikipedia: bool, n: int) -> int:
+    return sources.confidence(n, in_primary=in_wikipedia)
 
 
 def _general_search(q: str) -> dict:
@@ -494,6 +496,34 @@ def market_table(first: dt.date, last: dt.date, data: dict) -> str:
     return "| Market | Close | Change |\n|---|---|---|\n" + "\n".join(rows)
 
 
+# ------------------------------------------------------------------ inbox ---
+# Plugins can add their own checked, public stories to the knowledge base: one JSON object per
+# line in knowledge/inbox/<anything>.jsonl:
+#   {"date": "2026-10-14", "title": "...", "text": "...", "source": "Outlet", "url": "...",
+#    "confidence": 8, "region": "canada"}
+# Items of confidence 7+ go into that week's note with their source, like the outlets Wikipedia
+# cites. Only put public information here: the notes can be read by anyone using the Assistant.
+INBOX_MIN_CONFIDENCE = 7
+
+
+def inbox_items(monday: dt.date) -> str:
+    sunday = monday + dt.timedelta(days=6)
+    lines = []
+    for f in sorted((KB / "inbox").glob("*.jsonl")) if (KB / "inbox").exists() else []:
+        for line in f.read_text().splitlines():
+            try:
+                x = json.loads(line)
+                d = dt.date.fromisoformat(str(x["date"])[:10])
+                conf = int(x.get("confidence", 0))
+            except (ValueError, KeyError, TypeError):
+                continue
+            if monday <= d <= sunday and conf >= INBOX_MIN_CONFIDENCE and x.get("title"):
+                src = re.sub(r"[()]", "", str(x.get("source") or "your plugin"))[:40]
+                text = re.sub(r"\s+", " ", str(x.get("text") or ""))[:300]
+                lines.append(f"- [{d:%a %d %b}] {x['title']}: {text} ({src})")
+    return "\n".join(lines[:15])
+
+
 def write_week(
     monday: dt.date, today: dt.date, get=None, search=None, post=None, download=None, confirm=None
 ) -> Path | None:
@@ -504,6 +534,9 @@ def write_week(
     extra = recent_headlines(monday, today, search)
     if extra:
         text += "\n\n### Headlines from a news search this week\n" + extra
+    checked = inbox_items(monday)
+    if checked:
+        text += "\n\n### Checked stories from your plugins\n" + checked
     table = market_table(monday, monday + dt.timedelta(days=6), prices(start_date(), download))
     if table:
         text = f"### World markets this week (from prices)\n{table}\n\n{text}"
@@ -674,6 +707,7 @@ def update(today: dt.date | None = None, max_minutes: float | None = None, start
         if limit and (time.monotonic() - began) / 60 >= limit:
             stopped = True
             break
+        heavy.yield_to_chats()  # someone is chatting: let the chat have the model first
         try:
             path = write_week(
                 monday, today, io.get("get"), io.get("search"), io.get("post"), io.get("download"), io.get("confirm")
@@ -785,7 +819,13 @@ def main(argv=None) -> int:
         return 0
     if a.update or a.catch_up:
         print(f"Knowledge base: writing missing weeks since {start_date():%B %Y} (newest first)...", flush=True)
-        r = update(max_minutes=0 if a.catch_up else None)
+        with heavy.heavy_job("knowledge base"):
+            r = update(max_minutes=0 if a.catch_up else None)
+            if econ_calendar.due(dt.date.today()):
+                try:
+                    r["calendar_events"] = len(econ_calendar.refresh()["events"])
+                except Exception as e:  # noqa: BLE001 - a bonus, never a reason to fail the night
+                    r["calendar_events"] = f"failed ({e})"
         n = index_notes()
         print(json.dumps({**r, "indexed_notes": n}, indent=1))
         if r["left"]:

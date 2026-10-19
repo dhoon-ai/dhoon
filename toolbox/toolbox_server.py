@@ -167,7 +167,7 @@ import importlib  # noqa: E402
 import emailer  # noqa: E402, F401  (toolbox/emailer.py, settings in config/email.env; tools use tb.emailer)
 
 sys.modules.setdefault("toolbox_server", sys.modules[__name__])
-TOOLSETS = ["everyday", "web", "files", "documents", "knowledge", "planner", "stocks", "mail"]
+TOOLSETS = ["everyday", "web", "files", "documents", "knowledge", "economy", "planner", "stocks", "mail"]
 for _name in TOOLSETS:
     _mod = sys.modules.get(f"toolset.{_name}")
     if _mod is not None and getattr(_mod, "_registered_on", None) is not mcp:
@@ -238,6 +238,7 @@ _compact_schemas()
 # LibreChat talks to Ollama through here (baseURL .../8001/ollama/v1/), so the toolbox can
 # keep a copy of the Assistant's instructions + tool list (not the chat) for warmup.py,
 # which has Ollama read them in advance: the first answer then starts in seconds.
+import heavy  # noqa: E402  (toolbox/heavy.py: one heavy background job at a time, chats first)
 import warmup  # noqa: E402  (toolbox/warmup.py)
 
 _PASS_HEADERS = ("content-type", "accept", "authorization")
@@ -251,6 +252,7 @@ async def ollama_proxy(request):
     body = await request.body()
     if request.method == "POST" and path.rstrip("/").endswith("chat/completions"):
         warmup.remember(body)
+        heavy.chat_seen()  # background jobs pause between their steps while you chat
     client = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10), transport=_OLLAMA_TRANSPORT)
     upstream = client.build_request(
         request.method,

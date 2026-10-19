@@ -419,6 +419,7 @@ page address, a place name, a ticker), never your chats or files.
 | [rank-bm25](https://github.com/dorianbrown/rank_bm25) | keyword search in documents | Apache-2.0 |
 | [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Matplotlib](https://matplotlib.org) | numbers and charts (also in the sandbox) | BSD-3-Clause, BSD-3-Clause, Matplotlib (PSF-based) |
 | [yfinance](https://github.com/ranaroussi/yfinance) | market data from Yahoo Finance *(online; Yahoo's terms: personal use)* | Apache-2.0 |
+| [Bank of Canada Valet](https://www.bankofcanada.ca/valet/docs), [Statistics Canada](https://www.statcan.gc.ca/en/developers/wds), [FRED](https://fred.stlouisfed.org) | official economic numbers *(online)* | open data (Statistics Canada Open Licence; FRED terms) |
 | [Wikipedia "Current events"](https://en.wikipedia.org/wiki/Portal:Current_events) | world news for the knowledge base, summarised on your computer *(online)* | CC BY-SA 4.0 (content) |
 | [Python-Markdown](https://python-markdown.github.io) | e-mails in HTML | BSD-3-Clause |
 | [icalendar](https://github.com/collective/icalendar), [recurring-ical-events](https://github.com/niccokunzmann/python-recurring-ical-events), [caldav](https://github.com/python-caldav/caldav) | calendars | BSD-2-Clause, LGPL-3.0-or-later, Apache-2.0 / GPL-3.0 |

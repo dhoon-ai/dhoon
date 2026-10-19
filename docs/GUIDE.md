@@ -383,6 +383,8 @@ new ones. Reload the web page and pick **Agents → Assistant** (or **Quick Assi
      - For world news or market events after your training (late 2024 onward), call
        search_knowledge first (weekly notes up to last week, with market moves) and cite the week.
        For today's news use web_search; for current prices use the stock tools.
+     - For official economic numbers (interest rates, inflation, unemployment, bond yields) in
+       Canada or the US use economic_data; for upcoming central-bank and data dates economic_calendar.
      - For facts you are not sure of, use web_search, then read_webpage on the best result.
        Cite the URLs you used.
      - For questions about a document or book, use search_document on the file and answer
@@ -969,6 +971,34 @@ markets move in April 2025, and why?"*
 Only public pages are downloaded; nothing about you is sent. The notes are summaries of web
 content made by a local AI: good for context, but check anything important. Switch it off
 with `KNOWLEDGE=off` in `config/models.env`, then `bash scripts/04_toolbox.sh`.
+
+---
+
+## Official economic numbers and the economic calendar
+
+- **`economic_data`** gives the latest official numbers straight from the source, with their date
+  and link: for Canada the Bank of Canada policy rate, USD/CAD and the 10-year bond yield (Bank of
+  Canada Valet), inflation and unemployment (Statistics Canada); for the US inflation,
+  unemployment, the federal funds rate and the 10-year Treasury yield (FRED). Try *"What is
+  Canada's inflation rate now?"*
+- **`economic_calendar`** lists upcoming central-bank decisions and data releases for Canada, the
+  US, India, Europe and Australia. Once a week (with the knowledge base's nightly run) a few
+  searches look for the next dates; an event is kept only if its date is written in the search
+  result, with the link to check. Add your own in `~/agent-workspace/calendar/my-dates.json`:
+  `[{"date": "2026-12-10", "event": "Bank of Canada decision", "region": "canada"}]`.
+
+## Background jobs take turns
+
+The knowledge base and your plugins' nightly jobs use the same model on the same computer. They
+run one at a time (a job waits for the one before), and pause between their steps while you are
+chatting, so your answers stay fast. See which job runs now: `runtime/venv/bin/python toolbox/heavy.py`.
+Plugins use it with `with heavy.heavy_job("name"):` and `heavy.yield_to_chats()` (toolbox/heavy.py).
+
+Plugins can also add their own checked, **public** stories to the knowledge base: one JSON object
+per line in `~/agent-workspace/knowledge/inbox/<name>.jsonl` (date, title, text, source, url,
+confidence, region); items with confidence 7+ go into that week's note. The confidence scale is
+shared (`toolbox/sources.py`): 1 source 5/10, 2 sources 7/10, 3 sources 9/10, 4+ 10/10, an
+official source +1.
 
 ---
 
