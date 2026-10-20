@@ -26,6 +26,8 @@ config/models.env
 plugins/*
 !plugins/README.md
 .agent-model
-newsroom-actions.txt
-newsroom-push-key.pem
+# Private keys and your own plugin settings next to them (never commit them)
+*.pem
+*.key
+config/*.txt
 nohup.out
