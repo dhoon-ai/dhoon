@@ -1,6 +1,6 @@
 """World news and markets knowledge base: what happened after the AI model's training, week by week.
 
-The AI models know the world only up to their training (late 2024 for the Qwen3 models).
+The AI models know the world only up to their training (January 2025 for the Gemma 4 model and late 2024 for Qwen3 models).
 This script fills the gap, on this computer:
 
   1. Downloads Wikipedia's "Current events" pages (a day-by-day list of world news, CC BY-SA)
