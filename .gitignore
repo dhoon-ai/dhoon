@@ -26,3 +26,6 @@ config/models.env
 plugins/*
 !plugins/README.md
 .agent-model
+newsroom-actions.txt
+newsroom-push-key.pem
+nohup.out
