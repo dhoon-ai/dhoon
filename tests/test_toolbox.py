@@ -591,3 +591,34 @@ def test_search_document_also_finds_exact_terms(tb, monkeypatch):
     (tb.WORKSPACE / "invoices.txt").write_text(notes)
     out = tb.search_document("invoices.txt", "INV-20931 overdue", top_k=1)
     assert "INV-20931 is overdue" in out
+
+
+# ---------------------------------------------------------------- receipts ---
+def test_read_receipts_into_a_spreadsheet_and_continue(tb, monkeypatch):
+    rr = pytest.importorskip("receipt_reader")
+    from PIL import Image
+    from receipt_reader import model as rr_model
+
+    folder = tb.WORKSPACE / "receipts"
+    folder.mkdir(parents=True)
+    for name in ("a.jpg", "b.jpg"):
+        Image.new("RGB", (400, 600), "white").save(folder / name)
+    good = {"vendor": "Maple Corner Grocery", "date": "2026-10-20", "currency": "CAD",
+            "items": [{"description": "Bread", "quantity": 1, "amount": 3.29}], "subtotal": 3.29,
+            "taxes": [], "tip": None, "total": 3.29, "payment_method": "cash", "category": "groceries"}
+    asked = []
+    monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: asked.append(kw) or dict(good))
+    monkeypatch.setattr(sys.modules["toolset.receipts"], "MOST", 1)
+    first = tb.read_receipts("receipts", "receipts.csv")
+    assert "Read 1 receipt(s)" in first and "1 more receipt(s)" in first and asked[0]["model"] == tb.PLANNER_MODEL
+    second = tb.read_receipts("receipts", "receipts.csv")
+    assert "Read 1 receipt(s)" in second and "more receipt" not in second
+    rows = (tb.WORKSPACE / "receipts.csv").read_text().splitlines()
+    assert len(rows) == 3 and "Maple Corner Grocery" in rows[2]
+    assert "No new receipts" in tb.read_receipts("receipts", "receipts.csv")
+    assert rr.__name__ == "receipt_reader"
+
+
+def test_read_receipts_without_the_package(tb, monkeypatch):
+    monkeypatch.setitem(sys.modules, "receipt_reader", None)
+    assert "pip install git+https://github.com/knowreva/receipt-reader" in tb.read_receipts()

@@ -211,6 +211,8 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │  cancel_scheduled_task (run by ai-scheduler timer)  │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
+  │  read_receipts (photos/PDF invoices to a CSV, with  │
+  │    the optional receipt-reader package)             │
   │  ask_planner ──▶ main model in Ollama ─────────────┘
   └──────┬──────────────────────────────────────────────┘
          │

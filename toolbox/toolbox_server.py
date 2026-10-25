@@ -14,6 +14,7 @@ toolset/, one file per job:
   planner.py    ask_planner (plans big tasks in rounds)
   stocks.py     stock_price_summary / stock_indicators / stock_fundamentals / stock_save_history
   mail.py       send_email (your own account, allow-listed)
+  receipts.py   read_receipts (photos and PDF invoices to a CSV; needs KnowReva's receipt-reader)
 
 Every tool is also available here as toolbox_server.<name> (plugins and scripts use that).
 To add a skill: put a function with @tb.mcp.tool() and a clear docstring (the AI reads it)
@@ -167,7 +168,7 @@ import importlib  # noqa: E402
 import emailer  # noqa: E402, F401  (toolbox/emailer.py, settings in config/email.env; tools use tb.emailer)
 
 sys.modules.setdefault("toolbox_server", sys.modules[__name__])
-TOOLSETS = ["everyday", "web", "files", "documents", "knowledge", "economy", "planner", "stocks", "mail"]
+TOOLSETS = ["everyday", "web", "files", "documents", "knowledge", "economy", "planner", "stocks", "mail", "receipts"]
 for _name in TOOLSETS:
     _mod = sys.modules.get(f"toolset.{_name}")
     if _mod is not None and getattr(_mod, "_registered_on", None) is not mcp:
