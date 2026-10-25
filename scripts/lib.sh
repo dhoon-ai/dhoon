@@ -57,7 +57,7 @@ fi
 # agent never waits for the 19 GB model to load again. Machines with less RAM free it after
 # 30 minutes so other programs get the memory back.
 # How many requests one model answers at once. 2 with 28+ GB RAM: a chat is not stuck behind a
-# long background job (a newsroom draft); each costs memory for its own context.
+# long background job (a long report); each costs memory for its own context.
 if [ -z "${NUM_PARALLEL:-}" ]; then
   if [ "$RAM_GB" -ge 28 ]; then NUM_PARALLEL=2; else NUM_PARALLEL=1; fi
 fi
