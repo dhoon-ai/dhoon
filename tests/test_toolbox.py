@@ -622,3 +622,20 @@ def test_read_receipts_into_a_spreadsheet_and_continue(tb, monkeypatch):
 def test_read_receipts_without_the_package(tb, monkeypatch):
     monkeypatch.setitem(sys.modules, "receipt_reader", None)
     assert "pip install git+https://github.com/knowreva/receipt-reader" in tb.read_receipts()
+
+
+def test_read_receipts_with_your_usual_currency(tb, monkeypatch):
+    pytest.importorskip("receipt_reader")
+    from PIL import Image
+    from receipt_reader import model as rr_model
+
+    (tb.WORKSPACE / "receipts").mkdir(parents=True)
+    Image.new("RGB", (400, 600), "white").save(tb.WORKSPACE / "receipts" / "a.jpg")
+    good = {"vendor": "Corner Shop", "date": "2026-10-20", "currency": "$",
+            "items": [{"description": "Milk", "quantity": 1, "amount": 5.00}], "subtotal": 5.00,
+            "taxes": [], "tip": None, "total": 5.00, "payment_method": "cash", "category": "groceries"}
+    prompts = []
+    monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: prompts.append(messages[0]["content"]) or dict(good))
+    monkeypatch.setenv("RECEIPT_CURRENCY", "cad")
+    out = tb.read_receipts("receipts", "r.csv")
+    assert "5.0 CAD" in out and "it is CAD" in prompts[0]  # "$" became your usual currency

@@ -47,6 +47,9 @@ EnvironmentFile=-$KIT/config/email.env
 # only, personal details removed). Empty = your SearXNG's usual engines. Choose your own in
 # config/models.env, e.g. RESEARCH_ENGINES="startpage,duckduckgo,brave"
 Environment=RESEARCH_ENGINES=${RESEARCH_ENGINES:-}
+# read_receipts (optional receipt-reader package): its model and your usual currency, from config/models.env
+Environment=RECEIPT_MODEL=${RECEIPT_MODEL:-}
+Environment=RECEIPT_CURRENCY=${RECEIPT_CURRENCY:-}
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/toolbox_server.py
 Restart=on-failure
 RestartSec=5
@@ -71,6 +74,8 @@ Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
 Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
+Environment=RECEIPT_MODEL=${RECEIPT_MODEL:-}
+Environment=RECEIPT_CURRENCY=${RECEIPT_CURRENCY:-}
 EnvironmentFile=-$KIT/config/email.env
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/scheduler.py --run-due
 TimeoutStartSec=2h

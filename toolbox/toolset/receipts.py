@@ -1,7 +1,8 @@
 """read_receipts: receipt photos and PDF invoices to a spreadsheet, with KnowReva's open-source
 receipt-reader (https://github.com/knowreva/receipt-reader). Optional: if it isn't installed, the
 tool says how to install it. It uses Dhoon's own model (it can read images) unless RECEIPT_MODEL
-names another, e.g. qwen2.5vl:7b."""
+names another, e.g. qwen2.5vl:7b. RECEIPT_CURRENCY (e.g. CAD) is your usual currency, for receipts
+that only print "$". Updates to receipt-reader reach Dhoon when the package is updated (see below)."""
 
 import csv
 import os
@@ -12,16 +13,17 @@ MOST = 20  # receipts per call: each takes up to a minute on a CPU
 
 
 @tb.mcp.tool()
-def read_receipts(folder: str = "receipts", output: str = "receipts.csv") -> str:
+def read_receipts(folder: str = "receipts", output: str = "receipts.csv", currency: str = "") -> str:
     """Read the receipt photos and PDF invoices in a workspace folder into a spreadsheet (CSV in
     the workspace): date, shop, category, currency, tax and total for each. Every row is checked
     by arithmetic (items, tax and total must add up); rows marked CHECK need the user to look.
     Use when the user asks to log, list, total or organise receipts or invoices. Up to 20
-    receipts per call; call again for the next ones."""
+    receipts per call; call again for the next ones. currency: the user's usual currency as a
+    3-letter code (CAD, USD, EUR...) if they said it, for receipts that only print "$"."""
     try:
         from receipt_reader import files, output as out, reader
     except ImportError:
-        return ("receipt-reader isn't installed. On the Dhoon computer run: "
+        return ("receipt-reader isn't installed. On the Dhoon computer run (the same command updates it): "
                 "~/dhoon/runtime/venv/bin/pip install git+https://github.com/knowreva/receipt-reader "
                 "then: sudo systemctl restart ai-toolbox")  # fmt: skip
     src, dest = tb._safe_path(folder), tb._safe_path(output)
@@ -36,10 +38,12 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv") -> str
     if not todo:
         return f"No new receipts in '{folder}' ({len(done)} already in {output})."
     model = os.environ.get("RECEIPT_MODEL") or tb.PLANNER_MODEL
+    usual = (currency or os.environ.get("RECEIPT_CURRENCY", "")).strip().upper()
+    extra = {"currency": usual} if usual else {}  # only when set: older receipt-readers don't take it
     results, lines = [], []
     for path in todo[:MOST]:
         try:
-            r = reader.read(path, model=model, url=tb.OLLAMA_URL)
+            r = reader.read(path, model=model, url=tb.OLLAMA_URL, **extra)
         except Exception as e:  # noqa: BLE001 - one unreadable file doesn't stop the others
             r = {"file": str(path), "status": "check", "problems": [f"couldn't read it: {type(e).__name__}: {e}"]}
         results.append(r)
