@@ -9,6 +9,7 @@ doesn't add up. Updates to receipt-reader reach Dhoon when the package is update
 import csv
 import os
 
+import heavy
 import toolbox_server as tb
 
 MOST = 20  # receipts per call: each takes up to a minute on a CPU
@@ -44,15 +45,25 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
     extra = {"currency": usual} if usual else {}  # only when set: older receipt-readers don't take it
     if os.environ.get("RECEIPT_FAST", "").lower() == "on":
         extra["fast"] = True
+    busy = heavy.running()
+    if busy:  # a newsroom or knowledge-base run is using the model: two at once can push it out of memory
+        return (f"Not now: {busy.get('name', 'a long job')} is running (since {busy.get('since', '?')}) and uses the "
+                "same model. Reading receipts at the same time would slow both, or push its model out of memory. "
+                "Ask again when it has finished (python3 ~/dhoon/toolbox/heavy.py shows what is running).")  # fmt: skip
     results, lines = [], []
-    for path in todo[:MOST]:
-        try:
-            r = reader.read(path, model=model, url=tb.OLLAMA_URL, **extra)
-        except Exception as e:  # noqa: BLE001 - one unreadable file doesn't stop the others
-            r = {"file": str(path), "status": "check", "problems": [f"couldn't read it: {type(e).__name__}: {e}"]}
-        results.append(r)
-        lines.append(f"| {path.name} | {r.get('date', '')} | {r.get('vendor', '')} | {r.get('total', '')} {r.get('currency', '')} | "
-                     f"{'ok' if r['status'] == 'ok' else 'CHECK: ' + '; '.join(r['problems'])[:120]} |")  # fmt: skip
+    try:
+        with heavy.heavy_job("receipts", wait_minutes=0):  # in the queue: scheduled jobs wait for this one
+            for path in todo[:MOST]:
+                try:
+                    r = reader.read(path, model=model, url=tb.OLLAMA_URL, **extra)
+                except Exception as e:  # noqa: BLE001 - one unreadable file doesn't stop the others
+                    r = {"file": str(path), "status": "check",
+                         "problems": [f"couldn't read it: {type(e).__name__}: {e}"]}  # fmt: skip
+                results.append(r)
+                lines.append(f"| {path.name} | {r.get('date', '')} | {r.get('vendor', '')} | {r.get('total', '')} "
+                             f"{r.get('currency', '')} | {'ok' if r['status'] == 'ok' else 'CHECK: ' + '; '.join(r['problems'])[:120]} |")  # fmt: skip
+    except TimeoutError:
+        return "Not now: another long job has just started and uses the same model. Ask again when it has finished."
     rows = previous + [out.row(r) for r in results]
     with open(dest, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=out.COLUMNS)

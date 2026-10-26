@@ -696,3 +696,26 @@ def test_the_reranker_reorders_when_switched_on(tb, fake_embed, monkeypatch):
     monkeypatch.setattr(documents, "_reranker", None)
     monkeypatch.setitem(sys.modules, "fastembed", None)  # switched on but not installed: the usual order
     assert "Apples" in tb.search_document("a.txt", "red apples", top_k=1)
+
+
+def test_read_receipts_waits_its_turn_with_long_jobs(tb, monkeypatch):
+    """A newsroom run writing with the model while receipts load theirs pushed its model out of memory:
+    read_receipts says "not now" while a long job runs, and holds the queue while it reads."""
+    pytest.importorskip("receipt_reader")
+    import heavy
+    from PIL import Image
+    from receipt_reader import model as rr_model
+
+    (tb.WORKSPACE / "receipts").mkdir(parents=True)
+    Image.new("RGB", (400, 600), "white").save(tb.WORKSPACE / "receipts" / "a.jpg")
+    seen = []
+    good = {"vendor": "Corner Shop", "date": "2026-10-20", "date_printed": "2026-10-20", "currency": "CAD",
+            "items": [{"description": "Milk", "quantity": 1, "amount": 5.00}], "subtotal": 5.00, "taxes": [],
+            "tip": None, "total": 5.00, "payment_method": "cash", "category": "groceries"}  # fmt: skip
+    monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: seen.append(heavy.running().get("name")) or dict(good))
+    real = heavy.running
+    monkeypatch.setattr(heavy, "running", lambda: {"name": "newsroom", "since": "10:30", "pid": 1})
+    assert tb.read_receipts("receipts", "r.csv").startswith("Not now: newsroom is running (since 10:30)")
+    monkeypatch.setattr(heavy, "running", real)  # (not monkeypatch.undo: that would also undo HEAVY_DIR)
+    assert "Read 1 receipt(s)" in tb.read_receipts("receipts", "r.csv")
+    assert seen == ["receipts"] and heavy.running() == {}  # in the queue while reading, then let go
