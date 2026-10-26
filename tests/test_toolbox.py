@@ -639,3 +639,60 @@ def test_read_receipts_with_your_usual_currency(tb, monkeypatch):
     monkeypatch.setenv("RECEIPT_CURRENCY", "cad")
     out = tb.read_receipts("receipts", "r.csv")
     assert "5.0 CAD" in out and "it is CAD" in prompts[0]  # "$" became your usual currency
+
+
+# ---------------------------------------------------------------- every document at once ---
+def test_search_all_documents_finds_the_right_file_and_keeps_up_with_changes(tb, fake_embed):
+    import docx
+
+    (tb.WORKSPACE / "contracts").mkdir()
+    d = docx.Document()
+    d.add_paragraph("This lease renews automatically on March 1 unless either party gives sixty days notice.")
+    d.save(tb.WORKSPACE / "contracts" / "lease.docx")
+    _make_pdf(tb.WORKSPACE / "contracts" / "phone.pdf", ["The phone plan costs forty dollars a month with no contract."])
+    (tb.WORKSPACE / "recipes.txt").write_text("Bake the bread at two hundred degrees for forty minutes.\n" * 3)
+    (tb.WORKSPACE / ".hidden.txt").write_text("lease renews secret notes that must not be searched" * 3)
+    out = tb.search_all_documents("lease renews automatically", top_k=1)
+    assert out.splitlines()[2].startswith("[contracts/lease.docx, page 1") and "March 1" in out
+    assert ".hidden" not in out and (tb.WORKSPACE / ".index" / "vectors.sqlite").exists()
+    calls = len(fake_embed)
+    tb.search_all_documents("bread oven", top_k=1)
+    assert len(fake_embed) == calls + 1  # already indexed: only the question is embedded
+    assert "recipes.txt" in tb.search_all_documents("bake bread", folder=".", top_k=1)
+    assert "recipes.txt" not in tb.search_all_documents("bake bread", folder="contracts", top_k=3)  # one folder
+    (tb.WORKSPACE / "recipes.txt").write_text("Soup: simmer the lentils for half an hour.\n" * 3)  # changed
+    out = tb.search_all_documents("lentil soup", top_k=1)
+    assert "lentils" in out and "bread" not in out
+    (tb.WORKSPACE / "contracts" / "phone.pdf").unlink()  # deleted: gone from the index
+    assert "phone.pdf" not in tb.search_all_documents("phone plan forty dollars", top_k=5)
+
+
+def test_new_documents_are_indexed_a_few_at_a_time(tb, fake_embed, monkeypatch):
+    from toolset import documents
+
+    monkeypatch.setattr(documents, "NEW_FILES_PER_CALL", 2)
+    for i in range(5):
+        (tb.WORKSPACE / f"note{i}.txt").write_text(f"Note number {i} about the garden and the tomato plants." * 2)
+    out = tb.search_all_documents("tomato garden")
+    assert "2 new or changed document(s) indexed for this search; 3 more on the next one" in out
+    tb.search_all_documents("tomato garden")
+    assert "more on the next one" not in tb.search_all_documents("tomato garden")
+
+
+def test_the_reranker_reorders_when_switched_on(tb, fake_embed, monkeypatch):
+    from toolset import documents
+
+    (tb.WORKSPACE / "a.txt").write_text("Apples are red. " * 40 + "\n\n" + "Pears are green. " * 40)
+    plain = tb.search_document("a.txt", "red apples", top_k=1)
+    assert "Apples" in plain
+    monkeypatch.setattr(documents, "RERANK", True)
+
+    class Stub:  # a cross-encoder that prefers pears
+        def rerank(self, query, docs):
+            return [5.0 if "Pears" in d else 0.1 for d in docs]
+
+    monkeypatch.setattr(documents, "_reranker", Stub())
+    assert "Pears" in tb.search_document("a.txt", "red apples", top_k=1)
+    monkeypatch.setattr(documents, "_reranker", None)
+    monkeypatch.setitem(sys.modules, "fastembed", None)  # switched on but not installed: the usual order
+    assert "Apples" in tb.search_document("a.txt", "red apples", top_k=1)

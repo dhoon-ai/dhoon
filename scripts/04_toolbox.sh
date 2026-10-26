@@ -50,6 +50,9 @@ Environment=RESEARCH_ENGINES=${RESEARCH_ENGINES:-}
 # read_receipts (optional receipt-reader package): its model and your usual currency, from config/models.env
 Environment=RECEIPT_MODEL=${RECEIPT_MODEL:-}
 Environment=RECEIPT_CURRENCY=${RECEIPT_CURRENCY:-}
+Environment=RECEIPT_FAST=${RECEIPT_FAST:-}
+# search_document(s): the optional reranker (pip install fastembed; see config/models.env.example)
+Environment=DOC_RERANK=${DOC_RERANK:-}
 ExecStart=$RUNTIME/venv/bin/python $KIT/toolbox/toolbox_server.py
 Restart=on-failure
 RestartSec=5

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from bs4 import BeautifulSoup
 # ------------------------------------------------------------------ documents ---
 DOC_TYPES = {".pdf", ".docx", ".xlsx", ".txt", ".md", ".csv", ".html", ".htm", ".json"}
 CHUNK_CHARS, CHUNK_OVERLAP = 1200, 200
+# Optional reranker: a small cross-encoder (fastembed, ONNX on the CPU, about 80 MB) reads the question
+# and each candidate passage together and re-orders them. pip install fastembed, then DOC_RERANK=on.
+RERANK = os.environ.get("DOC_RERANK", "off").lower() == "on"
+RERANK_MODEL = os.environ.get("DOC_RERANK_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2")
+NEW_FILES_PER_CALL = 20  # search_all_documents indexes at most this many new or changed files a call
 
 
 def _doc_pages(p: Path) -> list[tuple[int, str]]:
@@ -110,6 +116,35 @@ def _hybrid_rank(chunks: list[dict], query: str, meaning: "list[float]") -> list
     return sorted(fused, key=lambda i: -fused[i])
 
 
+_reranker = None
+
+
+def _rerank(query: str, texts: list[str]) -> list[float] | None:
+    """Cross-encoder scores for each passage (higher is better), or None when it is off or not installed."""
+    global _reranker
+    if not RERANK or not texts:
+        return None
+    try:
+        if _reranker is None:
+            from fastembed.rerank.cross_encoder import TextCrossEncoder
+
+            _reranker = TextCrossEncoder(model_name=RERANK_MODEL)
+        return [float(x) for x in _reranker.rerank(query, texts)]
+    except Exception:  # noqa: BLE001 - not installed or the model can't load: the usual order
+        return None
+
+
+def _best(chunks: list[dict], query: str, scores, top_k: int) -> list[int]:
+    """Meaning + keywords, then (DOC_RERANK=on) the reranker over the top 20."""
+    order = _hybrid_rank(chunks, query, scores)
+    k = max(1, min(top_k, 10))
+    head = order[: max(20, k)]
+    again = _rerank(query, [chunks[i]["text"] for i in head])
+    if again is not None:
+        head = [i for _, i in sorted(zip(again, head, strict=True), key=lambda x: -x[0])]
+    return head[:k]
+
+
 @tb.mcp.tool()
 def search_document(path: str, query: str, top_k: int = 5) -> str:
     """Find the passages in a document (PDF, Word, Excel, text, Markdown, HTML, CSV) in the workspace
@@ -129,7 +164,7 @@ def search_document(path: str, query: str, top_k: int = 5) -> str:
         return f"Could not search {path}: {e}"
     m = np.array([c["vec"] for c in chunks])
     scores = m @ q / (np.linalg.norm(m, axis=1) * np.linalg.norm(q) + 1e-9)
-    best = _hybrid_rank(chunks, query, scores)[: max(1, min(top_k, 10))]
+    best = _best(chunks, query, scores, top_k)
     parts = [f"[page {chunks[i]['page']}, relevance {scores[i]:.2f}]\n{chunks[i]['text']}" for i in best]
     return (f"Top passages from {path} for: {query}\n\n" + "\n\n---\n\n".join(parts))[: tb.MAX_TEXT]
 
@@ -150,3 +185,80 @@ def read_document(path: str, start_page: int = 1, max_pages: int = 3) -> str:
     chosen = [(n, t) for n, t in pages if start <= n < start + max(1, min(max_pages, 10))]
     body = "\n\n".join(f"--- page {n} ---\n{t.strip()}" for n, t in chosen) or "(no text on these pages)"
     return f"{path}: {len(pages)} pages in total.\n\n{body}"[: tb.MAX_TEXT]
+
+
+# ------------------------------------------------------------------ every document at once ---
+def _store():
+    import vectors
+
+    return vectors.Store(tb.WORKSPACE / ".index" / "vectors.sqlite")
+
+
+def _documents(root: Path) -> list[Path]:
+    return sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in DOC_TYPES
+                  and not any(part.startswith(".") for part in p.relative_to(tb.WORKSPACE).parts))  # fmt: skip
+
+
+def _sync(store, root: Path) -> tuple[int, int, list[str]]:
+    """Bring the vector index up to date with the workspace: new and changed documents are indexed (at
+    most NEW_FILES_PER_CALL a call), deleted ones removed. Returns (indexed now, still waiting, problems)."""
+    import numpy as np
+
+    files = {str(p.relative_to(tb.WORKSPACE)): p for p in _documents(root)}
+    known = store.keys("files")
+    prefix = str(root.relative_to(tb.WORKSPACE)) if root != tb.WORKSPACE else ""
+    for rel in [k for k in known if k not in files and k.startswith(prefix)]:
+        store.remove_prefix("docs", rel + "#")
+        store.remove("files", rel)
+    todo = [rel for rel, p in files.items() if known.get(rel) != f"{p.stat().st_size}|{p.stat().st_mtime_ns}"]
+    done, problems = 0, []
+    for rel in todo[:NEW_FILES_PER_CALL]:
+        p = files[rel]
+        stamp = f"{p.stat().st_size}|{p.stat().st_mtime_ns}"
+        store.remove_prefix("docs", rel + "#")
+        try:
+            chunks = _index(p)  # cached per file: a document is embedded only once
+        except (ValueError, httpx.HTTPError) as e:
+            problems.append(f"{rel}: {e}")
+            store.add("files", rel, stamp)  # not tried again until it changes
+            continue
+        for i, c in enumerate(chunks):
+            v = np.asarray(c["vec"], np.float32)
+            store.put_vector(f"{rel}#{i}", (v / (np.linalg.norm(v) + 1e-9)).tolist())
+            store.add("docs", f"{rel}#{i}", c["text"], {"path": rel, "page": c["page"]})
+        store.add("files", rel, stamp)
+        done += 1
+    store.commit()
+    return done, max(0, len(todo) - NEW_FILES_PER_CALL), problems
+
+
+@tb.mcp.tool()
+def search_all_documents(query: str, folder: str = ".", top_k: int = 5) -> str:
+    """Search every document in the workspace (or one folder of it) at once: PDFs, Word, Excel, text,
+    Markdown, HTML, CSV. Use when the user doesn't say which document ("which contract mentions the
+    renewal date?"). Quote the passages and name their file and page. New documents are indexed on
+    the first search (a minute or two each on a CPU); after that searches are fast."""
+    import numpy as np
+
+    root = tb._safe_path(folder)
+    if not root.is_dir():
+        return f"No folder {folder} in the workspace. Use list_files to see what is there."
+    store = _store()
+    try:
+        indexed, waiting, problems = _sync(store, root)
+        q = np.asarray(_embed(["search_query: " + query])[0], np.float32)
+    except httpx.HTTPError as e:
+        return f"Could not search: {e}"
+    q = q / (np.linalg.norm(q) + 1e-9)
+    hits = [h for h in store.search(q.tolist(), "docs", k=60) if h["meta"]["path"].startswith(
+        "" if root == tb.WORKSPACE else str(root.relative_to(tb.WORKSPACE)) + "/")]  # fmt: skip
+    if not hits:
+        return "Nothing found." + (f" {waiting} document(s) are still to be indexed: ask again." if waiting else "")
+    chunks = [{"text": h["text"], "page": h["meta"]["page"]} for h in hits]
+    best = _best(chunks, query, [h["score"] for h in hits], top_k)
+    parts = [f"[{hits[i]['meta']['path']}, page {hits[i]['meta']['page']}, relevance {hits[i]['score']:.2f}]\n"
+             f"{hits[i]['text']}" for i in best]  # fmt: skip
+    note = (f"\n\n({indexed} new or changed document(s) indexed for this search; {waiting} more on the next one.)"
+            if waiting else "")  # fmt: skip
+    note += f"\n\nNot searchable: {'; '.join(problems[:3])}" if problems else ""
+    return (f"Top passages across the documents for: {query}\n\n" + "\n\n---\n\n".join(parts) + note)[: tb.MAX_TEXT]

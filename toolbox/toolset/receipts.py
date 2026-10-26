@@ -2,7 +2,9 @@
 receipt-reader (https://github.com/knowreva/receipt-reader). Optional: if it isn't installed, the
 tool says how to install it. It uses Dhoon's own model (it can read images) unless RECEIPT_MODEL
 names another, e.g. qwen2.5vl:7b. RECEIPT_CURRENCY (e.g. CAD) is your usual currency, for receipts
-that only print "$". Updates to receipt-reader reach Dhoon when the package is updated (see below)."""
+that only print "$". RECEIPT_FAST=on reads photos' text with Tesseract first (receipt-reader's --fast;
+needs tesseract-ocr and pytesseract): much faster on a CPU, with the picture read only when the text
+doesn't add up. Updates to receipt-reader reach Dhoon when the package is updated (see below)."""
 
 import csv
 import os
@@ -40,6 +42,8 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
     model = os.environ.get("RECEIPT_MODEL") or tb.PLANNER_MODEL
     usual = (currency or os.environ.get("RECEIPT_CURRENCY", "")).strip().upper()
     extra = {"currency": usual} if usual else {}  # only when set: older receipt-readers don't take it
+    if os.environ.get("RECEIPT_FAST", "").lower() == "on":
+        extra["fast"] = True
     results, lines = [], []
     for path in todo[:MOST]:
         try:

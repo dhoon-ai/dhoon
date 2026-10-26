@@ -211,6 +211,8 @@ Try it with the Level 7 example in the guide: [Step 9](docs/GUIDE.md#step-9--pra
   │  cancel_scheduled_task (run by ai-scheduler timer)  │
   │  search_document · read_document (PDF/Word/text,    │
   │    embedded with nomic-embed-text in Ollama)        │
+  │  search_all_documents (every file at once: a vector │
+  │    index in one SQLite file; optional reranker)     │
   │  read_receipts (photos/PDF invoices to a CSV, with  │
   │    the optional receipt-reader package)             │
   │  ask_planner ──▶ main model in Ollama ─────────────┘
@@ -321,7 +323,11 @@ up with the main model, every toolbox tool, File Search, the instructions in
 
 **Documents:** either copy a file into `~/agent-workspace` and mention its name (toolbox
 `search_document`), or upload it in the Agent Builder under **File Search** and select it
-with **+** in the chat. See [Ask questions about your documents](docs/GUIDE.md#ask-questions-about-your-documents).
+with **+** in the chat. To ask without naming a file ("which contract mentions the renewal
+date?"), Dhoon searches every document in the workspace at once (`search_all_documents`).
+Its vector index is one SQLite file (`~/agent-workspace/.index/vectors.sqlite`): at a
+person's scale numpy searches it in milliseconds, with no database server to run. An optional
+reranker (`DOC_RERANK=on`, see `config/models.env.example`) re-orders the best passages. See [Ask questions about your documents](docs/GUIDE.md#ask-questions-about-your-documents).
 
 ## Repository layout
 
