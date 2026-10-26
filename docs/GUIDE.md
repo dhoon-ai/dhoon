@@ -851,7 +851,7 @@ There are two ways. Both run entirely on your computer and work with whole books
 |---|---|---|
 | How to add a file | Upload in the Agent Builder | Copy into `~/agent-workspace` |
 | How to ask | Select it with **+**, then ask | Mention the file name in your message |
-| Good for | Asking questions about a document | Also combining it with other tools (web search, Python, saving reports) |
+| Good for | Asking questions about a document | Also combining it with other tools (web search, Python, saving reports), and searching all your documents at once |
 
 
 ### Way 1: LibreChat File Search (upload once, then pick it in any chat)
@@ -891,12 +891,27 @@ The agent uses two tools:
 | Tool | What it does |
 |---|---|
 | `search_document` | Finds the passages that best answer a question, with page numbers. Works on whole books. |
+| `search_all_documents` | The same across every document in the workspace (or one folder), when you don't name a file: *"Which of my contracts mentions the renewal date?"* |
 | `read_document` | Reads pages in order, for example to summarise the first chapter. |
 
 Supported: **PDF** (with real text, not scanned images), **Word (.docx)**, **.txt, .md,
 .csv, .html, .json**. The first search of a big document takes a minute or two while it
 is indexed with `nomic-embed-text`; after that, searches take seconds. Everything stays
 on your computer.
+
+`search_all_documents` keeps every document's passages in one vector index,
+`~/agent-workspace/.index/vectors.sqlite`, and keeps it up to date as files are added, changed
+or deleted. The first search after adding many documents indexes 20 of them and says how many
+are left; ask again for the rest.
+
+**Better order (optional):** a small reranker reads the question together with each of the best
+passages and puts the most relevant first. It runs on the CPU and downloads an 80 MB model on
+first use:
+```bash
+~/dhoon/runtime/venv/bin/pip install fastembed
+echo 'DOC_RERANK=on' >> ~/dhoon/config/models.env
+bash ~/dhoon/scripts/04_toolbox.sh
+```
 
 The workspace way also lets the agent combine documents with its other tools, for
 example *"Compare the refund rules in docs/policy.docx with the ones on this web page"*,
