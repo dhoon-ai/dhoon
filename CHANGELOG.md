@@ -2,6 +2,13 @@
 
 ## v1.1.1 (unreleased)
 
+- **Receipts to a spreadsheet** (`read_receipts`): photos and PDF invoices into a CSV with the date,
+  shop, category, tax and total, checked by code; your usual currency (`RECEIPT_CURRENCY`), an
+  optional fast path that reads the text with Tesseract first (`RECEIPT_FAST=on`), and it takes its
+  turn with the other long jobs.
+- **Search every document at once** (`search_all_documents`): all the workspace's documents in one
+  vector index (one SQLite file, `~/agent-workspace/.index/vectors.sqlite`), kept up to date as
+  files change, with an optional small reranker (`DOC_RERANK=on`).
 - **Official economic numbers** (`economic_data`): Bank of Canada, Statistics Canada and FRED,
   with dates and links, instead of numbers from news articles.
 - **Economic calendar** (`economic_calendar`): upcoming central-bank decisions and data releases
