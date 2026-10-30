@@ -243,6 +243,19 @@ import heavy  # noqa: E402  (toolbox/heavy.py: one heavy background job at a tim
 import warmup  # noqa: E402  (toolbox/warmup.py)
 
 _PASS_HEADERS = ("content-type", "accept", "authorization")
+# A chat on a cloud model (MODEL_CLOUD, a name ending in "cloud") that the cloud can't answer (offline,
+# busy, a usage limit, no answer in CLOUD_WAIT seconds) goes to MODEL_FALLBACK, the main model on this
+# computer, and the cloud is left alone for CLOUD_REST seconds, so a cloud outage costs one slow
+# start, not one per message. Only before the answer starts: an answer cut off halfway stays cut off.
+MODEL_FALLBACK = os.environ.get("MODEL_FALLBACK", "")
+CLOUD_WAIT = float(os.environ.get("CLOUD_WAIT", "90"))
+CLOUD_REST = float(os.environ.get("CLOUD_REST", "900"))
+_cloud = {"rest_until": 0.0}
+_CHAT_PATHS = ("chat/completions", "api/chat", "api/generate")
+
+
+def _is_cloud(model) -> bool:
+    return str(model or "").endswith("cloud")
 
 
 @mcp.custom_route("/ollama/{path:path}", methods=["GET", "POST"], include_in_schema=False)
@@ -251,19 +264,47 @@ async def ollama_proxy(request):
 
     path = request.path_params["path"]
     body = await request.body()
-    if request.method == "POST" and path.rstrip("/").endswith("chat/completions"):
+    chat = request.method == "POST" and path.rstrip("/").endswith(_CHAT_PATHS)
+    if chat and path.rstrip("/").endswith("chat/completions"):
         warmup.remember(body)
         heavy.chat_seen()  # background jobs pause between their steps while you chat
+    model, data = "", None
+    if chat:
+        try:
+            data = json.loads(body)
+            model = data.get("model", "")
+        except ValueError:
+            pass
     client = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10), transport=_OLLAMA_TRANSPORT)
-    upstream = client.build_request(
-        request.method,
-        f"{OLLAMA_URL}/{path}",
-        params=request.query_params,
-        content=body,
-        headers={k: v for k, v in request.headers.items() if k.lower() in _PASS_HEADERS},
+    headers = {k: v for k, v in request.headers.items() if k.lower() in _PASS_HEADERS}
+
+    def build(content: bytes, timeout=None):
+        return client.build_request(request.method, f"{OLLAMA_URL}/{path}", params=request.query_params,
+                                    content=content, headers=headers, timeout=timeout)  # fmt: skip
+
+    local = (
+        json.dumps({**data, "model": MODEL_FALLBACK}).encode() if data and _is_cloud(model) and MODEL_FALLBACK else None
     )
+    r = None
     try:
-        r = await client.send(upstream, stream=True)
+        if local and time.monotonic() < _cloud["rest_until"]:
+            r = await client.send(build(local), stream=True)  # the cloud is resting after a failure
+        elif local:
+            why = ""
+            try:
+                r = await client.send(build(body, httpx.Timeout(CLOUD_WAIT, connect=10)), stream=True)
+                if r.status_code >= 400:
+                    why = f"HTTP {r.status_code}"
+                    await r.aclose()
+            except httpx.RequestError as e:
+                why = type(e).__name__
+            if why:
+                _cloud["rest_until"] = time.monotonic() + CLOUD_REST
+                log.warning("CLOUD %s couldn't answer (%s): %s answers instead for %.0f min",
+                            model, why, MODEL_FALLBACK, CLOUD_REST / 60)  # fmt: skip
+                r = await client.send(build(local), stream=True)
+        else:
+            r = await client.send(build(body), stream=True)
     except httpx.RequestError as e:
         await client.aclose()
         return Response(f"Ollama is not reachable ({type(e).__name__}): sudo systemctl restart ollama", status_code=502)
@@ -276,8 +317,8 @@ async def ollama_proxy(request):
             await r.aclose()
             await client.aclose()
 
-    headers = {k: v for k, v in r.headers.items() if k.lower() in ("content-type", "cache-control")}
-    return StreamingResponse(relay(), status_code=r.status_code, headers=headers)
+    out = {k: v for k, v in r.headers.items() if k.lower() in ("content-type", "cache-control")}
+    return StreamingResponse(relay(), status_code=r.status_code, headers=out)
 
 
 _OLLAMA_TRANSPORT = None  # tests put a fake Ollama here

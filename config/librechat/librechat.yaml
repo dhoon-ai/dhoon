@@ -37,7 +37,7 @@ endpoints:
       # the Assistant's instructions so they can be read in advance (fast first answer).
       baseURL: "http://host.docker.internal:8001/ollama/v1/"
       models:
-        default: ["__MODEL_MAIN__", "__MODEL_FAST__"]   # filled in by the install script
+        default: [__MODEL_LIST__]   # filled in by the install script (MODEL_CLOUD, MODEL_MAIN, MODEL_FAST)
         fetch: true
       titleConvo: true
       titleModel: "__MODEL_FAST__"         # small fast model writes chat titles
