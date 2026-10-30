@@ -39,6 +39,8 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
+# a chat on a cloud model (MODEL_CLOUD) that the cloud can't answer goes to this model on this computer
+Environment=MODEL_FALLBACK=$MODEL_MAIN
 # every tool call is logged here (see: bash scripts/logs.sh)
 Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
 # e-mail settings for the send_email tool (optional; see config/email.env.example)
@@ -76,6 +78,8 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
+# a chat on a cloud model (MODEL_CLOUD) that the cloud can't answer goes to this model on this computer
+Environment=MODEL_FALLBACK=$MODEL_MAIN
 Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
 Environment=RECEIPT_MODEL=${RECEIPT_MODEL:-}
 Environment=RECEIPT_CURRENCY=${RECEIPT_CURRENCY:-}
@@ -133,6 +137,8 @@ Environment=WORKSPACE=$WORKSPACE_DIR
 Environment=SEARXNG_URL=http://127.0.0.1:8888
 Environment=OLLAMA_URL=http://127.0.0.1:11434
 Environment=PLANNER_MODEL=$MODEL_PLANNER
+# a chat on a cloud model (MODEL_CLOUD) that the cloud can't answer goes to this model on this computer
+Environment=MODEL_FALLBACK=$MODEL_MAIN
 Environment=TOOLBOX_LOG=$RUNTIME/logs/toolbox.log
 Environment=KNOWLEDGE_START=$KNOWLEDGE_START
 Environment=KNOWLEDGE_MAX_MINUTES=$KNOWLEDGE_MAX_MINUTES

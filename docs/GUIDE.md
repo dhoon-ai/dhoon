@@ -1105,6 +1105,7 @@ nano config/models.env
 | `MODEL_FAST` | `qwen3:4b-instruct-2507-q4_K_M` | Quick questions, chat titles | same as above |
 | `MODEL_EMBED` | `nomic-embed-text` | Document search | same as above |
 | `MODEL_PLANNER` | same as `MODEL_MAIN` | Model behind `ask_planner` | `bash scripts/04_toolbox.sh` |
+| `MODEL_CLOUD` | empty (no cloud) | An Ollama cloud model for the chat agents, e.g. `beam:cloud` (see below) | `ollama signin`, then `02`, `04`, `05` and `06` |
 | `CONTEXT_LENGTH` | 32768 with 28+ GB RAM, else 16384 | How much text the model keeps in mind | `bash scripts/ollama_settings.sh` |
 | `KEEP_ALIVE` | `-1` (forever) with 28+ GB RAM, else `30m` | How long models stay in memory (at most two at once: the main and the small model) | `bash scripts/ollama_settings.sh` |
 | `NUM_PARALLEL` | `2` with 28+ GB RAM, else `1` | Requests a model answers at once, so a chat doesn't wait behind a long job | `bash scripts/ollama_settings.sh` |
@@ -1116,6 +1117,30 @@ nano config/models.env
 
 Browse models at [ollama.com/library](https://ollama.com/library). For agents, choose
 models that list **tools** support and answer directly (*instruct*, not *thinking* models).
+
+### A cloud model for the chats (optional)
+
+Ollama also runs some large models on its own servers: their names end in `cloud`
+([ollama.com/search?c=cloud](https://ollama.com/search?c=cloud)). They answer many times faster than a
+CPU, and some are free. Sign Ollama in once, try one, then set it:
+
+```bash
+ollama signin
+ollama run beam:cloud "Say hello in five words."
+echo 'MODEL_CLOUD=beam:cloud' >> config/models.env
+bash scripts/02_download_models.sh && bash scripts/04_toolbox.sh
+bash scripts/05_librechat.sh && bash scripts/06_create_agent.sh
+```
+
+- The **Assistant** and the **Quick Assistant** run on the cloud model.
+- When the cloud can't answer (offline, busy, a usage limit, no answer in 90 seconds), the chat goes
+  to `MODEL_MAIN` on this computer, and the cloud is left alone for 15 minutes, so an outage costs one
+  slow start, not one per message. `bash scripts/logs.sh` shows each time (`CLOUD ... couldn't answer`).
+- A third agent, the **Private Assistant**, runs on `MODEL_MAIN` with every tool. With a cloud model,
+  what you type *and what the tools read* (your documents, mail, calendar) go to ollama.com. Ollama
+  says it doesn't log or train on them, but they leave your computer; for anything you'd rather keep
+  here, use the Private Assistant.
+- Background jobs, the knowledge base, `ask_planner` and plugins keep `MODEL_MAIN`.
 
 ---
 

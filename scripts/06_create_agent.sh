@@ -14,7 +14,13 @@ fi
 bash "$KIT/scripts/unban.sh" --if-needed || warn "Could not check for LibreChat bans (continuing)"
 # The Assistant runs on the main model; the Quick Assistant on the small fast one, so everyday
 # questions answer in seconds even while the main model is busy (a long report, say).
-python3 "$KIT/scripts/create_agent.py" --model "$MODEL_MAIN" --fast-model "$MODEL_FAST" "$@"
-echo "$MODEL_MAIN $MODEL_FAST" > "$KIT/.agent-model"   # update.sh says when the agents need updating
+# With MODEL_CLOUD (config/models.env) both run on the cloud model instead, and a third agent, the
+# Private Assistant, runs on the main model here, for chats whose files and answers stay here.
+if [ -n "$MODEL_CLOUD" ]; then
+  python3 "$KIT/scripts/create_agent.py" --model "$MODEL_CLOUD" --fast-model "$MODEL_CLOUD" --private-model "$MODEL_MAIN" "$@"
+else
+  python3 "$KIT/scripts/create_agent.py" --model "$MODEL_MAIN" --fast-model "$MODEL_FAST" "$@"
+fi
+echo "$AGENT_MODELS" > "$KIT/.agent-model"   # update.sh says when the agents need updating
 step "Script 06 done"
 next "open http://localhost:3080 -> Agents -> Assistant (docs/GUIDE.md step 9 has things to try)"

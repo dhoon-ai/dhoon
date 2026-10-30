@@ -230,3 +230,11 @@ def test_quick_assistant_runs_on_the_fast_model():
     assert r.returncode == 0, r.stdout + r.stderr
     models = {a["name"]: a["model"] for a in fake.agents.values()}
     assert models == {"Assistant": "m:instruct", "Quick Assistant": "small:instruct"}
+
+
+def test_a_cloud_assistant_comes_with_a_private_one_on_this_computer():
+    ca = create_agent
+    private, main = ca.private_payload("gemma4:26b"), ca.agent_payload("beam:cloud")
+    assert private["name"] == "Private Assistant" and private["model"] == "gemma4:26b"
+    assert private["tools"] == main["tools"] and private["instructions"] == main["instructions"]
+    assert "nothing you type or it reads leaves it" in private["description"]

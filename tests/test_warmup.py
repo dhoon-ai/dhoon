@@ -18,8 +18,8 @@ TOOLS = [
 ]
 
 
-def chat_request(user="Send me a test e-mail", tools=TOOLS):
-    return {"model": "qwen3:30b", "stream": True, "tools": tools,
+def chat_request(user="Send me a test e-mail", tools=TOOLS, model="qwen3:30b"):
+    return {"model": model, "stream": True, "tools": tools,
             "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]}  # fmt: skip
 
 
@@ -159,3 +159,37 @@ def test_every_request_slot_gets_the_instructions(warm, monkeypatch):
         "slots" not in warm.warm_up(httpx.MockTransport(lambda r: (seen.append(1), httpx.Response(200, json={}))[1]))[0]
     )
     assert len(seen) == 1
+
+
+def test_a_cloud_chat_falls_back_to_the_model_on_this_computer(warm, monkeypatch):
+    import toolbox_server
+
+    tb = importlib.reload(toolbox_server)
+    monkeypatch.setattr(tb, "MODEL_FALLBACK", "gemma4:26b")
+    tb._cloud["rest_until"] = 0.0
+    seen, cloud_ok = [], {"ok": False}
+
+    async def ollama(request):
+        model = json.loads(request.content).get("model")
+        seen.append(model)
+        if model.endswith("cloud") and not cloud_ok["ok"]:
+            return httpx.Response(503, json={"error": "busy"})
+        return httpx.Response(200, content=f'data: {{"model":"{model}"}}\n\ndata: [DONE]\n\n'.encode(),
+                              headers={"content-type": "text/event-stream"})  # fmt: skip
+
+    tb._OLLAMA_TRANSPORT = httpx.MockTransport(ollama)
+    from starlette.testclient import TestClient
+
+    with TestClient(tb.mcp.streamable_http_app(), base_url="http://host.docker.internal:8001") as client:
+        r = client.post("/ollama/v1/chat/completions", json=chat_request(model="beam:cloud"))
+        assert r.status_code == 200 and "gemma4:26b" in r.text  # answered on this computer
+        assert seen == ["beam:cloud", "gemma4:26b"]
+        cloud_ok["ok"] = True
+        client.post("/ollama/v1/chat/completions", json=chat_request(model="beam:cloud"))
+        assert seen[-1] == "gemma4:26b"  # the cloud rests after a failure: straight to this computer
+        tb._cloud["rest_until"] = 0.0
+        r = client.post("/ollama/v1/chat/completions", json=chat_request(model="beam:cloud"))
+        assert seen[-1] == "beam:cloud" and "beam:cloud" in r.text  # rested: the cloud again
+        client.post("/ollama/v1/chat/completions", json=chat_request(model="qwen3:30b"))
+        assert seen[-1] == "qwen3:30b"  # a model on this computer: passed on as it is
+    assert not [f for f in warm.WARM_DIR.glob("*.json") if "cloud" in f.name]  # nothing to read ahead in the cloud
