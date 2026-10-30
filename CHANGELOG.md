@@ -2,10 +2,10 @@
 
 ## v1.1.1 (unreleased)
 
-- **A cloud model for the chats** (`MODEL_CLOUD`, e.g. `beam:cloud`, after `ollama signin`): the
-  Assistant and the Quick Assistant run on it, and fall back to `MODEL_MAIN` on this computer when
-  the cloud can't answer (the cloud then rests 15 minutes). A third agent, the **Private
-  Assistant**, keeps everything on this computer. Background jobs and plugins stay local.
+- **Plugins can keep tools for an agent of their own** (`plugins/*/own-agent-tools.txt`): never
+  given to the Assistant or the Quick Assistant. An agent a plugin puts on an Ollama cloud model
+  falls back to the main model on this computer when the cloud can't answer. The Assistant and the
+  Quick Assistant still run only on this computer.
 
 - **Receipts to a spreadsheet** (`read_receipts`): photos and PDF invoices into a CSV with the date,
   shop, category, tax and total, checked by code; your usual currency (`RECEIPT_CURRENCY`), an

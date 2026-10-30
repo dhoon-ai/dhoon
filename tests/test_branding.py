@@ -62,20 +62,3 @@ def test_memory_is_off_unless_switched_on_and_uses_the_fast_model(tmp_path):
         assert memory["disabled"] is disabled
         # enabled: true is required, or LibreChat never saves a memory (found in release testing)
         assert memory["agent"] == {"enabled": True, "provider": "ollama", "model": "small"}
-
-
-def test_a_cloud_model_is_offered_first(tmp_path):
-    env = {
-        **os.environ,
-        "RUNTIME_DIR": str(tmp_path),
-        "MODEL_MAIN": "a",
-        "MODEL_FAST": "b",
-        "MODEL_CLOUD": "beam:cloud",
-    }
-    (tmp_path / "LibreChat").mkdir()
-    out = subprocess.run(["bash", "-c", f"source {REPO}/scripts/lib.sh && render_librechat_config && echo $AGENT_MODELS"],
-                         env=env, check=True, capture_output=True, text=True).stdout  # fmt: skip
-    assert re.search(
-        r"default: \[\"beam:cloud\", \"a\", \"b\"\]", (tmp_path / "LibreChat" / "librechat.yaml").read_text()
-    )
-    assert out.strip() == "beam:cloud beam:cloud a"

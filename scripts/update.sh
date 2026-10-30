@@ -52,8 +52,8 @@ wait_for_ollama 60 || { fail "Ollama did not start: journalctl -u ollama -n 50";
 for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama pull "$m"; done
 
 # The agents keep the model they were created with: when the main model changed, update them
-if [ -f "$KIT/.agent-model" ] && [ "$(cat "$KIT/.agent-model")" != "$AGENT_MODELS" ]; then
-  warn "The agents should use $AGENT_MODELS (Assistant, Quick Assistant[, Private Assistant]); they use $(cat "$KIT/.agent-model"). Update them: bash scripts/06_create_agent.sh"
+if [ -f "$KIT/.agent-model" ] && [ "$(cat "$KIT/.agent-model")" != "$MODEL_MAIN $MODEL_FAST" ]; then
+  warn "The agents should use $MODEL_MAIN (Assistant) and $MODEL_FAST (Quick Assistant); they use $(cat "$KIT/.agent-model"). Update them: bash scripts/06_create_agent.sh"
 fi
 
 step "Update done"

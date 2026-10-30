@@ -11,6 +11,8 @@ plugins/
     tools.py          extra agent tools (required)
     instructions.md   extra lines for the agent's instructions (optional)
     starters.txt      extra conversation starters, one per line (optional)
+    own-agent-tools.txt  tools only for an agent the plugin makes itself, one per line: never
+                         given to the Assistant or the Quick Assistant (optional)
 ```
 
 `tools.py`:

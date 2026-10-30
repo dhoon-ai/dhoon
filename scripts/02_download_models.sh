@@ -14,9 +14,6 @@ ollama pull "$MODEL_FAST"     # quick questions, chat titles
 ollama pull "$MODEL_MAIN"     # the agent's main brain
 ollama pull "$MODEL_EMBED"    # makes your documents searchable
 [ "$MODEL_PLANNER" = "$MODEL_MAIN" ] || ollama pull "$MODEL_PLANNER"  # only if you chose a separate planner
-if [ -n "$MODEL_CLOUD" ]; then  # runs on ollama.com: nothing big to download, but Ollama must be signed in
-  ollama pull "$MODEL_CLOUD" || warn "Could not add $MODEL_CLOUD. Sign Ollama in first: ollama signin (then run this again)"
-fi
 
 step "Quick speed test (look for 'eval rate')"
 ollama run "$MODEL_FAST" "In one sentence: what does a CPU do?" --verbose 2>&1 | tail -n 12

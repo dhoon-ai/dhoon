@@ -75,7 +75,7 @@ def remember(body: bytes) -> bool:
         data = json.loads(body)
         tools, messages, model = data.get("tools"), data.get("messages") or [], data.get("model")
         if not tools or not model or not messages or str(model).endswith("cloud"):
-            return False  # a cloud model (MODEL_CLOUD) has nothing to load on this computer
+            return False  # a cloud model has nothing to load on this computer
         system = []
         for m in messages:  # the leading system message(s): the Assistant's instructions
             if m.get("role") not in ("system", "developer"):
