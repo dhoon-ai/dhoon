@@ -5,7 +5,7 @@ import ipaddress
 import json
 import re
 import socket
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 import toolbox_server as tb
@@ -61,17 +61,36 @@ def _check_public_url(url: str) -> None:
 
 
 def _fetch(url: str, headers: dict | None = None) -> tuple[str, bytes]:
-    """Download up to MAX_DOWNLOAD bytes; return (content type, body)."""
-    _check_public_url(url)
-    with httpx.stream("GET", url, timeout=20, follow_redirects=True, headers=headers or BROWSER_HEADERS) as r:
-        r.raise_for_status()
-        _check_public_url(str(r.url))  # a redirect must not lead somewhere private
-        body = b""
-        for chunk in r.iter_bytes():
-            body += chunk
-            if len(body) > MAX_DOWNLOAD:
-                break
-        return r.headers.get("content-type", "").lower(), body
+    """Download up to MAX_DOWNLOAD bytes; return (content type, body).
+
+    Redirects are followed manually (at most five) so every hop is checked
+    against _check_public_url before it is requested.
+    """
+    headers = headers or BROWSER_HEADERS
+    current = url
+    redirects = 0
+    while True:
+        _check_public_url(current)
+        with httpx.stream("GET", current, timeout=20, follow_redirects=False, headers=headers) as r:
+            if r.is_redirect or r.status_code in (301, 302, 303, 307, 308):
+                if redirects >= 5:
+                    raise ValueError("too many redirects")
+                location = r.headers.get("location")
+                if not location:
+                    r.raise_for_status()
+                nxt = urljoin(current, location)
+                # checked before the new URL is ever requested
+                _check_public_url(nxt)
+                redirects += 1
+                current = nxt
+                continue
+            r.raise_for_status()
+            body = b""
+            for chunk in r.iter_bytes():
+                body += chunk
+                if len(body) > MAX_DOWNLOAD:
+                    break
+            return r.headers.get("content-type", "").lower(), body
 
 
 def _wikipedia_text(url: str) -> str | None:
