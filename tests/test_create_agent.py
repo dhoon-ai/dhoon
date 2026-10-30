@@ -232,9 +232,13 @@ def test_quick_assistant_runs_on_the_fast_model():
     assert models == {"Assistant": "m:instruct", "Quick Assistant": "small:instruct"}
 
 
-def test_a_cloud_assistant_comes_with_a_private_one_on_this_computer():
-    ca = create_agent
-    private, main = ca.private_payload("gemma4:26b"), ca.agent_payload("beam:cloud")
-    assert private["name"] == "Private Assistant" and private["model"] == "gemma4:26b"
-    assert private["tools"] == main["tools"] and private["instructions"] == main["instructions"]
-    assert "nothing you type or it reads leaves it" in private["description"]
+def test_a_plugin_keeps_its_own_tools_out_of_the_assistant(tmp_path, monkeypatch):
+    (tmp_path / "mine").mkdir()
+    (tmp_path / "mine" / "tools.py").write_text(
+        "@tb.mcp.tool()\ndef shared_tool(x):\n    pass\n\n\n@tb.mcp.tool()\ndef ask_other(x):\n    pass\n"
+    )
+    (tmp_path / "mine" / "own-agent-tools.txt").write_text("ask_other\n")
+    monkeypatch.setattr(create_agent, "PLUGINS", tmp_path)
+    names = [t.split(create_agent.MCP_DELIMITER)[0] for t in create_agent.agent_payload("m")["tools"]]
+    assert "shared_tool" in names and "ask_other" not in names
+    assert "ask_other" in create_agent.toolbox_tools()  # still a toolbox tool, for the plugin's own agent

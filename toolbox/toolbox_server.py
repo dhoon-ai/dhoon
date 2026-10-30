@@ -243,10 +243,11 @@ import heavy  # noqa: E402  (toolbox/heavy.py: one heavy background job at a tim
 import warmup  # noqa: E402  (toolbox/warmup.py)
 
 _PASS_HEADERS = ("content-type", "accept", "authorization")
-# A chat on a cloud model (MODEL_CLOUD, a name ending in "cloud") that the cloud can't answer (offline,
-# busy, a usage limit, no answer in CLOUD_WAIT seconds) goes to MODEL_FALLBACK, the main model on this
-# computer, and the cloud is left alone for CLOUD_REST seconds, so a cloud outage costs one slow
-# start, not one per message. Only before the answer starts: an answer cut off halfway stays cut off.
+# The Assistant and the Quick Assistant run on this computer. An agent you put on an Ollama cloud model
+# yourself (a name ending in "cloud", from a private plugin, say) gets a fallback: when the cloud can't
+# answer (offline, busy, a usage limit, nothing in CLOUD_WAIT seconds), the chat goes to MODEL_FALLBACK,
+# the main model on this computer, and the cloud is left alone for CLOUD_REST seconds. Only before the
+# answer starts: an answer cut off halfway stays cut off.
 MODEL_FALLBACK = os.environ.get("MODEL_FALLBACK", "")
 CLOUD_WAIT = float(os.environ.get("CLOUD_WAIT", "90"))
 CLOUD_REST = float(os.environ.get("CLOUD_REST", "900"))

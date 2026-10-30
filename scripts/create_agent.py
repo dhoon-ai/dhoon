@@ -28,9 +28,6 @@ from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
 AGENT_NAME = "Assistant"
-# With a cloud model (MODEL_CLOUD) for the Assistant: the same agent on the model on this computer,
-# for chats whose files, mail and money should stay here.
-PRIVATE_NAME = "Private Assistant"
 AVATAR = KIT / "assets" / "assistant-avatar.png"
 QUICK_AVATAR = KIT / "assets" / "quick-assistant-avatar.png"  # amber, with a lightning bolt
 # The custom endpoint is named "Ollama" in librechat.yaml, but LibreChat normalises that name
@@ -52,6 +49,12 @@ STARTERS = [
 
 
 PLUGINS = Path(os.environ.get("PLUGINS_DIR", KIT / "plugins"))  # private, git-ignored add-ons
+
+
+def own_agent_tools() -> set[str]:
+    """Tools a plugin keeps for an agent of its own (plugins/*/own-agent-tools.txt, one per line):
+    never given to the Assistant or the Quick Assistant."""
+    return {line.strip() for text in plugin_extras("own-agent-tools.txt") for line in text.splitlines() if line.strip()}
 
 
 def toolbox_tools() -> list[str]:
@@ -100,13 +103,9 @@ def quick_payload(model: str) -> dict:
     }
 
 
-def private_payload(model: str) -> dict:
-    return {**agent_payload(model), "name": PRIVATE_NAME,
-            "description": "The Assistant on this computer's own model: nothing you type or it reads leaves it."}  # fmt: skip
-
-
 def agent_payload(model: str) -> dict:
-    tools = [f"{t}{MCP_DELIMITER}{MCP_SERVER}" for t in toolbox_tools()]
+    own = own_agent_tools()
+    tools = [f"{t}{MCP_DELIMITER}{MCP_SERVER}" for t in toolbox_tools() if t not in own]
     tools += [f"sys__server__sys{MCP_DELIMITER}{MCP_SERVER}", "file_search"]
     return {
         "name": AGENT_NAME,
@@ -281,8 +280,6 @@ def main() -> int:
     p.add_argument("--url", default=os.environ.get("LIBRECHAT_URL", "http://localhost:3080"))
     p.add_argument("--model", required=True, help="main model, e.g. gemma4:26b (the Assistant)")
     p.add_argument("--fast-model", default="", help="small fast model for the Quick Assistant (default: --model)")
-    p.add_argument("--private-model", default="", help="with a cloud --model: this computer's model for the "
-                   "Private Assistant (everything stays here)")  # fmt: skip
     p.add_argument("--email", default=os.environ.get("LIBRECHAT_EMAIL"))
     p.add_argument("--password", default=os.environ.get("LIBRECHAT_PASSWORD"))
     p.add_argument("--yes", action="store_true", help="create the account without asking if it doesn't exist")
@@ -322,18 +319,17 @@ def main() -> int:
     agents = data.get("data") or []
     problems = 0
     fast = args.fast_model or args.model
-    todo = [(agent_payload(args.model), args.model, AVATAR), (quick_payload(fast), fast, QUICK_AVATAR)]
-    if args.private_model:
-        todo.append((private_payload(args.private_model), args.private_model, AVATAR))
-    for payload, model, avatar in todo:
+    for payload, model, avatar in (
+        (agent_payload(args.model), args.model, AVATAR),
+        (quick_payload(fast), fast, QUICK_AVATAR),
+    ):
         problems += save_agent(lc, payload, agents, model, avatar)
     if problems:
         return 1
     marker = Path(os.environ.get("RUNTIME_DIR", KIT / "runtime")) / ".agent-created"  # read by status.sh
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(args.model)
-    print(f"Open {args.url}, choose Agents -> {AGENT_NAME} (everything) or {QUICK_NAME} (faster, everyday)"
-          + (f", or {PRIVATE_NAME} (everything stays on this computer)." if args.private_model else "."))  # fmt: skip
+    print(f"Open {args.url}, choose Agents -> {AGENT_NAME} (everything) or {QUICK_NAME} (faster, everyday).")
     return 0
 
 

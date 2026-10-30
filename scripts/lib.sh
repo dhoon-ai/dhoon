@@ -47,16 +47,6 @@ MODEL_FAST="${MODEL_FAST:-qwen3:4b-instruct-2507-q4_K_M}"
 MODEL_EMBED="${MODEL_EMBED:-nomic-embed-text}"
 # The ask_planner tool uses the main Instruct model by default (fast, no separate download).
 MODEL_PLANNER="${MODEL_PLANNER:-$MODEL_MAIN}"
-# Optional: an Ollama cloud model for the chat agents (a name ending in "cloud", e.g. beam:cloud;
-# sign Ollama in first: ollama signin). The Assistant and the Quick Assistant then run on it, with
-# MODEL_MAIN on this computer as the fallback, and a "Private Assistant" on MODEL_MAIN keeps
-# everything here. Background jobs and plugins keep MODEL_MAIN. Empty: no cloud.
-MODEL_CLOUD="${MODEL_CLOUD:-}"
-# The models the agents should have (Assistant, Quick Assistant[, Private Assistant]): 06 records
-# them and update.sh compares.
-if [ -n "$MODEL_CLOUD" ]; then AGENT_MODELS="$MODEL_CLOUD $MODEL_CLOUD $MODEL_MAIN"
-else                           AGENT_MODELS="$MODEL_MAIN $MODEL_FAST"
-fi
 # How much text the model can keep in mind at once (tokens). A big task (several web pages,
 # stock data, a report) needs ~20k; when it doesn't fit, Ollama silently drops the start of
 # the chat, including your request, and the agent loses track. 32k uses ~3 GB extra RAM.
@@ -159,9 +149,7 @@ librechat_checkout() {
 render_librechat_config() {
   local memory_off=true   # memory is off unless MEMORY=on (asked during install)
   [ "${MEMORY:-off}" = "on" ] && memory_off=false
-  local models="\"$MODEL_MAIN\", \"$MODEL_FAST\""   # the models LibreChat offers (cloud first, when set)
-  [ -n "$MODEL_CLOUD" ] && models="\"$MODEL_CLOUD\", $models"
-  sed -e "s|__MODEL_LIST__|$models|g" -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
+  sed -e "s|__MODEL_MAIN__|$MODEL_MAIN|g" -e "s|__MODEL_FAST__|$MODEL_FAST|g" \
       -e "s|__MEMORY_DISABLED__|$memory_off|g" \
     "$KIT/config/librechat/librechat.yaml" > "$LIBRECHAT_DIR/librechat.yaml"
   cp "$KIT/config/librechat/docker-compose.override.yml" "$LIBRECHAT_DIR/docker-compose.override.yml"
