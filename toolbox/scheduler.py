@@ -32,14 +32,26 @@ MODEL = os.environ.get("SCHEDULER_MODEL") or os.environ.get("PLANNER_MODEL", "ge
 MAX_STEPS = int(os.environ.get("SCHEDULER_MAX_STEPS", "15"))
 MAX_TASKS = 20
 REPEATS = ("", "hourly", "daily", "weekdays", "weekly", "monthly")
-# tools an unattended run must not use (it can't ask you, and a web page could try to trick it)
-DENY = set(
-    os.environ.get(
-        "SCHEDULER_DENY_TOOLS",
-        "send_email,schedule_task,scheduled_tasks,cancel_scheduled_task,calendar_add_event,"
-        "calendar_delete_event,record_investment,investment_tax_rules",
-    ).split(",")
-)
+# Tools an unattended run may use. Anything else is refused, even plugin tools, unless you add it
+# with SCHEDULER_ALLOW_EXTRA. SCHEDULER_ALLOW_TOOLS replaces this default list; SCHEDULER_DENY_TOOLS
+# removes tools from it (comma-separated, trimmed).
+DEFAULT_ALLOW_TOOLS = (
+    "current_datetime,list_files,read_file,write_file,file_link,read_document,search_document,"
+    "search_all_documents,web_search,read_webpage,weather"
+).split(",")
+
+
+def allowed_tools() -> set[str]:
+    raw = os.environ.get("SCHEDULER_ALLOW_TOOLS")
+    if raw is None:
+        base = {x.strip() for x in DEFAULT_ALLOW_TOOLS if x.strip()}
+    else:
+        base = {x.strip() for x in raw.split(",") if x.strip()}
+    extra = {x.strip() for x in os.environ.get("SCHEDULER_ALLOW_EXTRA", "").split(",") if x.strip()}
+    denied = {x.strip() for x in os.environ.get("SCHEDULER_DENY_TOOLS", "").split(",") if x.strip()}
+    return (base | extra) - denied
+
+
 UNATTENDED = (
     "\n\nYou are running a SCHEDULED task the user set up earlier; nobody is watching, so don't ask "
     "questions: do the task with your tools and write the complete result as your final answer. "
@@ -200,7 +212,7 @@ def run_task(text: str, post=None) -> str:
     tools = [
         {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.input_schema}}
         for t in asyncio.run(tb.mcp.list_tools())
-        if t.name not in DENY
+        if t.name in allowed_tools()
     ]
     allowed = {t["function"]["name"] for t in tools}
     messages = [{"role": "system", "content": _instructions()}, {"role": "user", "content": text}]

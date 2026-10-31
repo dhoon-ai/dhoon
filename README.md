@@ -376,8 +376,9 @@ runtime/        created at install time; git-ignored (LibreChat, venv, secrets)
   `runtime/google_token.json`, readable only by you; Google access is limited to calendar
   events. The agent adds or deletes events only when you ask.
 - **Scheduled tasks** are stored outside the workspace (so nothing the agent reads or writes
-  can add one) and run unattended without the tools that send e-mail, change calendars,
-  record investments or schedule more tasks. Results go only to your own inbox.
+  can add one) and run unattended with only a small allowlist of workspace and lookup tools;
+  SCHEDULER_ALLOW_TOOLS replaces it, SCHEDULER_ALLOW_EXTRA adds to it, and SCHEDULER_DENY_TOOLS
+  removes from it. Results go only to your own inbox.
 - **Knowledge base** downloads only public pages (Wikipedia's "Current events", market prices,
   headline searches through your SearXNG); nothing about you is sent, and its notes are
   labelled as untrusted web content for the model.

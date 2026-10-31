@@ -129,3 +129,26 @@ def test_tools_are_in_the_toolbox(tmp_path, monkeypatch):
     assert "Scheduled task" in tb.schedule_task(when, "Weather and my day", "daily")
     assert "task, daily" in tb.scheduled_tasks()
     assert "No active scheduled task" in tb.cancel_scheduled_task("nope")
+
+
+def test_allowlist_default(sch):
+    allowed = sch.allowed_tools()
+    assert "read_file" in allowed and "web_search" in allowed
+    assert "send_email" not in allowed and "run_python" not in allowed and "publish_story" not in allowed
+
+
+def test_allowlist_extra_trimmed(sch, monkeypatch):
+    monkeypatch.setenv("SCHEDULER_ALLOW_EXTRA", " publish_story , x")
+    allowed = sch.allowed_tools()
+    assert "publish_story" in allowed and "x" in allowed
+
+
+def test_allowlist_deny_removes(sch, monkeypatch):
+    monkeypatch.setenv("SCHEDULER_DENY_TOOLS", "read_file")
+    assert "read_file" not in sch.allowed_tools()
+
+
+def test_allowlist_replaces_default(sch, monkeypatch):
+    monkeypatch.setenv("SCHEDULER_ALLOW_TOOLS", "read_file")
+    allowed = sch.allowed_tools()
+    assert "read_file" in allowed and "web_search" not in allowed

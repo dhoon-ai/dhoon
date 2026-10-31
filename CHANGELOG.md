@@ -2,6 +2,10 @@
 
 ## v1.1.1 (unreleased)
 
+- **Scheduled tasks: an allowlist of workspace and lookup tools instead of a deny list**
+  (`SCHEDULER_ALLOW_TOOLS`, `SCHEDULER_ALLOW_EXTRA`, `SCHEDULER_DENY_TOOLS`). Plugin tools need
+  `SCHEDULER_ALLOW_EXTRA`.
+
 - **Plugins can keep tools for an agent of their own** (`plugins/*/own-agent-tools.txt`): never
   given to the Assistant or the Quick Assistant. An agent a plugin puts on an Ollama cloud model
   falls back to the main model on this computer when the cloud can't answer. The Assistant and the
