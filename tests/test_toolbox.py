@@ -719,3 +719,85 @@ def test_read_receipts_waits_its_turn_with_long_jobs(tb, monkeypatch):
     monkeypatch.setattr(heavy, "running", real)  # (not monkeypatch.undo: that would also undo HEAVY_DIR)
     assert "Read 1 receipt(s)" in tb.read_receipts("receipts", "r.csv")
     assert seen == ["receipts"] and heavy.running() == {}  # in the queue while reading, then let go
+
+
+class _Stream:
+    def __init__(self, url, status=200, headers=None, body=b"ok"):
+        self.url = url
+        self.status_code = status
+        self.headers = headers or {}
+        self._body = body
+        self.is_redirect = status in (301, 302, 303, 307, 308)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise Exception("http error")
+
+    def iter_bytes(self):
+        yield self._body
+
+
+def _addrinfo(host, port):
+    ip = "127.0.0.1" if host == "127.0.0.1" else "93.184.216.34"
+    return [(2, 1, 6, "", (ip, 0))]
+
+
+def test_fetch_refuses_redirect_to_private_address(tb, monkeypatch):
+    import httpx
+
+    import toolbox.toolset.web as web
+
+    urls = []
+
+    def stream(method, url, **kw):
+        urls.append(url)
+        if url.endswith("/start"):
+            r = _Stream(url, status=302, headers={"location": "http://127.0.0.1/x"}, body=b"")
+            r.url = "http://127.0.0.1/x"
+            return r
+        return _Stream(url, body=b"final")
+
+    monkeypatch.setattr(tb.socket, "getaddrinfo", _addrinfo)
+    monkeypatch.setattr(httpx, "stream", stream)
+    with pytest.raises(ValueError):
+        web._fetch("https://public.example/start")
+    assert urls == ["https://public.example/start"]
+
+
+def test_fetch_follows_relative_redirect(tb, monkeypatch):
+    import httpx
+
+    import toolbox.toolset.web as web
+
+    def stream(method, url, **kw):
+        if url.endswith("/start"):
+            r = _Stream(url, status=302, headers={"location": "/next"}, body=b"")
+            r.url = "https://a.example/next"
+            return r
+        return _Stream(url, body=b"final")
+
+    monkeypatch.setattr(tb.socket, "getaddrinfo", _addrinfo)
+    monkeypatch.setattr(httpx, "stream", stream)
+    ctype, body = web._fetch("https://a.example/start")
+    assert body == b"final"
+
+
+def test_fetch_too_many_redirects(tb, monkeypatch):
+    import httpx
+
+    import toolbox.toolset.web as web
+
+    def stream(method, url, **kw):
+        r = _Stream(url, status=302, headers={"location": "/next"}, body=b"")
+        return r
+
+    monkeypatch.setattr(tb.socket, "getaddrinfo", _addrinfo)
+    monkeypatch.setattr(httpx, "stream", stream)
+    with pytest.raises(ValueError, match="too many redirects"):
+        web._fetch("https://public.example/start")
