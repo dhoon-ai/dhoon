@@ -1,0 +1,9 @@
+[Unit]
+Description=Failure alert for %i
+
+[Service]
+Type=oneshot
+User=@USER@
+Environment=EMAIL_RETRY_ATTEMPTS=3
+EnvironmentFile=-@KIT@/config/email.env
+ExecStart=@PYTHON@ @KIT@/scripts/notify-failure.py --unit %i

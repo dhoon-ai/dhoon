@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily AI health check
+
+[Service]
+Type=oneshot
+User=@USER@
+Environment=EMAIL_RETRY_ATTEMPTS=3
+EnvironmentFile=-@KIT@/config/email.env
+ExecStart=@PYTHON@ @KIT@/scripts/health-check.py
