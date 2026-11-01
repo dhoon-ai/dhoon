@@ -46,7 +46,7 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
     if os.environ.get("RECEIPT_FAST", "").lower() == "on":
         extra["fast"] = True
     busy = heavy.running()
-    if busy:  # a newsroom or knowledge-base run is using the model: two at once can push it out of memory
+    if busy:  # a nightly report or knowledge-base run is using the model: two at once can push it out of memory
         return (f"Not now: {busy.get('name', 'a long job')} is running (since {busy.get('since', '?')}) and uses the "
                 "same model. Reading receipts at the same time would slow both, or push its model out of memory. "
                 "Ask again when it has finished (python3 ~/dhoon/toolbox/heavy.py shows what is running).")  # fmt: skip

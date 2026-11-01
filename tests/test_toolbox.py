@@ -273,10 +273,10 @@ def test_ask_planner_ollama_down_or_empty(tb, monkeypatch):
 @pytest.mark.parametrize(
     "text,secret",
     [
-        ("email rahul.k@example.com my report", "rahul.k@example.com"),
+        ("email alex.k@example.com my report", "alex.k@example.com"),
         ("see https://bank.example.com/acct?id=99 now", "bank.example.com"),
         ("server 192.168.1.20 backup", "192.168.1.20"),
-        ("backup /home/rahul/photos/2024 to disk", "/home/rahul"),
+        ("backup /home/alex/photos/2024 to disk", "/home/alex"),
         ("summarise salary_2025.xlsx for me", "salary_2025"),
         ("call +1 (555) 123-4567 tomorrow", "555"),
         ("budget of $12,500 for a car", "12,500"),
@@ -291,8 +291,8 @@ def test_redact_removes_personal_details(tb, text, secret):
 def test_redact_keeps_generic_questions_and_removes_user_name(tb, monkeypatch):
     q = "how to compare open source backup tools for linux in 2026"
     assert tb._redact(q) == q
-    monkeypatch.setattr(tb.Path, "home", lambda: tb.Path("/home/rahulk"))
-    assert "rahulk" not in tb._redact("plan for rahulk backups")
+    monkeypatch.setattr(tb.Path, "home", lambda: tb.Path("/home/alexk"))
+    assert "alexk" not in tb._redact("plan for alexk backups")
     assert len(tb._redact("word " * 100)) <= 150
 
 
@@ -310,9 +310,9 @@ def test_ask_planner_web_research_is_redacted_and_reported(tb, monkeypatch):
     monkeypatch.setattr(tb.httpx, "get", fake_get)
     monkeypatch.setattr(tb.httpx, "post", fake_post)
     monkeypatch.setattr(tb, "RESEARCH_ENGINES", "startpage,duckduckgo")
-    out = tb.ask_planner("back up my files", research_query="how to back up /home/rahul for me@x.com")
+    out = tb.ask_planner("back up my files", research_query="how to back up /home/alex for me@x.com")
     assert len(searched) == 1 and searched[0]["engines"] == "startpage,duckduckgo"
-    assert "/home/rahul" not in searched[0]["q"] and "me@x.com" not in searched[0]["q"]
+    assert "/home/alex" not in searched[0]["q"] and "me@x.com" not in searched[0]["q"]
     assert "Step A" in planned["user"] and "untrusted" in planned["user"]
     assert out.startswith('Searched the web for: "how to back up [path] for [email]"')
     assert "NEXT STEPS FROM PLANNER" in out
@@ -699,7 +699,7 @@ def test_the_reranker_reorders_when_switched_on(tb, fake_embed, monkeypatch):
 
 
 def test_read_receipts_waits_its_turn_with_long_jobs(tb, monkeypatch):
-    """A newsroom run writing with the model while receipts load theirs pushed its model out of memory:
+    """A nightly report run writing with the model while receipts load theirs pushed its model out of memory:
     read_receipts says "not now" while a long job runs, and holds the queue while it reads."""
     pytest.importorskip("receipt_reader")
     import heavy
@@ -714,8 +714,8 @@ def test_read_receipts_waits_its_turn_with_long_jobs(tb, monkeypatch):
             "tip": None, "total": 5.00, "payment_method": "cash", "category": "groceries"}  # fmt: skip
     monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: seen.append(heavy.running().get("name")) or dict(good))
     real = heavy.running
-    monkeypatch.setattr(heavy, "running", lambda: {"name": "newsroom", "since": "10:30", "pid": 1})
-    assert tb.read_receipts("receipts", "r.csv").startswith("Not now: newsroom is running (since 10:30)")
+    monkeypatch.setattr(heavy, "running", lambda: {"name": "nightly report", "since": "10:30", "pid": 1})
+    assert tb.read_receipts("receipts", "r.csv").startswith("Not now: nightly report is running (since 10:30)")
     monkeypatch.setattr(heavy, "running", real)  # (not monkeypatch.undo: that would also undo HEAVY_DIR)
     assert "Read 1 receipt(s)" in tb.read_receipts("receipts", "r.csv")
     assert seen == ["receipts"] and heavy.running() == {}  # in the queue while reading, then let go
