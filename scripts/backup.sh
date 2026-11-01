@@ -296,7 +296,7 @@ backup() {
     echo "Restore with: bash scripts/restore.sh   (paths are relative to the home folder)"
     for p in "${items[@]}"; do echo "  ~/$p"; done
     echo
-    tar -tf "$stage/backup/files.tar" | head -1000
+    tar -tf "$stage/backup/files.tar" | head -1000 || true
   } > "$stage/backup/MANIFEST.txt"
   out="backup-$stamp.tar.gz.age"
   tar -czf - -C "$stage" backup | age -R "$CONF/recipients.txt" -o "$stage/$out"
