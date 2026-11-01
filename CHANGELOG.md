@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.1.1 (unreleased)
+## v1.2.0 (2026-11-01)
 
 - **Scheduled tasks: an allowlist of workspace and lookup tools instead of a deny list**
   (`SCHEDULER_ALLOW_TOOLS`, `SCHEDULER_ALLOW_EXTRA`, `SCHEDULER_DENY_TOOLS`). Plugin tools need
