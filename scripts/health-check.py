@@ -33,15 +33,24 @@ def read_units(path):
     return units
 
 
-def failed_ai_units():
-    out = subprocess.run(["systemctl", "list-units", "--type=service", "--state=failed", "--no-legend"],
-                         capture_output=True, text=True)
+def parse_failed(text):
     bad = []
-    for line in out.stdout.splitlines():
-        unit = line.split()[0] if line.split() else ""
+    for line in text.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        unit = parts[0]
+        if unit in ("●", "*") and len(parts) > 1:
+            unit = parts[1]
         if unit.startswith("ai-") and unit.endswith(".service"):
             bad.append(unit)
     return bad
+
+
+def failed_ai_units():
+    out = subprocess.run(["systemctl", "list-units", "--type=service", "--state=failed", "--no-legend", "--plain"],
+                         capture_output=True, text=True)
+    return parse_failed(out.stdout)
 
 
 def last_success_age_hours(unit):
@@ -55,14 +64,18 @@ def last_success_age_hours(unit):
             result = line.split("=", 1)[1].strip()
         elif line.startswith("ExecMainExitTimestamp="):
             val = line.split("=", 1)[1].strip()
+            if val.startswith("@"):
+                val = val[1:]
             if val and val != "0":
                 ts = val
-    if result != "success" or not ts:
-        return None  # caller treats None as "never succeeded" -> stale
+    if not ts:
+        return "never"  # caller decides message
+    if result != "success":
+        return ("failed", result)
     try:
         return (datetime.now().timestamp() - float(ts)) / 3600.0
     except ValueError:
-        return None
+        return "never"
 
 
 def disk_bad():
@@ -88,9 +101,11 @@ def main():
 
     for unit, max_age in read_units(args.env):
         age = last_success_age_hours(unit)
-        if age is None:
+        if age == "never":
             problems.append(f"stale: {unit} never succeeded")
-        elif age > max_age:
+        elif isinstance(age, tuple) and age and age[0] == "failed":
+            problems.append(f"stale: {unit} last run failed (Result={age[1]})")
+        elif age is not None and age > max_age:
             problems.append(f"stale: {unit} last success {age:.1f}h ago (limit {max_age}h)")
 
     if not problems:

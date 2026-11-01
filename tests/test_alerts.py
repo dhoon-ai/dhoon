@@ -179,15 +179,21 @@ def test_never_ran_is_stale():
     assert m.last_success_age_hours is not None
 
 
-def test_staleness_none_not_skipped(monkeypatch):
+def test_staleness_real_format(monkeypatch):
     import subprocess
     m = load_health()
 
-    def fake_run(*a, **k):
-        return type("R", (), {"stdout": "Result=failed\nExecMainExitTimestamp=0\n", "returncode": 0})()
+    def fake_never(*a, **k):
+        return type("R", (), {"stdout": "Result=success\nExecMainExitTimestamp=0\n", "returncode": 0})()
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    assert m.last_success_age_hours("x.service") is None
+    monkeypatch.setattr(subprocess, "run", fake_never)
+    assert m.last_success_age_hours("x.service") == "never"
+
+    def fake_failed(*a, **k):
+        return type("R", (), {"stdout": "Result=failed\nExecMainExitTimestamp=@1793413802\n", "returncode": 0})()
+
+    monkeypatch.setattr(subprocess, "run", fake_failed)
+    assert m.last_success_age_hours("x.service") == ("failed", "failed")
 
 
 def test_unit_files_no_literal_user_or_home():
@@ -221,3 +227,20 @@ def test_per_unit_limit_survives_midnight(tmp_path):
                        capture_output=True, text=True)
     # daily counter reset to 0, but per-unit (recent) still blocks
     assert "rate limited" in (r.stdout + r.stderr)
+
+
+def test_health_parses_real_show_format(monkeypatch):
+    import subprocess
+    m = load_health()
+
+    def fake_run(*a, **k):
+        return type("R", (), {"stdout": "Result=success\nExecMainExitTimestamp=@1793413802\n", "returncode": 0})()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    age = m.last_success_age_hours("ai-knowledge.service")
+    assert isinstance(age, float) and age >= 0
+
+
+def test_parse_failed_handles_bullet():
+    m = load_health()
+    assert m.parse_failed("● ai-backup.service loaded failed failed X\nother.service loaded failed failed Y\n") == ["ai-backup.service"]
