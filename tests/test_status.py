@@ -113,3 +113,27 @@ def test_old_keep_alive_means_step_1_is_redone(half_installed):
     conf.write_text('[Service]\nEnvironment="OLLAMA_CONTEXT_LENGTH=32768"\nEnvironment="OLLAMA_KEEP_ALIVE=30m"\n')
     r = subprocess.run(["bash", str(REPO / "scripts/status.sh")], env=half_installed, capture_output=True, text=True)
     assert "keep-alive" in r.stdout and "continues from step 1" in r.stdout
+
+
+def test_installer_accepts_git_worktree(tmp_path):
+    """A git worktree's .git is a file, not a dir; installer must still treat it as this project."""
+    import shutil
+
+    repo = tmp_path / "repo"
+    shutil.copytree(REPO, repo, ignore=shutil.ignore_patterns("runtime", "__pycache__", ".git"))
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t.test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "T"], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+
+    worktree = tmp_path / "worktree"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(worktree)], check=True)
+    assert worktree.joinpath(".git").is_file(), "worktree .git should be a file"
+
+    env = {**os.environ, "INSTALL_DRY_RUN": "1", "INSTALL_DIR": str(worktree)}
+    r = subprocess.run(["bash", str(REPO / "install.sh")], env=env, capture_output=True, text=True, timeout=60)
+    combined = r.stdout + r.stderr
+    assert "is not this project" not in combined
+    assert "2/8" in r.stdout
+    assert r.returncode == 0, combined

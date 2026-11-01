@@ -53,7 +53,7 @@ main() {
 
   say "1/8  Getting the project into $dir"
   if ! command -v git >/dev/null 2>&1; then run sudo apt-get update; run sudo apt-get install -y git; fi
-  if [ -d "$dir/.git" ]; then
+  if [ -d "$dir/.git" ] || { [ -f "$dir/.git" ] && git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; }; then
     run git -C "$dir" pull --ff-only || echo "  (could not update - continuing with the existing copy)"
   elif [ -e "$dir" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
     die "$dir exists and is not this project. Move it away, or set INSTALL_DIR=/another/folder"
