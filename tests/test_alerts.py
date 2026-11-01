@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(REPO / "toolbox"))
 NOTIFY = REPO / "scripts" / "notify-failure.py"
 HEALTH = REPO / "scripts" / "health-check.py"
 INSTALL = REPO / "scripts" / "install-alerts.sh"
@@ -169,7 +171,7 @@ def test_notify_dry_run_30_lines_max(tmp_path):
     r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-backup.service", "--dry-run"], env=e,
                        capture_output=True, text=True)
     journal = r.stdout.split("=== last 30 journal lines ===", 1)[-1]
-    assert len(journal.splitlines()) <= 32
+    assert len(journal.splitlines()) <= 33
 
 
 def test_never_ran_is_stale():
@@ -244,3 +246,11 @@ def test_health_parses_real_show_format(monkeypatch):
 def test_parse_failed_handles_bullet():
     m = load_health()
     assert m.parse_failed("● ai-backup.service loaded failed failed X\nother.service loaded failed failed Y\n") == ["ai-backup.service"]
+
+
+def test_indented_notify_body_becomes_code_block():
+    import emailer as _emailer
+    body = "ai-backup.service failed.\n\n=== s ===\n\n    line one\n    line two\n"
+    html = _emailer.markdown_to_html(body)
+    assert "<pre><code>" in html
+    assert "line one" in html and "line two" in html

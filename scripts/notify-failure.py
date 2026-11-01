@@ -62,10 +62,12 @@ def main():
     journal = run_cmd(["journalctl", "-u", unit, "-n", "30", "--no-pager", "--output=cat"])
     status_lines = redact(status).splitlines()[:10]
     journal_lines = redact(journal).splitlines()[-30:]
+    status_block = "\n".join("    " + line for line in status_lines)
+    journal_block = "\n".join("    " + line for line in journal_lines)
     body = (
         f"{unit} failed on {host}.\n\n"
-        "=== systemctl status (first 10 lines) ===\n" + "\n".join(status_lines) + "\n"
-        "=== last 30 journal lines ===\n" + "\n".join(journal_lines)
+        "=== systemctl status (first 10 lines) ===\n\n" + status_block + "\n\n"
+        "=== last 30 journal lines ===\n\n" + journal_block
     )
     # journal to 30 lines max (the command already limits, but be safe)
     lines = body.splitlines()
