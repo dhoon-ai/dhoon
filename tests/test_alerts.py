@@ -182,19 +182,11 @@ def test_never_ran_is_stale():
 
 
 def test_staleness_real_format(monkeypatch):
-    import subprocess
     m = load_health()
-
-    def fake_never(*a, **k):
-        return type("R", (), {"stdout": "Result=success\nExecMainExitTimestamp=0\n", "returncode": 0})()
-
-    monkeypatch.setattr(subprocess, "run", fake_never)
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: "")
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "Result=success\nExecMainExitTimestamp=0\n")
     assert m.last_success_age_hours("x.service") == "never"
-
-    def fake_failed(*a, **k):
-        return type("R", (), {"stdout": "Result=failed\nExecMainExitTimestamp=@1793413802\n", "returncode": 0})()
-
-    monkeypatch.setattr(subprocess, "run", fake_failed)
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "Result=failed\nExecMainExitTimestamp=@1793413802\n")
     assert m.last_success_age_hours("x.service") == ("failed", "failed")
 
 
@@ -232,13 +224,9 @@ def test_per_unit_limit_survives_midnight(tmp_path):
 
 
 def test_health_parses_real_show_format(monkeypatch):
-    import subprocess
     m = load_health()
-
-    def fake_run(*a, **k):
-        return type("R", (), {"stdout": "Result=success\nExecMainExitTimestamp=@1793413802\n", "returncode": 0})()
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: "")
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "Result=success\nExecMainExitTimestamp=@1793413802\n")
     age = m.last_success_age_hours("ai-knowledge.service")
     assert isinstance(age, float) and age >= 0
 
@@ -254,3 +242,62 @@ def test_indented_notify_body_becomes_code_block():
     html = _emailer.markdown_to_html(body)
     assert "<pre><code>" in html
     assert "line one" in html and "line two" in html
+
+
+def test_health_journal_systemd_finished_two_hours_ago(monkeypatch):
+    import time
+    m = load_health()
+    now = time.time()
+    ts = int(now - 7200)
+    text = f"{ts} example-host systemd[1]: Finished ai-example-a.service - x.\n"
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: text)
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "")
+    age = m.last_success_age_hours("ai-example-a.service")
+    assert abs(age - 2.0) < 0.05
+
+
+def test_health_journal_only_failed_with_result_is_never(monkeypatch):
+    import time
+    m = load_health()
+    now = time.time()
+    ts = int(now - 300)
+    text = f"{ts} example-host systemd[1]: ai-example-a.service: Failed with result 'timeout'.\n"
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: text)
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "")
+    age = m.last_success_age_hours("ai-example-a.service")
+    assert age == "never"
+
+
+def test_health_journal_job_output_finished_story_is_never(monkeypatch):
+    import time
+    m = load_health()
+    now = time.time()
+    ts = int(now - 300)
+    text = f"{ts} example-host ai-example-a.service[123]: Finished story 3\n"
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: text)
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "")
+    age = m.last_success_age_hours("ai-example-a.service")
+    assert age == "never"
+
+
+def test_health_journal_empty_uses_systemctl_timestamp(monkeypatch):
+    import time
+    m = load_health()
+    now = time.time()
+    ts = int(now - 7200)
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: "")
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: f"Result=success\nExecMainExitTimestamp=@{ts}\n")
+    age = m.last_success_age_hours("ai-example-a.service")
+    assert abs(age - 2.0) < 0.05
+
+
+def test_health_journal_systemd_finished_100_hours_ago(monkeypatch):
+    import time
+    m = load_health()
+    now = time.time()
+    ts = int(now - 100 * 3600)
+    text = f"{ts} example-host systemd[1]: Finished ai-example-a.service - x.\n"
+    monkeypatch.setattr(m, "run_journalctl", lambda unit: text)
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "")
+    age = m.last_success_age_hours("ai-example-a.service")
+    assert age > 99

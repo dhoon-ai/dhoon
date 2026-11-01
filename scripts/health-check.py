@@ -53,13 +53,72 @@ def failed_ai_units():
     return parse_failed(out.stdout)
 
 
+def journal_last_success_timestamp(text, unit):
+    """Return epoch seconds of the latest real systemd success line in journal text.
+
+    Only systemd's own lines count:
+      " systemd[1]: Finished ..." and
+      " systemd[1]: <unit>: Deactivated successfully."
+    A job's own output containing "Finished" does not count.
+    """
+    latest = None
+    for line in (text or "").splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        try:
+            ts = float(parts[0])
+        except ValueError:
+            continue
+        if " systemd[1]: Finished " in line or f" systemd[1]: {unit}: Deactivated successfully." in line:
+            if latest is None or ts > latest:
+                latest = ts
+    return latest
+
+
+def has_journal_entries(text):
+    text = text or ""
+    if not text.strip():
+        return False
+    if "-- No entries --" in text:
+        return False
+    return True
+
+
+def run_journalctl(unit):
+    try:
+        out = subprocess.run(["journalctl", "-u", unit, "--since", "-7 days",
+                              "-o", "short-unix", "--no-pager"],
+                             capture_output=True, text=True)
+    except Exception:
+        return ""
+    return out.stdout or ""
+
+
+def run_systemctl_show(unit):
+    try:
+        out = subprocess.run(["systemctl", "show", "--timestamp=unix", unit, "-p", "Result", "-p",
+                              "ExecMainExitTimestamp"], capture_output=True, text=True)
+    except Exception:
+        return ""
+    return out.stdout or ""
+
+
 def last_success_age_hours(unit):
-    # A unit that never succeeded (or whose last run failed) counts as stale.
-    out = subprocess.run(["systemctl", "show", "--timestamp=unix", unit, "-p", "Result", "-p",
-                          "ExecMainExitTimestamp"], capture_output=True, text=True)
+    # Prefer the journal: it survives a reboot, when ExecMainExitTimestamp is empty.
+    journal_text = run_journalctl(unit)
+    ts = journal_last_success_timestamp(journal_text, unit)
+    if ts is not None:
+        return (datetime.now().timestamp() - ts) / 3600.0
+    if has_journal_entries(journal_text):
+        # The journal ran this unit but never recorded a successful completion.
+        return "never"
+
+    # Fall back to systemctl's recorded timestamp only when the journal is empty.
+    show_text = run_systemctl_show(unit)
     result = None
     ts = None
-    for line in out.stdout.splitlines():
+    for line in show_text.splitlines():
         if line.startswith("Result="):
             result = line.split("=", 1)[1].strip()
         elif line.startswith("ExecMainExitTimestamp="):
