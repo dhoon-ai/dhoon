@@ -54,6 +54,7 @@ def tb(tmp_path, monkeypatch):
     monkeypatch.setenv("WORKSPACE", str(tmp_path / "ws"))
     monkeypatch.setenv("EMAIL_STATE", str(tmp_path / "count.json"))
     monkeypatch.setenv("EMAIL_ENV_FILE", str(tmp_path / "none.env"))
+    monkeypatch.setenv("EMAIL_RETRY_DELAY", "0")
     monkeypatch.setenv("EMAIL_PROVIDER", "gmail")
     monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "abcd efgh ijkl mnop")
@@ -237,3 +238,133 @@ def test_no_address_means_the_users_own_inbox(tb):
     assert "Not allowed to send to investor@domain.com" in out and "with to left empty" in out
     assert len(FakeSMTP.sent) == 1
     assert "body is empty" in tb.send_email(subject="x")
+
+
+def test_network_error_retried_then_succeeds(tb, monkeypatch):
+    monkeypatch.setattr(tb.emailer, "EMAIL_RETRY_ATTEMPTS", 3)
+    calls = []
+
+    def send_once(cfg, recipients, subject, body_markdown, attachments=()):
+        calls.append(1)
+        if len(calls) < 3:
+            raise OSError("Temporary failure in name resolution")
+        return "E-mail 'x' sent to me@gmail.com."
+
+    monkeypatch.setattr(tb.emailer, "_send_once", send_once)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    out = tb.send_email("me@gmail.com", "subj", "body")
+    assert "sent" in out
+    assert len(calls) == 3
+    assert slept == [0, 0]
+
+
+def test_network_error_always_fails_after_three_attempts(tb, monkeypatch):
+    monkeypatch.setattr(tb.emailer, "EMAIL_RETRY_ATTEMPTS", 3)
+    calls = []
+
+    def send_once(cfg, recipients, subject, body_markdown, attachments=()):
+        calls.append(1)
+        raise OSError("Temporary failure in name resolution")
+
+    monkeypatch.setattr(tb.emailer, "_send_once", send_once)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    try:
+        tb.send_email("me@gmail.com", "subj", "body")
+    except Exception as e:
+        assert "name resolution" in str(e).lower() or "could not" in str(e).lower()
+    else:
+        raise AssertionError("expected failure")
+    assert len(calls) == 3
+    assert slept == [0, 0]
+
+
+def test_default_attempts_no_retry_and_no_sleep(tb, monkeypatch):
+    monkeypatch.setattr(tb.emailer, "EMAIL_RETRY_ATTEMPTS", 1)
+    calls = []
+
+    def send_once(cfg, recipients, subject, body_markdown, attachments=()):
+        calls.append(1)
+        raise OSError("Temporary failure in name resolution")
+
+    monkeypatch.setattr(tb.emailer, "_send_once", send_once)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    try:
+        tb.send_email("me@gmail.com", "subj", "body")
+    except Exception:
+        pass
+    assert slept == []
+    assert calls == [1]
+
+
+def test_smtp_data_errors_not_retried(tb, monkeypatch):
+    calls = []
+
+    def deliver(host, port, security, cfg, msg):
+        calls.append(1)
+        raise smtplib.SMTPDataError(450, b"try again later")
+
+    monkeypatch.setattr(tb.emailer, "_deliver", deliver)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    try:
+        tb.send_email("me@gmail.com", "subj", "body")
+    except Exception:
+        pass
+    assert 1 <= len(calls) <= 2
+    assert slept == []
+
+
+def test_auth_error_is_not_retried(tb, monkeypatch):
+    calls = []
+
+    def deliver(host, port, security, cfg, msg):
+        calls.append(1)
+        raise smtplib.SMTPAuthenticationError(535, b"5.7.30 Basic authentication is not supported")
+
+    monkeypatch.setattr(tb.emailer, "_deliver", deliver)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    out = tb.send_email("me@gmail.com", "subj", "body")
+    assert "refused the login" in out
+    assert 1 <= len(calls) <= 2
+    assert slept == []
+
+
+def test_smtp_recipients_refused_not_retried(tb, monkeypatch):
+    calls = []
+
+    def deliver(host, port, security, cfg, msg):
+        calls.append(1)
+        raise smtplib.SMTPRecipientsRefused({"me@gmail.com": (550, b"unknown user")})
+
+    monkeypatch.setattr(tb.emailer, "_deliver", deliver)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    try:
+        tb.send_email("me@gmail.com", "subj", "body")
+    except Exception:
+        pass
+    assert 1 <= len(calls) <= 2
+    assert slept == []
+
+
+def test_zero_attempts_still_makes_one_attempt(tb, monkeypatch):
+    monkeypatch.setattr(tb.emailer, "EMAIL_RETRY_ATTEMPTS", 0)
+    calls = []
+
+    def send_once(cfg, recipients, subject, body_markdown, attachments=()):
+        calls.append(1)
+        raise OSError("Temporary failure in name resolution")
+
+    monkeypatch.setattr(tb.emailer, "_send_once", send_once)
+    slept = []
+    monkeypatch.setattr(tb.emailer.time, "sleep", lambda s: slept.append(s))
+    try:
+        tb.send_email("me@gmail.com", "subj", "body")
+    except Exception:
+        pass
+    assert calls == [1]
+    assert slept == []

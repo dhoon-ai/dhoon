@@ -28,6 +28,7 @@ import mimetypes
 import os
 import smtplib
 import ssl
+import time
 from datetime import date
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -65,6 +66,11 @@ FALLBACK = {
     "zoho-eu": ("smtp.zoho.eu", 587, "starttls"),
 }
 MAX_ATTACHMENTS_MB = 15
+try:
+    EMAIL_RETRY_ATTEMPTS = max(1, int(os.environ.get("EMAIL_RETRY_ATTEMPTS", "1")))
+except (TypeError, ValueError):
+    EMAIL_RETRY_ATTEMPTS = 1
+EMAIL_RETRY_DELAY = int(os.environ.get("EMAIL_RETRY_DELAY", "300"))  # seconds (~5 min); two waits make ~10 min over 3 tries
 
 
 class EmailError(Exception):
@@ -246,31 +252,45 @@ def _deliver(host: str, port: int, security: str, cfg: dict, msg: EmailMessage) 
         server.close()
 
 
-def send(
-    to: list[str],
+def _is_network_error(exc: BaseException) -> bool:
+    """True only for failures that a retry might fix: DNS, connect, timeout and dropped connections.
+    Auth and allow-list failures are never retried."""
+    import socket
+
+    if isinstance(exc, (socket.gaierror, socket.timeout, TimeoutError, ConnectionError)):
+        return True
+    if isinstance(exc, (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError)):
+        return True
+    try:
+        import httpx
+
+        if isinstance(exc, httpx.TimeoutException):
+            return True
+        if isinstance(exc, httpx.ConnectError):
+            return True
+        if isinstance(exc, httpx.NetworkError):
+            return True
+        if isinstance(exc, httpx.RemoteProtocolError):
+            return True
+    except ImportError:
+        pass
+    msg = str(exc).lower()
+    if "not allowed" in msg or "refused the login" in msg or "refused it (" in msg:
+        return False
+    network_words = ("could not reach", "connection", "timeout", "name resolution",
+                      "temporary failure", "network", "socket", "reset by peer",
+                      "broken pipe", "server disconnected")
+    return any(w in msg for w in network_words)
+
+
+def _send_once(
+    cfg: dict,
+    recipients: list[str],
     subject: str,
     body_markdown: str,
     attachments: list[Path] = (),
-    check_allowed: bool = True,
 ) -> str:
-    """Send one e-mail (plain text + HTML version of the Markdown body, plus attachments)."""
-    cfg = settings()
-    recipients = [t.strip() for t in to if t and t.strip()]
-    if not recipients:
-        raise EmailError("No recipient given.")
-    if check_allowed:
-        blocked = [r for r in recipients if r.lower() not in cfg["allowed"]]
-        if blocked:
-            raise EmailError(
-                f"Not allowed to send to {', '.join(blocked)}. Allowed: {', '.join(sorted(cfg['allowed']))}. "
-                "Add addresses to EMAIL_ALLOWED_TO in config/email.env if you trust them."
-            )
-    if _sent_today() >= cfg["max_per_day"]:
-        raise EmailError(f"Daily limit of {cfg['max_per_day']} e-mails reached (EMAIL_MAX_PER_DAY).")
-    total = sum(Path(a).stat().st_size for a in attachments)
-    if total > MAX_ATTACHMENTS_MB * 1024 * 1024:
-        raise EmailError(f"Attachments are {total / 1e6:.1f} MB; the limit is {MAX_ATTACHMENTS_MB} MB.")
-
+    """One delivery attempt. Caller (send) handles network retries."""
     if cfg["provider"] in API_PROVIDERS:
         _send_api(cfg, recipients, subject[:200], body_markdown, [Path(a) for a in attachments])
         _count_one()
@@ -311,6 +331,43 @@ def send(
     _count_one()
     names = f" with {len(attachments)} attachment(s)" if attachments else ""
     return f"E-mail '{subject[:80]}' sent to {', '.join(recipients)}{names}."
+
+
+def send(
+    to: list[str],
+    subject: str,
+    body_markdown: str,
+    attachments: list[Path] = (),
+    check_allowed: bool = True,
+) -> str:
+    """Send one e-mail (plain text + HTML version of the Markdown body, plus attachments).
+    Network errors (DNS/connect/timeout) are retried only when EMAIL_RETRY_ATTEMPTS > 1
+    (unattended jobs set it); auth and allow-list failures are never retried."""
+    cfg = settings()
+    recipients = [t.strip() for t in to if t and t.strip()]
+    if not recipients:
+        raise EmailError("No recipient given.")
+    if check_allowed:
+        blocked = [r for r in recipients if r.lower() not in cfg["allowed"]]
+        if blocked:
+            raise EmailError(
+                f"Not allowed to send to {', '.join(blocked)}. Allowed: {', '.join(sorted(cfg['allowed']))}. "
+                "Add addresses to EMAIL_ALLOWED_TO in config/email.env if you trust them."
+            )
+    if _sent_today() >= cfg["max_per_day"]:
+        raise EmailError(f"Daily limit of {cfg['max_per_day']} e-mails reached (EMAIL_MAX_PER_DAY).")
+    total = sum(Path(a).stat().st_size for a in attachments)
+    if total > MAX_ATTACHMENTS_MB * 1024 * 1024:
+        raise EmailError(f"Attachments are {total / 1e6:.1f} MB; the limit is {MAX_ATTACHMENTS_MB} MB.")
+
+    retry_attempts = max(1, EMAIL_RETRY_ATTEMPTS)
+    for attempt in range(retry_attempts):
+        try:
+            return _send_once(cfg, recipients, subject, body_markdown, attachments)
+        except Exception as e:  # noqa: BLE001 - classify below, re-raise non-network
+            if not _is_network_error(e) or attempt == retry_attempts - 1:
+                raise
+            time.sleep(EMAIL_RETRY_DELAY)
 
 
 def send_test() -> str:
