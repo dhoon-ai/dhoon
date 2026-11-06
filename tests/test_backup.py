@@ -191,3 +191,11 @@ def test_chats_are_backed_up_and_put_back(kit):
 
     r = run([str(dhoon / "scripts/backup.sh")], dict(env, BACKUP_CHATS="no"))
     assert "Chats exported" not in r.stdout
+
+
+
+def test_restore_shows_download_progress():
+    # 6 Nov: a ~450 MB clone with -q looked like a hang on a new machine
+    text = Path(RESTORE).read_text()
+    assert "git clone -q" not in text and text.count("git clone --progress") == 2
+    assert "Downloading the backups from" in text

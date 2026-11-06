@@ -58,14 +58,19 @@ newest_first() {
 if [ -z "$file" ]; then
   if [ -n "$from" ]; then
     REPO_DIR=$(mktemp -d)/repo
-    git clone -q --depth 1 "$from" "$REPO_DIR"
+    # the repo holds the last BACKUP_KEEP backups (~50 MB each): say so, and show git's progress,
+    # so a long download doesn't look like a hang (6 Nov: ~450 MB, minutes, nothing on screen)
+    echo "Downloading the backups from $from (the last few, can be hundreds of MB: minutes)..."
+    git clone --progress --depth 1 "$from" "$REPO_DIR"
+    ok "Downloaded $(du -sh "$REPO_DIR" | cut -f1)"
   elif [ -d "$REPO_DIR/.git" ]; then
     if git -C "$REPO_DIR" fetch -q origin 2>/dev/null; then git -C "$REPO_DIR" reset -q --hard origin/main; fi
   elif [ -f "$CONF/backup.env" ]; then
     # shellcheck source=/dev/null
     source "$CONF/backup.env"
     mkdir -p "$(dirname "$REPO_DIR")"
-    git clone -q "$BACKUP_REPO" "$REPO_DIR"
+    echo "Downloading the backups from $BACKUP_REPO (can be hundreds of MB: minutes)..."
+    git clone --progress "$BACKUP_REPO" "$REPO_DIR"
   fi
   file=$(newest_first "$REPO_DIR/backups" | head -1 || true)
   [ -n "$file" ] || { fail "No backup found. Use --from URL, or give a downloaded FILE.age"; exit 1; }
