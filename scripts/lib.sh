@@ -92,6 +92,8 @@ cpu_temp() {
 # empty = the newest release.
 # Both print "" (never fail) when there is nothing to find: under set -euo pipefail a failing check here
 # stopped a fresh install silently (6 Nov, Debian VM with no Ollama yet).
+# The models Dhoon needs, each once (the planner is often the main model: 6 Nov, gemma4 was checked twice).
+wanted_models() { printf '%s\n' "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER" | awk 'NF && !seen[$0]++'; }
 ollama_installed_version() { { ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1; } || true; }
 ollama_latest_version() {
   { curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/ollama/ollama/releases/latest 2>/dev/null \
@@ -192,7 +194,7 @@ step_done() {
     2)
       curl -fs http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || { STATUS_REASON="Ollama not running"; return 1; }
       local m
-      for m in "$MODEL_MAIN" "$MODEL_FAST" "$MODEL_EMBED" "$MODEL_PLANNER"; do
+      for m in $(wanted_models); do
         _model_present "$m" || { STATUS_REASON="model $m not downloaded"; return 1; }
       done
       ;;

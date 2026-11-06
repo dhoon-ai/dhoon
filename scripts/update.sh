@@ -49,7 +49,7 @@ fi
 step "Making sure the configured models are downloaded"
 # The Ollama installer and the settings above restart Ollama: wait until it answers.
 wait_for_ollama 60 || { fail "Ollama did not start: journalctl -u ollama -n 50"; exit 1; }
-for m in "$MODEL_FAST" "$MODEL_MAIN" "$MODEL_EMBED" "$MODEL_PLANNER"; do ollama pull "$m"; done
+for m in $(wanted_models); do ollama pull "$m"; done
 
 # The agents keep the model they were created with: when the main model changed, update them
 if [ -f "$KIT/.agent-model" ] && [ "$(cat "$KIT/.agent-model")" != "$MODEL_MAIN $MODEL_FAST" ]; then

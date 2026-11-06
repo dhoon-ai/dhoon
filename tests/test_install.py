@@ -119,3 +119,14 @@ def test_ollama_version_checks_never_stop_a_fresh_install(tmp_path):
                        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)})  # Ollama lives in /usr/local/bin
     assert r.returncode == 0, r.stderr
     assert "installed=[]" in r.stdout
+
+
+def test_each_model_is_checked_once():
+    # 6 Nov: the planner defaults to the main model, and check.sh warned about gemma4:26b twice
+    import subprocess
+    from pathlib import Path
+    lib = Path(__file__).resolve().parents[1] / "scripts" / "lib.sh"
+    line = next(l for l in lib.read_text().splitlines() if l.startswith("wanted_models()"))
+    r = subprocess.run(["/bin/bash", "-c", f"MODEL_MAIN=m1 MODEL_FAST=f MODEL_EMBED=e MODEL_PLANNER=m1; {line}; wanted_models"],
+                       capture_output=True, text=True)
+    assert r.stdout.split() == ["m1", "f", "e"]
