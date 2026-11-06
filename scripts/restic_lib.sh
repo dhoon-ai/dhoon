@@ -11,6 +11,7 @@ ENV_FILE="${RESTIC_ENV:-$CONF/restic.env}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
 PODMAN="${PODMAN:-podman}"            # tests use a stand-in
 DOCKER="${DOCKER:-docker}"            # the chat stack still runs on Docker today
+CURL="${CURL:-curl}"                  # tests use a stand-in
 RESTIC_TARGETS="${RESTIC_TARGETS:-usb}"
 RESTIC_ROLES="${RESTIC_ROLES:-workspace claude config backupconf ssh rebuild}"
 RESTIC_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-$CONF/restic-password}"

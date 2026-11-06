@@ -33,6 +33,12 @@
 #                       can be restored; with it next to the disk, anyone holding the disk can read it.
 #   RESTIC_KEEP         "--keep-daily 7 --keep-weekly 4 --keep-monthly 6" (applied on Sundays)
 #   RESTIC_TIME         03:10 (the daily timer)
+#   PLAIN_FILES         files copied AS-IS, not by restic, so they can be fetched with no restic password:
+#                       for a file that is already encrypted on its own (a KeePass .kdbx), the key to all the
+#                       others. Never list a file that isn't encrypted by itself.
+#   PLAIN_USB           folder for those copies (e.g. on the backup disk)
+#   PLAIN_R2            https://<account>.r2.cloudflarestorage.com/<bucket>/<folder> (uploaded with curl and the
+#                       same R2 token; download from the Cloudflare dashboard). Use a bucket or folder of its own.
 set -euo pipefail
 
 # shellcheck source=scripts/restic_lib.sh
@@ -105,6 +111,26 @@ backup_target() {  # back up every role to one target; 0 = all saved
   return "$failed"
 }
 
+plain_copies() {  # PLAIN_FILES to PLAIN_USB and PLAIN_R2, unchanged; 0 = all copied
+  local bad=0 f
+  for f in ${PLAIN_FILES:-}; do
+    [ -f "$f" ] || { warn "[plain] $f not found"; bad=1; continue; }
+    if [ -n "${PLAIN_USB:-}" ]; then
+      if mkdir -p "$PLAIN_USB" && cp -p "$f" "$PLAIN_USB/"; then say "[plain] $(basename "$f") copied to $PLAIN_USB"
+      else warn "[plain] $(basename "$f") NOT copied to $PLAIN_USB"; bad=1; fi
+    fi
+    if [ -n "${PLAIN_R2:-}" ]; then
+      # the token goes in on stdin (curl -K -), never on a command line
+      if printf 'user = "%s:%s"\n' "${AWS_ACCESS_KEY_ID:-}" "${AWS_SECRET_ACCESS_KEY:-}" \
+           | "$CURL" -sS --fail -K - --aws-sigv4 "aws:amz:auto:s3" -T "$f" "${PLAIN_R2%/}/$(basename "$f")" >/dev/null; then
+        say "[plain] $(basename "$f") uploaded to R2"
+      else warn "[plain] $(basename "$f") NOT uploaded to R2"; bad=1; fi
+    fi
+  done
+  return "$bad"
+}
+
+
 status() {  # one line per target from the last run; exit 1 if any is stale or failed
   [ -f "$STATUS" ] || { say "No restic backup has run yet."; return 1; }
   local bad=0 now; now="$(date +%s)"
@@ -166,6 +192,10 @@ for t in $RESTIC_TARGETS; do
   if backup_target "$t"; then r=ok; else r=failed; overall=1; fi
   printf '%s %s %s\n' "$t" "$r" "$(date -Iseconds)" >> "$STATUS.tmp"
 done
+if [ -n "${PLAIN_FILES:-}" ]; then
+  if plain_copies; then r=ok; else r=failed; overall=1; fi
+  printf '%s %s %s\n' plain "$r" "$(date -Iseconds)" >> "$STATUS.tmp"
+fi
 mv "$STATUS.tmp" "$STATUS"
 status || true
 exit "$overall"

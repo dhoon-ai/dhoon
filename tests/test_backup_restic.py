@@ -172,3 +172,36 @@ def test_rebuild_keeps_single_files_by_place(env, tmp_path):
     stage = home / ".local/share/ai-kit-backup/rebuild/files/home"
     assert (stage / ".gitconfig").read_text() == "[user]\n"
     assert (stage / "notes" / "settings.json").exists()
+
+
+FAKE_CURL = r"""#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_LOG"
+cat > "$CURL_LOG.stdin"
+[ -z "${FAIL_CURL:-}" ]
+"""
+
+
+def test_plain_copy_to_disk_and_r2_without_token_on_command_line(env, tmp_path):
+    kdbx = Path(env["HOME"]) / "MyPass.kdbx"
+    kdbx.write_bytes(b"\x03\xd9\xa2\x9a keepass")
+    curl = tmp_path / "curl"
+    curl.write_text(FAKE_CURL)
+    curl.chmod(0o755)
+    env.update(PLAIN_FILES=str(kdbx), PLAIN_USB=str(tmp_path / "disk" / "plain"), CURL=str(curl),
+               CURL_LOG=str(tmp_path / "curl.log"), PLAIN_R2="https://acct.r2.cloudflarestorage.com/recovery/",
+               AWS_ACCESS_KEY_ID="keyid", AWS_SECRET_ACCESS_KEY="supersecret")
+    r = run(BACKUP, env)
+    assert r.returncode == 0, r.stderr
+    assert (tmp_path / "disk" / "plain" / "MyPass.kdbx").read_bytes() == kdbx.read_bytes()
+    argv = (tmp_path / "curl.log").read_text()
+    assert "https://acct.r2.cloudflarestorage.com/recovery/MyPass.kdbx" in argv and "--aws-sigv4" in argv
+    assert "supersecret" not in argv and "keyid" not in argv
+    assert 'user = "keyid:supersecret"' in (tmp_path / "curl.log.stdin").read_text()
+    status = (Path(env["HOME"]) / ".config/ai-kit-backup/last-restic.txt").read_text()
+    assert "\nplain ok " in "\n" + status
+
+
+def test_plain_copy_failure_is_reported(env, tmp_path):
+    env.update(PLAIN_FILES=str(tmp_path / "missing.kdbx"))
+    r = run(BACKUP, env)
+    assert r.returncode == 1 and "not found" in r.stderr
