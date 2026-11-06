@@ -3,7 +3,7 @@
 #
 #   bash scripts/restore_restic.sh --list [--from usb|r2]
 #   bash scripts/restore_restic.sh --role workspace --to ~/agent-workspace [--from r2] [--snapshot latest]
-#   bash scripts/restore_restic.sh --drill [--from usb|r2]
+#   bash scripts/restore_restic.sh --drill [--from usb|r2] [--keep]
 #
 # Where to: --to, else $RESTORE_DIR/<role> (RESTORE_DIR in restic.env or the environment, default
 # ~/restore). The disk and off-site places are RESTIC_USB / RESTIC_R2 in restic.env: nothing is fixed.
@@ -12,22 +12,24 @@
 # --drill restores every role into a scratch folder (RESTIC_DRILL_DIR, default ~/.cache/restic-drill),
 # counts the files, checks the database dumps aren't empty, prints a table and exits 1 if anything is
 # missing. Nothing live is touched; run it monthly and on a new machine before trusting the backup.
+# The drill folder holds secrets (.ssh, *.env) unencrypted, so it is deleted at the end unless --keep.
 # Settings: the same restic.env as backup_restic.sh.
 set -euo pipefail
 
 # shellcheck source=scripts/restic_lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/restic_lib.sh"
 
-FROM="" ROLE="" TO="" SNAP="latest" MODE=""
+FROM="" ROLE="" TO="" SNAP="latest" MODE="" KEEP=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --list) MODE=list ;;
     --drill) MODE=drill ;;
+    --keep) KEEP=yes ;;
     --role) ROLE="${2:?--role needs a name}"; MODE="${MODE:-role}"; shift ;;
     --to) TO="${2:?--to needs a folder}"; shift ;;
     --from) FROM="${2:?--from needs usb or r2}"; shift ;;
     --snapshot) SNAP="${2:?--snapshot needs an id}"; shift ;;
-    --help|-h) sed -n '2,15p' "$0"; exit 0 ;;
+    --help|-h) sed -n '2,16p' "$0"; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
   shift
@@ -61,7 +63,8 @@ case "$MODE" in
     for dump in mongo.archive.gz postgres.sql.gz; do
       if [ -s "$base/rebuild/$dump" ]; then say "dump $dump: ok"; else say "dump $dump: MISSING"; bad=1; fi
     done
-    say "Drill folder: $base (delete it when done)"
+    if [ -n "$KEEP" ]; then say "Drill folder kept: $base (it holds secrets: delete it when done)"
+    else rm -rf "$base"; say "Drill folder deleted"; fi
     exit "$bad" ;;
   *) die "nothing to do (see --help)" ;;
 esac

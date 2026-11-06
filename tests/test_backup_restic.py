@@ -146,3 +146,11 @@ def test_restore_goes_to_restore_dir_by_default(env, tmp_path):
     r = run(RESTORE, env, "--role", "queue")
     assert r.returncode == 0, r.stderr
     assert (tmp_path / "elsewhere" / "queue" / "file.txt").exists()
+
+
+def test_drill_deletes_its_folder_unless_kept(env, tmp_path):
+    env.update(RESTIC_ROLES="workspace", RESTIC_DRILL_DIR=str(tmp_path / "drill"))
+    r = run(RESTORE, env, "--drill")
+    assert "Drill folder deleted" in r.stdout and not any((tmp_path / "drill").iterdir())
+    r = run(RESTORE, env, "--drill", "--keep")
+    assert "Drill folder kept" in r.stdout and len(list((tmp_path / "drill").iterdir())) == 1
