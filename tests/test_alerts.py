@@ -301,3 +301,31 @@ def test_health_journal_systemd_finished_100_hours_ago(monkeypatch):
     monkeypatch.setattr(m, "run_systemctl_show", lambda unit: "")
     age = m.last_success_age_hours("ai-example-a.service")
     assert age > 99
+
+
+def test_health_env_user_units_and_checks(tmp_path):
+    env_file = tmp_path / "health.env"
+    env_file.write_text("ai-example.service 26\nuser ai-example-user.service 30\n"
+                        "check bash backup.sh --status\n# check not-this\n")
+    m = load_health()
+    assert m.read_units(str(env_file)) == [("ai-example.service", 26.0)]
+    assert m.read_units(str(env_file), scope="user") == [("ai-example-user.service", 30.0)]
+    assert m.read_checks(str(env_file)) == ["bash backup.sh --status"]
+
+
+def test_health_user_journal_manager_is_not_pid_1(monkeypatch):
+    import time
+    m = load_health()
+    ts = int(time.time() - 7200)
+    text = f"{ts} example-host systemd[2071]: Finished ai-example-user.service - x.\n"
+    assert m.journal_last_success_timestamp(text, "ai-example-user.service") is None  # system scope: pid 1 only
+    monkeypatch.setattr(m, "run_journalctl", lambda unit, user=False: text if user else "")
+    monkeypatch.setattr(m, "run_systemctl_show", lambda unit, user=False: "")
+    age = m.last_success_age_hours("ai-example-user.service", user=True)
+    assert abs(age - 2.0) < 0.05
+
+
+def test_health_check_command_result():
+    m = load_health()
+    assert m.run_check("exit 0") is None
+    assert m.run_check("echo first; echo 'usb: failed, 50h ago'; exit 1") == "exit 1: usb: failed, 50h ago"
