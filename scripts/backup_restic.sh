@@ -18,7 +18,10 @@
 #   config     <repo>/config (*.env: secrets)
 #   backupconf ~/.config/ai-kit-backup             ssh      ~/.ssh
 #   rebuild    made fresh each run: database dumps, runtime state files, user units, Quadlets,
-#              model/image/package lists, crontab
+#              model/image/package lists, crontab, and single files a new machine needs (files/home/... for
+#              files under your home, files/system/... for the rest): the chat site's .env and
+#              librechat.yaml, the file-share key, ~/.gitconfig, ~/.config/ai-alerts, the ai-* system units
+#              and Ollama's override. Add your own with REBUILD_EXTRA="path path" (files or folders).
 # Settings: ~/.config/ai-kit-backup/restic.env (chmod 600):
 #   RESTIC_IMAGE        docker.io/restic/restic@sha256:...   (pinned; required)
 #   RESTIC_TARGETS      "usb r2" (any of them)
@@ -61,6 +64,19 @@ make_rebuild() {  # what a rebuild needs that isn't a folder: dumps, state files
     [ -d "$u" ] && mkdir -p "$d/units" && cp -rp "$u" "$d/units/$(basename "$(dirname "$u")")-$(basename "$u")" || true
   done
   ls -l "$HOME/.local/bin" > "$d/local-bin.txt" 2>/dev/null || true
+  shopt -s nullglob
+  local extra=("$KIT/runtime/LibreChat/.env" "$KIT/runtime/LibreChat/librechat.yaml" "$KIT/runtime/fileshare.key"
+               "$HOME/.gitconfig" "$HOME/.config/ai-alerts" /etc/systemd/system/ai-* /etc/systemd/system/ollama.service.d)
+  shopt -u nullglob
+  # shellcheck disable=SC2206  # REBUILD_EXTRA is a list of paths
+  extra+=(${REBUILD_EXTRA:-})
+  for src in "${extra[@]}"; do
+    [ -e "$src" ] || continue
+    local rel
+    case "$src" in "$HOME"/*) rel="home/${src#"$HOME"/}" ;; *) rel="system/${src#/}" ;; esac
+    mkdir -p "$d/files/$(dirname "$rel")"
+    cp -rpP "$src" "$d/files/$rel" 2>/dev/null || warn "could not copy $src"
+  done
   date -Iseconds > "$d/made-at.txt"
   rm -rf "$STAGE" && mv "$STAGE.tmp" "$STAGE"
 }

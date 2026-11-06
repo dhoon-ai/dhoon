@@ -2,6 +2,7 @@
 
 import datetime as dt
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -137,8 +138,11 @@ def test_drill_flags_missing_dumps(env, tmp_path):
 
 
 def test_no_fixed_home_paths():
+    # an absolute /home/<user> path; a sub-folder named home (files/home/...) is fine
+    absolute = re.compile(r"""(^|[\s"'=:(])/home/""", re.M)
     for name in ("backup_restic.sh", "restore_restic.sh", "restic_lib.sh"):
-        assert "/home/" not in (ROOT / "scripts" / name).read_text(), name
+        assert not absolute.search((ROOT / "scripts" / name).read_text()), name
+    assert absolute.search('x="/home/alex/ws"') and not absolute.search("files/home/.gitconfig")
 
 
 def test_restore_goes_to_restore_dir_by_default(env, tmp_path):
@@ -154,3 +158,17 @@ def test_drill_deletes_its_folder_unless_kept(env, tmp_path):
     assert "Drill folder deleted" in r.stdout and not any((tmp_path / "drill").iterdir())
     r = run(RESTORE, env, "--drill", "--keep")
     assert "Drill folder kept" in r.stdout and len(list((tmp_path / "drill").iterdir())) == 1
+
+
+def test_rebuild_keeps_single_files_by_place(env, tmp_path):
+    home = Path(env["HOME"])
+    (home / ".gitconfig").write_text("[user]\n")
+    extra = home / "notes" / "settings.json"
+    extra.parent.mkdir()
+    extra.write_text("{}")
+    env["REBUILD_EXTRA"] = str(extra)
+    r = run(BACKUP, env)
+    assert r.returncode == 0, r.stderr
+    stage = home / ".local/share/ai-kit-backup/rebuild/files/home"
+    assert (stage / ".gitconfig").read_text() == "[user]\n"
+    assert (stage / "notes" / "settings.json").exists()
