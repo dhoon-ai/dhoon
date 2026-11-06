@@ -90,10 +90,12 @@ cpu_temp() {
 # Ollama: install or update only when the version changes (its installer downloads ~1.5 GB
 # and restarts Ollama every time). OLLAMA_VERSION (config/models.env) pins one, e.g. 0.12.6;
 # empty = the newest release.
-ollama_installed_version() { ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1; }
+# Both print "" (never fail) when there is nothing to find: under set -euo pipefail a failing check here
+# stopped a fresh install silently (6 Nov, Debian VM with no Ollama yet).
+ollama_installed_version() { { ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -1; } || true; }
 ollama_latest_version() {
-  curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/ollama/ollama/releases/latest 2>/dev/null \
-    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$'
+  { curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/ollama/ollama/releases/latest 2>/dev/null \
+      | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$'; } || true
 }
 install_ollama() {
   local want have

@@ -101,3 +101,21 @@ def test_memory_question_saves_the_answer_and_defaults_to_off(tmp_path):
     assert _ask_memory(tmp_path / "b", {"MEMORY": "on"}).strip().endswith("MEMORY=on")
     kept = _ask_memory(tmp_path / "c", {"MEMORY": "on"}, models_env="MEMORY=off\n")
     assert kept == "MEMORY=off\n"  # asked only once
+
+
+def test_ollama_version_checks_never_stop_a_fresh_install(tmp_path):
+    # 6 Nov: on a new Debian machine with no Ollama, install_ollama's version check failed under
+    # set -euo pipefail and stopped the installer with no message
+    import subprocess
+    from pathlib import Path
+    lib = Path(__file__).resolve().parents[1] / "scripts" / "lib.sh"
+    script = (f'set -euo pipefail; source "{lib}"; '
+              'v="$(ollama_installed_version)"; echo "installed=[$v]"')
+    import shutil
+    import pytest
+    if shutil.which("ollama", path="/usr/bin:/bin"):
+        pytest.skip("ollama is in /usr/bin or /bin here: can't hide it")
+    r = subprocess.run(["/bin/bash", "-c", script], capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)})  # Ollama lives in /usr/local/bin
+    assert r.returncode == 0, r.stderr
+    assert "installed=[]" in r.stdout
