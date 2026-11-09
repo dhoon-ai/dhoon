@@ -199,3 +199,19 @@ def test_restore_shows_download_progress():
     text = Path(RESTORE).read_text()
     assert "git clone -q" not in text and text.count("git clone --progress") == 2
     assert "Downloading the backups from" in text
+
+
+def test_linked_folder_is_backed_up_not_just_the_link(kit):
+    """~/agent-workspace/notes is a link to another disk: the backup holds the files, not the link."""
+    home, env = kit["home"], kit["env"]
+    other = kit["tmp"] / "other-disk" / "notes"
+    other.mkdir(parents=True)
+    (other / "a.txt").write_text("on the other disk")
+    shutil.rmtree(home / "agent-workspace/notes")
+    (home / "agent-workspace/notes").symlink_to(other)
+    run([BACKUP], env)
+    run([RESTORE, "--key", str(kit["conf"] / "recovery-key.txt")], env)
+    out = next(home.glob("restore-*"))
+    got = out / "backup/home/agent-workspace/notes/a.txt"
+    assert not (out / "backup/home/agent-workspace/notes").is_symlink()
+    assert got.read_text() == "on the other disk"

@@ -290,7 +290,13 @@ backup() {
   trap 'rm -rf "$stage"' EXIT
   mkdir -p "$stage/backup"
   printf '%s\n' "${items[@]}" > "$stage/backup/paths.txt"
-  tar -cf "$stage/backup/files.tar" -C "$HOME" "${excludes[@]}" "${items[@]}"
+  # a link to a folder (~/agent-workspace -> /agent/agent-workspace): save what it points to, not the
+  # link ("name/." makes tar go through it; it unpacks as name/...)
+  local tar_items=()
+  for p in "${items[@]}"; do
+    if [ -L "$HOME/$p" ] && [ -d "$HOME/$p" ]; then tar_items+=("$p/."); else tar_items+=("$p"); fi
+  done
+  tar -cf "$stage/backup/files.tar" -C "$HOME" "${excludes[@]}" "${tar_items[@]}"
   {
     echo "Backup $stamp from $(hostname)"
     echo "Restore with: bash scripts/restore.sh   (paths are relative to the home folder)"
