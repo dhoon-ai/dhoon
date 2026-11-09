@@ -25,10 +25,13 @@ sudo mkdir -p /etc/systemd/system/ollama.service.d
   # knowledge-base search) at once; loading another big model (another writer being tried, say)
   # unloads one instead of running out of memory. With 2, each search unloaded the main model.
   echo 'Environment="OLLAMA_MAX_LOADED_MODELS=3"'
-  if mountpoint -q /data; then
-    sudo mkdir -p /data/ollama
-    sudo chown -R ollama:ollama /data/ollama 2>/dev/null || true
-    echo 'Environment="OLLAMA_MODELS=/data/ollama"'
+  # OLLAMA_MODELS_DIR: where the models live (any disk); default /data/ollama when /data is a disk
+  models_dir="${OLLAMA_MODELS_DIR:-}"
+  if [ -z "$models_dir" ] && mountpoint -q /data; then models_dir=/data/ollama; fi
+  if [ -n "$models_dir" ]; then
+    sudo mkdir -p "$models_dir"
+    sudo chown -R ollama:ollama "$models_dir" 2>/dev/null || true
+    echo "Environment=\"OLLAMA_MODELS=$models_dir\""
   fi
 } | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
 

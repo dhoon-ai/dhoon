@@ -205,3 +205,26 @@ def test_plain_copy_failure_is_reported(env, tmp_path):
     env.update(PLAIN_FILES=str(tmp_path / "missing.kdbx"))
     r = run(BACKUP, env)
     assert r.returncode == 1 and "not found" in r.stderr
+
+
+def test_usb_not_mounted_writes_nothing(env, tmp_path):
+    """USB_MOUNT set but nothing mounted there: no backup on the system disk under the empty mount point."""
+    mnt = tmp_path / "backups"
+    mnt.mkdir()
+    env.update(USB_MOUNT=str(mnt), RESTIC_USB=str(mnt / "restic"))
+    r = run(BACKUP, env)
+    assert r.returncode != 0
+    assert "not mounted" in r.stderr
+    assert not (mnt / "restic").exists()
+
+
+def test_plain_copy_skipped_when_usb_not_mounted(env, tmp_path):
+    kdbx = Path(env["HOME"]) / "MyPass.kdbx"
+    kdbx.write_bytes(b"keepass")
+    mnt = tmp_path / "backups"
+    mnt.mkdir()
+    env.update(USB_MOUNT=str(mnt), RESTIC_TARGETS="", PLAIN_FILES=str(kdbx), PLAIN_USB=str(mnt / "plain"))
+    r = run(BACKUP, env)
+    assert r.returncode != 0
+    assert "NOT copied" in r.stderr
+    assert not (mnt / "plain").exists()

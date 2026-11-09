@@ -106,7 +106,8 @@ run sudo rm -f /etc/systemd/system/ollama.service
 run sudo rm -rf /etc/systemd/system/ollama.service.d
 run sudo rm -f /usr/local/bin/ollama /usr/bin/ollama
 run sudo rm -rf /usr/local/lib/ollama /usr/lib/ollama /usr/share/ollama
-mountpoint -q /data 2>/dev/null && run sudo rm -rf /data/ollama
+if [ -n "${OLLAMA_MODELS_DIR:-}" ]; then run sudo rm -rf "$OLLAMA_MODELS_DIR"
+elif mountpoint -q /data 2>/dev/null; then run sudo rm -rf /data/ollama; fi
 run rm -rf "$HOME/.ollama"
 id ollama >/dev/null 2>&1 && run sudo userdel ollama
 getent group ollama >/dev/null 2>&1 && run sudo groupdel ollama

@@ -27,6 +27,15 @@ say()  { printf '%s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+usb_ready() {  # usb_ready <folder on the backup disk>: 0 when the disk is there and the folder exists
+  # USB_MOUNT (e.g. /backups): when set, the disk must be mounted there, so an unplugged disk never
+  # turns into a "backup" on the system disk under the empty mount point.
+  if [ -n "${USB_MOUNT:-}" ] && ! mountpoint -q "$USB_MOUNT"; then
+    warn "the backup disk is not mounted at $USB_MOUNT (plugged in?)"; return 1
+  fi
+  [ -d "$1" ] || mkdir -p "$1" 2>/dev/null || { warn "can't reach $1 (disk plugged in?)"; return 1; }
+}
+
 role_path() {  # the place a role lives on this computer
   local over="ROLE_PATH_$1"
   if [ -n "${!over:-}" ]; then printf '%s' "${!over}"; return; fi
@@ -51,7 +60,7 @@ restic_run() {  # restic_run <target> [podman -v mounts...] -- <restic args...>
               -e RESTIC_CACHE_DIR=/cache -v "$CACHE:/cache")
   case "$target" in
     usb) [ -n "${RESTIC_USB:-}" ] || { warn "RESTIC_USB is not set"; return 1; }
-         [ -d "$RESTIC_USB" ] || mkdir -p "$RESTIC_USB" 2>/dev/null || { warn "can't reach $RESTIC_USB (disk plugged in?)"; return 1; }
+         usb_ready "$RESTIC_USB" || return 1
          args+=(-v "$RESTIC_USB:/repo" -e RESTIC_REPOSITORY=/repo) ;;
     r2)  [ -n "${RESTIC_R2:-}" ] || { warn "RESTIC_R2 is not set"; return 1; }
          args+=(-e "RESTIC_REPOSITORY=$RESTIC_R2" -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY) ;;

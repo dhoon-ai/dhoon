@@ -26,6 +26,7 @@
 #   RESTIC_IMAGE        docker.io/restic/restic@sha256:...   (pinned; required)
 #   RESTIC_TARGETS      "usb r2" (any of them)
 #   RESTIC_USB          /path/to/disk/restic                 (a folder on the external disk)
+#   USB_MOUNT           /path/to/disk                        (optional: refuse to write unless mounted)
 #   RESTIC_R2           s3:https://<account>.r2.cloudflarestorage.com/<bucket>
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY             (the R2 API token; never on a command line)
 #   RESTIC_PASSWORD_FILE  default ~/.config/ai-kit-backup/restic-password. Keep a copy OFF this
@@ -116,7 +117,7 @@ plain_copies() {  # PLAIN_FILES to PLAIN_USB and PLAIN_R2, unchanged; 0 = all co
   for f in ${PLAIN_FILES:-}; do
     [ -f "$f" ] || { warn "[plain] $f not found"; bad=1; continue; }
     if [ -n "${PLAIN_USB:-}" ]; then
-      if mkdir -p "$PLAIN_USB" && cp -p "$f" "$PLAIN_USB/"; then say "[plain] $(basename "$f") copied to $PLAIN_USB"
+      if usb_ready "$PLAIN_USB" && cp -p "$f" "$PLAIN_USB/"; then say "[plain] $(basename "$f") copied to $PLAIN_USB"
       else warn "[plain] $(basename "$f") NOT copied to $PLAIN_USB"; bad=1; fi
     fi
     if [ -n "${PLAIN_R2:-}" ]; then
