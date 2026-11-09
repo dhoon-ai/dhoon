@@ -49,8 +49,13 @@ DEV_WORKTREES="dhoon dhoon/plugins/cloud dhoon/plugins/mentor dhoon/plugins/news
 ## 2. Base system (the only sudo step)
 Install Debian (or Ubuntu) normally with your user. Then:
 ```bash
-sudo apt-get update && sudo apt-get install -y git curl gnupg rsync age keepassxc build-essential python3-dev python3-venv podman uidmap passt libpam-systemd dbus-user-session && sudo loginctl enable-linger "$USER" && echo "127.0.1.1 $NEW_HOSTNAME" | sudo tee -a /etc/hosts && sudo hostnamectl set-hostname "$NEW_HOSTNAME" && sudo timedatectl set-timezone America/Toronto
+sudo apt-get update && sudo apt-get install -y git curl gnupg rsync age keepassxc build-essential python3-dev python3-venv podman uidmap passt libpam-systemd dbus-user-session systemd-timesyncd smartmontools pciutils usbutils lm-sensors efibootmgr && sudo timedatectl set-ntp true && sudo loginctl enable-linger "$USER" && echo "127.0.1.1 $NEW_HOSTNAME" | sudo tee -a /etc/hosts && sudo hostnamectl set-hostname "$NEW_HOSTNAME" && sudo timedatectl set-timezone America/Toronto
 ```
+- Firmware (Debian: needs `non-free-firmware` in the apt sources; a debootstrap install has none): Intel
+  machines `sudo apt-get install -y intel-microcode firmware-linux firmware-intel-graphics firmware-intel-misc firmware-sof-signed firmware-iwlwifi && sudo dracut --force --regenerate-all`
+  (or `update-initramfs -u`). Check after a reboot: `sudo dmesg | grep -i -E 'firmware.*fail|dmc'` shows no failure.
+- Health check (read-only): kernel firmware failures, failed units, errors this boot, disk SMART, time sync:
+  `sudo dmesg | grep -i 'failed to load'; systemctl --failed; journalctl -b -p err -o cat | sort | uniq -c | sort -rn | head; sudo smartctl -H /dev/<disk>; timedatectl`.
 - Disks: create and mount them where `paths.env` says (fstab with `nofail`), then
   `sudo mkdir -p "$PROJECT_DIR" "$AGENT_DIR" "$MODELS_DIR" && sudo chown "$USER": "$PROJECT_DIR" "$AGENT_DIR"`.
 - USB backup disk (NTFS, so it needs an owner): by its stable id, never `/dev/sdX`:
@@ -155,8 +160,14 @@ systemctl --user list-timers --no-pager && systemctl list-timers 'ai-*' --no-pag
 - Desktop: KeePassXC, VS Code, PairDesk (.deb), GNOME Remote Login.
 
 ## 13. Boot (only when this disk shares a computer with other systems)
-Give the system its own firmware entry through shim (Secure Boot), first in the order; leave other
-systems' disks alone. `efibootmgr -v` shows the entries.
+Give the system its own firmware entry through shim (works with Secure Boot on or off), first in the
+order; never touch another system's disk. Replace `<disk>`/`<esp-partition-number>` (`lsblk`, `findmnt /boot/efi`).
+```bash
+grep -q '^GRUB_DISABLE_OS_PROBER=true' /etc/default/grub || echo 'GRUB_DISABLE_OS_PROBER=true' | sudo tee -a /etc/default/grub && sudo update-grub && sudo efibootmgr -q -c -d /dev/<disk> -p <esp-partition-number> -L Debian -l '\EFI\debian\shimx64.efi' && efibootmgr
+```
+`-c` puts the new entry first; set the rest with `sudo efibootmgr -o <new>,<others>`. Reboot once, check
+that everything starts (step 12 check), and only then delete old entries with `sudo efibootmgr -b <num> -B`.
+Other systems stay reachable through the firmware boot menu (F10 on Intel NUCs), not GRUB.
 
 ## 14. Finish
 - `rm -rf "$RESTORE_DIR"` (it holds secrets in plain text) once everything runs.
@@ -164,7 +175,9 @@ systems' disks alone. `efibootmgr -v` shows the entries.
 
 ## Known gaps in the backup (fix in backup_restic.sh, then remove from this list)
 - Repos not on GitHub (PairDesk, its site): only as bundles handed over by hand.
-- `model-check` was missing from the restore's repo list.
+- `model-check` was missing from the restore's repo list, and its private data folders (`email-triage`,
+  `order-details`, `orders2`, ignored by git) are only in the age backup (`BACKUP_PATHS`).
+- Fixed 8 Nov: `backup.sh` saved a linked folder (`~/agent-workspace` -> another disk) as just the link.
 - Personal folders: Documents, Pictures, Videos, Desktop, the PairDesk shared folders, `~/.config/pairdesk`.
 - Runtime state not in `rebuild`: `runtime/warm/`, `last-chat`, `mentor-dashboard.pin`, `benchmark.txt`
   (all rebuildable), `runtime/searxng/settings.yml` (check it matches `config/searxng`).
