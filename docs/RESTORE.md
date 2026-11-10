@@ -49,7 +49,7 @@ DEV_WORKTREES="dhoon dhoon/plugins/cloud dhoon/plugins/mentor dhoon/plugins/news
 ## 2. Base system (the only sudo step)
 Install Debian (or Ubuntu) normally with your user. Then:
 ```bash
-sudo apt-get update && sudo apt-get install -y git curl gnupg rsync age keepassxc build-essential python3-dev python3-venv podman uidmap passt libpam-systemd dbus-user-session systemd-timesyncd smartmontools pciutils usbutils lm-sensors efibootmgr && sudo timedatectl set-ntp true && sudo loginctl enable-linger "$USER" && echo "127.0.1.1 $NEW_HOSTNAME" | sudo tee -a /etc/hosts && sudo hostnamectl set-hostname "$NEW_HOSTNAME" && sudo timedatectl set-timezone America/Toronto
+sudo apt-get update && sudo apt-get install -y git curl gnupg rsync age keepassxc build-essential python3-dev python3-venv podman uidmap passt catatonit libpam-systemd dbus-user-session systemd-timesyncd smartmontools pciutils usbutils lm-sensors efibootmgr && sudo timedatectl set-ntp true && sudo loginctl enable-linger "$USER" && echo "127.0.1.1 $NEW_HOSTNAME" | sudo tee -a /etc/hosts && sudo hostnamectl set-hostname "$NEW_HOSTNAME" && sudo timedatectl set-timezone America/Toronto
 ```
 - Firmware (Debian: needs `non-free-firmware` in the apt sources; a debootstrap install has none): Intel
   machines `sudo apt-get install -y intel-microcode firmware-linux firmware-intel-graphics firmware-intel-misc firmware-sof-signed firmware-iwlwifi && sudo dracut --force --regenerate-all`
@@ -64,6 +64,11 @@ sudo apt-get update && sudo apt-get install -y git curl gnupg rsync age keepassx
 - GitHub CLI (not in Debian testing): add the cli.github.com apt repo (keyring
   `/etc/apt/keyrings/githubcli-archive-keyring.gpg`), `sudo apt-get install -y gh`, then
   `gh auth login -h github.com -p https -w && gh auth setup-git` (the token is not in the backup).
+- Security key (opens the age backups without the recovery file):
+  `sudo apt-get install -y yubikey-manager pcscd scdaemon fido2-tools`, then put the `age-plugin-fido2-hmac`
+  binary (v0.5.0, from its GitHub releases) in `/usr/local/bin`. Check: `ykman list` with the key plugged in.
+- System logs for your own user (status scripts, `journalctl` without sudo): `sudo usermod -aG systemd-journal "$USER"`
+  (log out and in once).
 - Static address (optional): `nmcli con mod <connection> ipv4.method manual ipv4.addresses $STATIC_IP ipv4.gateway $GATEWAY ipv4.dns $DNS`.
 
 ## 3. Secrets from the password manager
@@ -113,6 +118,9 @@ keep-alive -1, 2 parallel, 3 loaded, CPU cap, listening on all addresses).
 Models are NOT in the backup: copy the folder from a disk that has them, or
 `awk 'NR>1{print $1}' "$RESTORE_DIR/rebuild/models.txt" | xargs -n1 ollama pull` (~21 GB).
 Check: `ollama run qwen3:4b-instruct-2507-q4_K_M "say ok"` (use the FULL tag).
+Speed: measure before changing anything (`bash scripts/benchmark.sh --speed-settings`). On a small Intel
+machine without a graphics card, the integrated GPU (Vulkan) and flash attention + `q8_0` were both slower
+than plain CPU, so leave them off unless the benchmark says otherwise.
 
 ## 10. Podman storage
 ```bash
@@ -128,8 +136,14 @@ Only inside systemd-nspawn (a chroot drill) also add `containers.conf` with `def
   computer and switch "Require this computer" back on for the scheduled tasks that need it.
 - Claude Code: `curl -fsSL https://claude.ai/install.sh | bash`, then `claude` once to sign in.
 - Beam: `ln -sf ~/dhoon/plugins/cloud/beam ~/.local/bin/beam && ln -sf ~/dhoon/plugins/cloud/ask-claude ~/.local/bin/ask-claude`.
-  Test: `beam --local --report -p "Reply with one word: ok"` **(not proven yet)**. The cloud model needs
-  `ollama signin` (paid plan); without it the Beam queue falls back to the local model.
+  Test: `beam --local --report -p "Reply with one word: ok"` **(not proven yet)**.
+- Beam queue model: before each job it tries cloud models that answer **for free right now** (the first models
+  on Ollama's cloud page plus `BEAM_CLOUD_CANDIDATES`), else the local model with the long time limit. Needs
+  `ollama signin`. Settings (user unit drop-in `beam-queue.service.d/model.conf`):
+  `printf '[Service]\nEnvironment=BEAM_CLOUD_DISCOVER=on\nEnvironment=BEAM_QUEUE_TIMEOUT_LOCAL=180m\n' > ~/.config/systemd/user/beam-queue.service.d/model.conf`.
+  **Only safe while the Ollama account has no credits or plan**; before adding any, set `Environment=BEAM_CLOUD=off`.
+- `beam-later.service` (user unit; runs `$AGENT_DIR/beam-queue/run-later.sh`, one queued job at a time when no
+  `ai-*` run is busy) needs `sudo apt-get install -y libnotify-bin` for its desktop notifications.
 
 ## 12. Services and timers
 Only ONE computer may run the timers (otherwise you get double drafts, e-mails and pushes): stop
@@ -147,14 +161,29 @@ R="$RESTORE_DIR/rebuild" && mkdir -p ~/.config/systemd/user && for f in "$R"/uni
 S="$R/files/system/etc/systemd/system" && T=$(mktemp -d) && for f in "$S"/ai-*; do n=$(basename "$f"); [ "$n" = ai-toolbox.service ] && continue; if [ -d "$f" ]; then cp -r "$f" "$T/"; else sed -e "s#/home/[^/]*/#$HOME/#g" -e "s#^User=.*#User=$USER#" "$f" > "$T/$n"; fi; done && sudo cp -r "$T"/* /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ai-backup.timer ai-health-check.timer ai-knowledge.timer ai-mentor.timer ai-mentor-india.timer ai-mentor-morning.timer ai-scheduler.timer ai-studio-guide.timer ai-studio-leads.timer ai-studio-site.timer ai-warmup.timer ai-files.service ai-mentor-dashboard.service && sudo systemctl enable ai-model-preload.service
 systemctl --user list-timers --no-pager && systemctl list-timers 'ai-*' --no-pager && systemctl --failed --no-pager && systemctl --user --failed --no-pager
 ```
-`ai-toolbox` is left out until the chat stack runs (it wants Docker's bridge, `172.17.0.1`).
+`ai-toolbox` is NOT a system unit any more: it is a user unit that comes with the chat stack below.
+
+**Chat stack: LibreChat on rootless Podman** (proven 9 Nov; one pod, files in `config/librechat/podman/`):
+```bash
+L="$DHOON_HOME/runtime/LibreChat" && R="$RESTORE_DIR/rebuild" && mkdir -p "$L"/{branding,images,uploads,logs,skill,data-node,meili_data_v1.35.1} && cp "$R/files/home/dhoon/runtime/LibreChat/.env" "$R/files/home/dhoon/runtime/LibreChat/librechat.yaml" "$L/" && cp "$DHOON_HOME"/config/branding/* "$L/branding/" && grep '^ADMIN_PANEL_SESSION_SECRET=' "$L/.env" | sed 's/^ADMIN_PANEL_//' > "$L/admin-panel.env" && chmod 600 "$L/.env" "$L/admin-panel.env" && cp "$DHOON_HOME"/config/librechat/podman/*.container "$DHOON_HOME"/config/librechat/podman/librechat.pod ~/.config/containers/systemd/ && cp "$DHOON_HOME"/config/librechat/podman/ai-toolbox.service ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now ai-toolbox.service && systemctl --user start librechat-pod.service && sleep 60 && podman exec -i chat-mongodb mongorestore --quiet --archive --gzip --drop --nsInclude 'LibreChat.*' < "$R/mongo.archive.gz" && podman restart LibreChat >/dev/null && zcat "$R/postgres.sql.gz" | podman exec -i vectordb psql -q -U myuser -d mydatabase >/dev/null 2>&1; podman ps --format '{{.Names}}  {{.Status}}' && curl -s -o /dev/null -w 'chat: %{http_code}\n' http://127.0.0.1:3080/
+```
+`chat: 200` = OK; then log in at `http://<this computer>:3080` and send one message to an agent.
+(`mongo.archive.gz` = chats, accounts and agents; "already exists" lines from the postgres dump are harmless.
+From an age backup instead: `DOCKER=podman bash scripts/restore.sh --chats`.
+Moving from another disk instead: copy `data-node/` and `meili_data_v1.35.1/` from the old checkout.)
+Backups must use Podman for the chat export:
+```bash
+mkdir -p ~/.config/systemd/user/ai-backup-restic.service.d && printf '[Service]\nEnvironment=DOCKER=podman\n' > ~/.config/systemd/user/ai-backup-restic.service.d/podman.conf && sudo mkdir -p /etc/systemd/system/ai-backup.service.d && printf '[Service]\nEnvironment=DOCKER=podman\nEnvironment=XDG_RUNTIME_DIR=/run/user/%s\n' "$(id -u)" | sudo tee /etc/systemd/system/ai-backup.service.d/podman.conf >/dev/null && systemctl --user daemon-reload && sudo systemctl daemon-reload
+```
+
+**Second age backup** (a plugin's private data with its own keys and repo; settings in `~/.config/<name>-backup/`):
+```bash
+n=mentor && printf '[Unit]\nDescription=%s backup\n\n[Service]\nType=oneshot\nEnvironment=BACKUP_CONF=%%h/.config/%s-backup\nEnvironment=BACKUP_REPO_DIR=%%h/.local/share/%s-backup/repo\nExecStart=/bin/bash %%h/dhoon/scripts/backup.sh\n' $n $n $n > ~/.config/systemd/user/$n-backup.service && printf '[Unit]\nDescription=Daily %s backup\n\n[Timer]\nOnCalendar=*-*-* 04:20\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n' $n > ~/.config/systemd/user/$n-backup.timer && systemctl --user daemon-reload && systemctl --user enable --now $n-backup.timer && systemctl --user start $n-backup.service && cat ~/.config/$n-backup/last-backup.txt
+```
+(The first run clones its repo; proven 9 Nov.)
 
 **Not proven yet:**
-- Containers: LibreChat stack (mongo, meilisearch, pgvector, rag_api,
-  admin panel), agent-sandbox (local build), site-preview (hugo); images and digests in
-  `rebuild/images-*.txt`; settings in `$DHOON_HOME/config/{searxng,librechat}`; chats from
-  `rebuild/mongo.archive.gz` + `postgres.sql.gz` (`scripts/restore.sh --chats`).
-- ai-toolbox on Podman: change `BIND_HOST` and drop `Requires=docker.service`.
+- Containers: agent-sandbox (local build), site-preview (hugo); images and digests in `rebuild/images-*.txt`.
 - Crontab: `rebuild/crontab.txt` (empty on 8 Nov).
 - First backup run from the new computer: `bash ~/dhoon/scripts/backup_restic.sh && bash ~/dhoon/scripts/backup_restic.sh --status`.
 - Desktop: KeePassXC, VS Code, PairDesk (.deb), GNOME Remote Login.
@@ -174,13 +203,20 @@ Other systems stay reachable through the firmware boot menu (F10 on Intel NUCs),
 - Run a backup from the new computer and a `--drill` of it.
 
 ## Known gaps in the backup (fix in backup_restic.sh, then remove from this list)
-- Repos not on GitHub (PairDesk, its site): only as bundles handed over by hand.
+- Repos with history that isn't on GitHub (an old private history, a repo not pushed yet): add each as its own
+  restic role (`ROLE_PATH_<name>=<folder>` and the name in `RESTIC_ROLES` in `restic.env`), never only as bundles.
+- Signing keys (`~/.gnupg`, e.g. for an apt repository): add it as a restic role too; it isn't in any default role.
 - `model-check` was missing from the restore's repo list, and its private data folders (`email-triage`,
   `order-details`, `orders2`, ignored by git) are only in the age backup (`BACKUP_PATHS`).
 - Fixed 8 Nov: `backup.sh` saved a linked folder (`~/agent-workspace` -> another disk) as just the link.
-- Personal folders: Documents, Pictures, Videos, Desktop, the PairDesk shared folders, `~/.config/pairdesk`.
+- Personal folders (Documents, Pictures, Videos, Downloads, Desktop) are in no role: add them, or keep another copy.
 - Runtime state not in `rebuild`: `runtime/warm/`, `last-chat`, `mentor-dashboard.pin`, `benchmark.txt`
   (all rebuildable), `runtime/searxng/settings.yml` (check it matches `config/searxng`).
 - `runtime/searxng/settings.yml` is the live SearXNG setting; `config/searxng/settings.yml` (backed up) differs.
 - SearXNG image is `:latest`, not pinned by digest.
-- The LibreChat source checkout (`runtime/LibreChat`) is re-cloned, not restored: pin its commit.
+- The chat stack needs no LibreChat source checkout any more (images only), but `runtime/LibreChat/`
+  `branding/`, `images/`, `uploads/`, `skill/` and `admin-panel.env` are not in `rebuild` yet (only `.env`,
+  `librechat.yaml` and the chat dump).
+- `beam-later.service`, `ai-toolbox.service`, the Quadlets and the `*.service.d` drop-ins: check that the
+  `rebuild` role copies all of `~/.config/systemd/user` and `~/.config/containers/systemd`.
+- A second age backup grows: GitHub refuses files over 100 MB (`backup.sh` stops at 95 MB).

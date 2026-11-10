@@ -1,0 +1,18 @@
+[Unit]
+Description=LibreChat vector database (Postgres + pgvector)
+
+[Container]
+ContainerName=vectordb
+Image=docker.io/pgvector/pgvector:0.8.0-pg15-trixie
+Pod=librechat.pod
+User=0:0
+Environment=POSTGRES_DB=mydatabase
+Environment=POSTGRES_USER=myuser
+Environment=POSTGRES_PASSWORD=mypassword
+Volume=librechat-pgdata:/var/lib/postgresql/data
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

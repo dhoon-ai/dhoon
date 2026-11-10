@@ -1,0 +1,39 @@
+[Unit]
+Description=LibreChat (the chat site, port 3080)
+Requires=chat-mongodb.service rag_api.service
+After=chat-mongodb.service chat-meilisearch.service rag_api.service
+
+[Container]
+ContainerName=LibreChat
+Image=registry.librechat.ai/librechat-ai/librechat-dev@sha256:9ff616417d60b6ad5f2362736a3a1fd51b9faf01a41e0d070f2d40da11f33b5e
+Pod=librechat.pod
+User=1000:1000
+Environment=HOST=0.0.0.0
+Environment=MONGO_URI=mongodb://127.0.0.1:27017/LibreChat
+Environment=MEILI_HOST=http://127.0.0.1:7700
+Environment=LIBRECHAT_TEMP_CREDENTIALS_PATH=/app/data/.env.temp
+Environment=RAG_PORT=8000
+Environment=RAG_API_URL=http://127.0.0.1:8000
+Environment=APP_TITLE=Dhoon
+Environment="CUSTOM_FOOTER=[Dhoon](https://dhoon.knowreva.com) · your private AI, on your own computer · chat app by [LibreChat](https://librechat.ai)"
+Environment=HELP_AND_FAQ_URL=https://github.com/dhoon-ai/dhoon/blob/main/docs/GUIDE.md
+Volume=%h/dhoon/runtime/LibreChat/.env:/app/.env
+Volume=%h/dhoon/runtime/LibreChat/librechat.yaml:/app/librechat.yaml
+Volume=%h/dhoon/runtime/LibreChat/images:/app/client/public/images
+Volume=%h/dhoon/runtime/LibreChat/uploads:/app/uploads
+Volume=%h/dhoon/runtime/LibreChat/logs:/app/logs
+Volume=%h/dhoon/runtime/LibreChat/skill:/app/skill
+Volume=librechat-data:/app/data
+Volume=%h/dhoon/runtime/LibreChat/branding/logo.svg:/app/client/dist/assets/logo.svg:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/favicon-32x32.png:/app/client/dist/assets/favicon-32x32.png:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/apple-touch-icon-180x180.png:/app/client/dist/assets/apple-touch-icon-180x180.png:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
+Volume=%h/dhoon/runtime/LibreChat/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

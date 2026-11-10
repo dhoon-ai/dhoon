@@ -1,0 +1,20 @@
+[Unit]
+Description=LibreChat document search API (rag_api)
+Requires=vectordb.service
+After=vectordb.service
+
+[Container]
+ContainerName=rag_api
+Image=registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite@sha256:a62ce2221b43a9bb57fa6cb733e7047c80132960272c33d5704028f3071a1251
+Pod=librechat.pod
+User=0:0
+EnvironmentFile=%h/dhoon/runtime/LibreChat/.env
+Environment=DB_HOST=127.0.0.1
+Environment=RAG_HOST=127.0.0.1
+Environment=RAG_PORT=8000
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

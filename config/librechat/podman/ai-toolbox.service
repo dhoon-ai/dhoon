@@ -1,0 +1,27 @@
+[Unit]
+Description=AI agent toolbox (MCP server for the chat site; 127.0.0.1 only)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/dhoon/toolbox
+Environment=BIND_HOST=127.0.0.1
+Environment=PORT=8001
+Environment=WORKSPACE=%h/agent-workspace
+Environment=SEARXNG_URL=http://127.0.0.1:8888
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=PLANNER_MODEL=gemma4:26b
+Environment=MODEL_FALLBACK=gemma4:26b
+Environment=TOOLBOX_LOG=%h/dhoon/runtime/logs/toolbox.log
+EnvironmentFile=-%h/dhoon/config/email.env
+Environment=RESEARCH_ENGINES=startpage,duckduckgo,brave
+Environment=RECEIPT_MODEL=gemma4:26b
+Environment=MODEL_CLOUD=beam:cloud
+Environment=RECEIPT_CURRENCY=CAD
+Environment=RECEIPT_FAST=on
+Environment=DOC_RERANK=
+ExecStart=%h/dhoon/runtime/venv/bin/python %h/dhoon/toolbox/toolbox_server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

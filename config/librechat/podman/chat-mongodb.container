@@ -1,0 +1,16 @@
+[Unit]
+Description=LibreChat database (MongoDB)
+
+[Container]
+ContainerName=chat-mongodb
+Image=docker.io/library/mongo:8.0.20
+Pod=librechat.pod
+User=1000:1000
+Volume=%h/dhoon/runtime/LibreChat/data-node:/data/db
+Exec=mongod --noauth --bind_ip 127.0.0.1
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

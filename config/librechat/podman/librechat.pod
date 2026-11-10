@@ -1,0 +1,12 @@
+# LibreChat (chat site) + its databases, as one rootless pod. The containers share localhost.
+# Same container names as the old Docker Compose stack, so backup.sh / restore.sh keep working.
+[Pod]
+PodName=librechat
+# containers reach the NUC's own 127.0.0.1 (toolbox on :8001) as host.docker.internal
+Network=pasta:--map-host-loopback,169.254.1.3
+PodmanArgs=--userns=keep-id:uid=1000,gid=1000 --add-host=host.docker.internal:169.254.1.3
+PublishPort=3080:3080
+PublishPort=3000:3000
+
+[Install]
+WantedBy=default.target

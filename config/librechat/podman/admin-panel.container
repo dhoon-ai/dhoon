@@ -1,0 +1,21 @@
+[Unit]
+Description=LibreChat admin panel (port 3000)
+After=LibreChat.service
+
+[Container]
+ContainerName=admin-panel
+Image=registry.librechat.ai/clickhouse/librechat-admin-panel@sha256:a395465d1daa3c11495810a8c224df86675985d50de42e98e36eeedbd8aecb94
+Pod=librechat.pod
+User=0:0
+# SESSION_SECRET only (made from ADMIN_PANEL_SESSION_SECRET in .env by the install step)
+EnvironmentFile=%h/dhoon/runtime/LibreChat/admin-panel.env
+Environment=PORT=3000
+Environment=API_SERVER_URL=http://127.0.0.1:3080
+Environment=VITE_API_BASE_URL=http://localhost:3080
+Environment=SESSION_COOKIE_SECURE=false
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
