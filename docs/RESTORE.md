@@ -77,6 +77,12 @@ Open `MyPass.kdbx` in KeePassXC. Save `restic.env` and `restic-password` into `$
 `RESTIC_USB=$BACKUP_USB/restic`, `PLAIN_USB=$BACKUP_USB/plain`, `USB_MOUNT=$BACKUP_USB` (backups refuse to
 write when the disk is not mounted there) and `RESTORE_DIR` to the value from `paths.env`.
 
+Model-router keys (not in the backups, only in the password manager), both files mode 600:
+`~/.config/dhoon/llm-keys.env` with `GROQ_API_KEY=` and `KAGGLE_TUNNEL_SECRET=` (64 hex characters; the same
+value is the `TUNNEL_SECRET` secret on the Kaggle notebook), and the Kaggle CLI token in `~/.kaggle/access_token`.
+`mkdir -p -m 700 ~/.config/dhoon ~/.kaggle`, write them, `chmod 600` both. The router refuses a keys file
+others can read.
+
 ## 4. Get Dhoon and the backup (restic, rootless Podman, image pinned by digest)
 ```bash
 git clone https://github.com/<public-org>/dhoon.git "$DHOON_HOME" && cd "$DHOON_HOME" && bash scripts/restore_restic.sh --list --from r2 && bash scripts/restore_restic.sh --drill --from r2 && for r in workspace queue claude config backupconf ssh rebuild; do bash scripts/restore_restic.sh --role $r --from r2 || echo "FAILED $r"; done && du -sh "$RESTORE_DIR"/*
@@ -142,6 +148,15 @@ Only inside systemd-nspawn (a chroot drill) also add `containers.conf` with `def
   `ollama signin`. Settings (user unit drop-in `beam-queue.service.d/model.conf`):
   `printf '[Service]\nEnvironment=BEAM_CLOUD_DISCOVER=on\nEnvironment=BEAM_QUEUE_TIMEOUT_LOCAL=180m\n' > ~/.config/systemd/user/beam-queue.service.d/model.conf`.
   **Only safe while the Ollama account has no credits or plan**; before adding any, set `Environment=BEAM_CLOUD=off`.
+- Model router: `ln -sf ~/dhoon/plugins/cloud/kaggle-up ~/.local/bin/kaggle-up`. The Kaggle tier is optional:
+  import `plugins/cloud/kaggle/llm-server.ipynb` into a Kaggle notebook (GPU T4 x2, Internet on, secret
+  `TUNNEL_SECRET`), Run All, then run the `kaggle-up <url>` line it prints (the URL is saved in
+  `~/.local/state/dhoon/kaggle-url.txt` for 12 h at most; `kaggle-up --off` forgets it). With no URL saved,
+  everything runs as without Kaggle. To keep Kaggle out entirely: `NEWSROOM_KAGGLE=off` in
+  `config/newsroom.env`, and for Beam
+  `printf '[Service]\nEnvironment=BEAM_KAGGLE=off\n' > ~/.config/systemd/user/beam-queue.service.d/kaggle.conf`.
+  Newsroom: `NEWSROOM_GROQ=on` only after `scripts/groq_check.py` showed Groq agrees (recorded with
+  `NEWSROOM_MODEL_CHECK_RECORD=on`); `NEWSROOM_ROUTE=off` restores the cloud -> this computer behaviour.
 - `beam-later.service` (user unit; runs `$AGENT_DIR/beam-queue/run-later.sh`, one queued job at a time when no
   `ai-*` run is busy) needs `sudo apt-get install -y libnotify-bin` for its desktop notifications.
 
