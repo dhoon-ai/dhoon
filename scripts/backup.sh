@@ -32,7 +32,10 @@ SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 KIT="$(cd "$SCRIPTS/.." && pwd)"
 CONF="${BACKUP_CONF:-$HOME/.config/ai-kit-backup}"
 REPO_DIR="${BACKUP_REPO_DIR:-$HOME/.local/share/ai-kit-backup/repo}"
-WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
+# shellcheck source=scripts/paths.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/paths.sh"   # the paths file: WORKSPACE, ...
+# the agent's workspace: from the paths file; ~/agent-workspace only for an install without one
+WORKSPACE_DIR="${WORKSPACE_DIR:-${WORKSPACE:-$HOME/agent-workspace}}"
 SSH_KEY="$HOME/.ssh/ai_kit_backup"
 SSH_HOST="github-ai-kit-backup"
 MAX_MB="${BACKUP_MAX_MB:-95}"   # GitHub refuses files over 100 MB

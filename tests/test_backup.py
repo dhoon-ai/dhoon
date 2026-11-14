@@ -159,7 +159,7 @@ def test_chats_are_backed_up_and_put_back(kit):
     home, env = kit["home"], kit["env"]
     dhoon = home / "dhoon"
     (dhoon / "scripts").mkdir(parents=True)
-    for s in ("backup.sh", "restore.sh"):
+    for s in ("backup.sh", "restore.sh", "paths.sh"):
         shutil.copy(ROOT / "scripts" / s, dhoon / "scripts" / s)
     log = kit["tmp"] / "docker.log"
     fake = kit["tmp"] / "docker"

@@ -17,20 +17,20 @@ Environment=RAG_API_URL=http://127.0.0.1:8000
 Environment=APP_TITLE=Dhoon
 Environment="CUSTOM_FOOTER=[Dhoon](https://dhoon.knowreva.com) · your private AI, on your own computer · chat app by [LibreChat](https://librechat.ai)"
 Environment=HELP_AND_FAQ_URL=https://github.com/dhoon-ai/dhoon/blob/main/docs/GUIDE.md
-Volume=%h/dhoon/runtime/LibreChat/.env:/app/.env
-Volume=%h/dhoon/runtime/LibreChat/librechat.yaml:/app/librechat.yaml
-Volume=%h/dhoon/runtime/LibreChat/images:/app/client/public/images
-Volume=%h/dhoon/runtime/LibreChat/uploads:/app/uploads
-Volume=%h/dhoon/runtime/LibreChat/logs:/app/logs
-Volume=%h/dhoon/runtime/LibreChat/skill:/app/skill
+Volume=@DHOON_HOME@/runtime/LibreChat/.env:/app/.env
+Volume=@DHOON_HOME@/runtime/LibreChat/librechat.yaml:/app/librechat.yaml
+Volume=@DHOON_HOME@/runtime/LibreChat/images:/app/client/public/images
+Volume=@DHOON_HOME@/runtime/LibreChat/uploads:/app/uploads
+Volume=@DHOON_HOME@/runtime/LibreChat/logs:/app/logs
+Volume=@DHOON_HOME@/runtime/LibreChat/skill:/app/skill
 Volume=librechat-data:/app/data
-Volume=%h/dhoon/runtime/LibreChat/branding/logo.svg:/app/client/dist/assets/logo.svg:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/favicon-32x32.png:/app/client/dist/assets/favicon-32x32.png:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/apple-touch-icon-180x180.png:/app/client/dist/assets/apple-touch-icon-180x180.png:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
-Volume=%h/dhoon/runtime/LibreChat/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/logo.svg:/app/client/dist/assets/logo.svg:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/favicon-32x32.png:/app/client/dist/assets/favicon-32x32.png:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/apple-touch-icon-180x180.png:/app/client/dist/assets/apple-touch-icon-180x180.png:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
+Volume=@DHOON_HOME@/runtime/LibreChat/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
 
 [Service]
 Restart=always

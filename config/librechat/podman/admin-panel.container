@@ -8,7 +8,7 @@ Image=registry.librechat.ai/clickhouse/librechat-admin-panel@sha256:a395465d1daa
 Pod=librechat.pod
 User=0:0
 # SESSION_SECRET only (made from ADMIN_PANEL_SESSION_SECRET in .env by the install step)
-EnvironmentFile=%h/dhoon/runtime/LibreChat/admin-panel.env
+EnvironmentFile=@DHOON_HOME@/runtime/LibreChat/admin-panel.env
 Environment=PORT=3000
 Environment=API_SERVER_URL=http://127.0.0.1:3080
 Environment=VITE_API_BASE_URL=http://localhost:3080

@@ -8,7 +8,10 @@ CONF="${BACKUP_CONF:-$HOME/.config/ai-kit-backup}"
 ENV_FILE="${RESTIC_ENV:-$CONF/restic.env}"
 # shellcheck source=/dev/null
 [ -f "$ENV_FILE" ] && { set -a; source "$ENV_FILE"; set +a; }
-WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/agent-workspace}"
+# shellcheck source=scripts/paths.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/paths.sh"   # the paths file: WORKSPACE, ...
+# the agent's workspace: from the paths file; ~/agent-workspace only for an install without one
+WORKSPACE_DIR="${WORKSPACE_DIR:-${WORKSPACE:-$HOME/agent-workspace}}"
 PODMAN="${PODMAN:-podman}"            # tests use a stand-in
 DOCKER="${DOCKER:-docker}"            # the chat stack still runs on Docker today
 CURL="${CURL:-curl}"                  # tests use a stand-in
