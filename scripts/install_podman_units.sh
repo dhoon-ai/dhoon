@@ -20,7 +20,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 mkdir -p "$QDIR" "$UDIR"
-fill() { sed -e "s#@DHOON_HOME@#$KIT#g" -e "s#@WORKSPACE@#$WORKSPACE_DIR#g" -e "s#@SEARXNG_IMAGE@#$SEARXNG_IMAGE#g" "$1"; }
+# Podman needs the registry in an image name (Docker assumed docker.io)
+full_image() { case ${1%%/*} in *.*|*:*|localhost) printf '%s' "$1" ;; *) printf 'docker.io/%s' "$1" ;; esac; }
+fill() { sed -e "s#@DHOON_HOME@#$KIT#g" -e "s#@WORKSPACE@#$WORKSPACE_DIR#g" -e "s#@SEARXNG_IMAGE@#$(full_image "$SEARXNG_IMAGE")#g" "$1"; }
 wanted() { local n; n=$(basename "$1"); n=${n%.*}; [ -z "$ONLY" ] || [[ $ONLY == *",$n,"* ]]; }
 written=()
 for f in "$KIT"/config/librechat/podman/*.container "$KIT"/config/librechat/podman/*.pod; do

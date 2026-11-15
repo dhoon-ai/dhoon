@@ -53,6 +53,6 @@ def test_only_some_units_into_the_xdg_folder(tmp_path):
     assert sorted(p.name for p in q.iterdir()) == ["searxng.container"]
     assert (u / "ai-toolbox.service").exists() and not (tmp_path / ".config").exists()
     sx = (q / "searxng.container").read_text()
-    assert "Image=searxng/searxng@sha256:" in sx and "PublishPort=127.0.0.1:8888:8080" in sx and "@" not in sx.replace("@sha256", "")
+    assert "Image=docker.io/searxng/searxng@sha256:" in sx and "PublishPort=127.0.0.1:8888:8080" in sx and "@" not in sx.replace("@sha256", "")
     settings = (tmp_path / "rt" / "searxng" / "settings.yml").read_text()
     assert "CHANGE_ME" not in settings and "secret_key:" in settings
