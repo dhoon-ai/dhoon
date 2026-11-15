@@ -3,7 +3,6 @@ Description=AI agent toolbox (MCP server for the chat site; 127.0.0.1 only)
 After=network-online.target
 
 [Service]
-EnvironmentFile=-%h/.config/dhoon/paths.env
 WorkingDirectory=@DHOON_HOME@/toolbox
 Environment=BIND_HOST=127.0.0.1
 Environment=PORT=8001

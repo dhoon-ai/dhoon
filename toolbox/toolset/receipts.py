@@ -27,7 +27,7 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
         from receipt_reader import files, output as out, reader
     except ImportError:
         return ("receipt-reader isn't installed. On the Dhoon computer run (the same command updates it): "
-                "~/dhoon/runtime/venv/bin/pip install git+https://github.com/knowreva/receipt-reader "
+                "$DHOON_HOME/runtime/venv/bin/pip install git+https://github.com/knowreva/receipt-reader "
                 "then: sudo systemctl restart ai-toolbox")  # fmt: skip
     src, dest = tb._safe_path(folder), tb._safe_path(output)
     if not src.exists():
@@ -49,7 +49,7 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
     if busy:  # a nightly report or knowledge-base run is using the model: two at once can push it out of memory
         return (f"Not now: {busy.get('name', 'a long job')} is running (since {busy.get('since', '?')}) and uses the "
                 "same model. Reading receipts at the same time would slow both, or push its model out of memory. "
-                "Ask again when it has finished (python3 ~/dhoon/toolbox/heavy.py shows what is running).")  # fmt: skip
+                "Ask again when it has finished (python3 $DHOON_HOME/toolbox/heavy.py shows what is running).")  # fmt: skip
     results, lines = [], []
     try:
         with heavy.heavy_job("receipts", wait_minutes=0):  # in the queue: scheduled jobs wait for this one

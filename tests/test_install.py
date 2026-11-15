@@ -81,6 +81,25 @@ def test_an_install_from_before_the_rename_is_updated_in_place(tmp_path):
     assert f"Getting the project into {home}/ai-kit" in out and f"git -C {home}/ai-kit pull" in out
 
 
+def test_new_install_writes_its_folders_to_the_paths_file(tmp_path, monkeypatch):
+    """The code has no home-folder default: the installer saves the folders it uses."""
+    monkeypatch.delenv("XDG_CONFIG_HOME")
+    monkeypatch.delenv("WORKSPACE")
+    home, out = _dry_run_home(tmp_path, old_install=False)
+    assert f"Writing the folders to {home}/.config/environment.d/10-paths.conf" in out
+    assert f"DHOON_HOME={home}/dhoon" in out and f"WORKSPACE={home}/agent-workspace" in out
+
+
+def test_paths_file_values_are_kept_on_a_rerun(tmp_path, monkeypatch):
+    conf = tmp_path / "cfg"
+    (conf / "environment.d").mkdir(parents=True)
+    (conf / "environment.d" / "10-paths.conf").write_text("DHOON_HOME=/srv/dhoon\nWORKSPACE=/data/ws\n")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(conf))
+    monkeypatch.delenv("WORKSPACE")
+    _, out = _dry_run_home(tmp_path, old_install=False)
+    assert "Writing the folders" not in out
+
+
 def _ask_memory(tmp_path, answer_env, models_env=None):
     """Run only the installer's memory question (taken from install.sh) in a test folder."""
     (tmp_path / "config").mkdir(parents=True)

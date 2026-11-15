@@ -3,9 +3,9 @@
 Once a week (with the knowledge base's nightly run) a few searches through your SearXNG look for
 the next dates in each region; your main model lists the events it sees in the results, and code
 keeps an event only if its date is written in that result's text (with the link to check).
-Your own dates in ~/agent-workspace/calendar/my-dates.json are added as they are:
+Your own dates in $WORKSPACE/calendar/my-dates.json are added as they are:
     [{"date": "2026-12-10", "event": "Bank of Canada decision", "region": "canada"}]
-Everything is saved in ~/agent-workspace/calendar/economy.json for the Assistant (the
+Everything is saved in $WORKSPACE/calendar/economy.json for the Assistant (the
 economic_calendar tool) and for plugins. Only public search results are used.
 """
 
@@ -13,11 +13,15 @@ import datetime as dt
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 import httpx
 
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from places import workspace  # noqa: E402  (WORKSPACE from the paths file, no home default)
+
+WORKSPACE = workspace()
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 MODEL = os.environ.get("PLANNER_MODEL", "gemma4:26b")

@@ -3,14 +3,15 @@
 #
 #   curl -fsSL https://dhoon.knowreva.com/install.sh | bash
 #
-# It downloads the project to ~/dhoon and runs scripts 00-06 in order: hardware check,
+# It downloads the project (default: dhoon in your home folder), saves its folders in the
+# paths file, and runs scripts 00-06 in order: hardware check,
 # Docker + Ollama, models, private search, toolbox, LibreChat, and the Assistant agent.
 # Safe to run again: it checks each step and skips the ones already done, so it resumes
 # after a failure and continues a manual install (see scripts/status.sh). If a step fails,
 # it stops and explains how to run and fix that step by hand in another terminal.
 #
 # Options (as environment variables in front of `bash`):
-#   INSTALL_DIR=~/dhoon       where to put the project (an older install in ~/ai-kit is
+#   INSTALL_DIR=/some/dir     where to put the project (an older install in ~/ai-kit is
 #                             found and updated there)
 #   REPO_URL=...              git URL to install from (e.g. your fork)
 #   LIBRECHAT_EMAIL / LIBRECHAT_PASSWORD   account for the web app (otherwise asked)
@@ -26,7 +27,7 @@
 main() {
   set -euo pipefail
   local repo_url="${REPO_URL:-https://github.com/dhoon-ai/dhoon.git}"
-  local dir="${INSTALL_DIR:-$HOME/dhoon}"
+  local dir="${INSTALL_DIR:-$HOME/dhoon}"   # new-install default (then saved in the paths file)
   # Installed before the project was called Dhoon: keep using that folder (the toolbox
   # and its services point there).
   if [ -z "${INSTALL_DIR:-}" ] && [ ! -e "$dir" ] && [ -f "$HOME/ai-kit/scripts/lib.sh" ]; then dir="$HOME/ai-kit"; fi
@@ -61,6 +62,25 @@ main() {
     run git clone --depth 1 "$repo_url" "$dir"
   fi
   [ -n "$dry" ] || cd "$dir"
+
+  # Where things live: the paths file. Every script and (through systemd) every service reads
+  # it; the code has no folder of its own. Missing names are added, existing ones never changed.
+  local conf="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/10-paths.conf"
+  local ws="${WORKSPACE:-$(dirname "$dir")/agent-workspace}"
+  local add=""
+  grep -qs '^DHOON_HOME=' "$conf" || add+="DHOON_HOME=$dir"$'\n'
+  grep -qs '^WORKSPACE=' "$conf" || add+="WORKSPACE=$ws"$'\n'
+  if [ -n "$add" ]; then
+    say "Writing the folders to $conf"
+    printf '%s' "$add" | sed 's/^/  /'
+    if [ -z "$dry" ]; then
+      mkdir -p "$(dirname "$conf")"
+      [ -f "$conf" ] || echo "# Dhoon's folders (written by install.sh). Change them here, then log out and in." > "$conf"
+      printf '%s' "$add" >> "$conf"
+    fi
+  fi
+  [ -n "${WORKSPACE:-}" ] || export WORKSPACE="$ws"
+  [ -n "${DHOON_HOME:-}" ] || export DHOON_HOME="$dir"
 
   # Load the per-step status checks (also used by scripts/status.sh).
   have_status=false

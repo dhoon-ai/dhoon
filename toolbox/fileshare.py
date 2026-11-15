@@ -19,17 +19,21 @@ import mimetypes
 import os
 import secrets
 import socket
+import sys
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from places import workspace  # noqa: E402  (WORKSPACE from the paths file, no home default)
 
 KIT = Path(__file__).resolve().parents[1]
 INLINE = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"}  # shown in the browser; the rest is downloaded
 
 
 def _workspace() -> Path:
-    return Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace"))).resolve()
+    return workspace().resolve()
 
 
 def _port() -> int:

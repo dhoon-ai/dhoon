@@ -17,8 +17,8 @@ LIBRECHAT_GIT_URL="${LIBRECHAT_GIT_URL:-https://github.com/danny-avila/LibreChat
 SEARXNG_IMAGE="${SEARXNG_IMAGE:-searxng/searxng@sha256:ddd642cae6eac75412938fd846ddbf440a2df029cfeae8a562b8b205f4e35e25}"
 # shellcheck source=scripts/paths.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/paths.sh"   # the paths file: WORKSPACE, ...
-# the agent's workspace: from the paths file; ~/agent-workspace only for an install without one
-WORKSPACE_DIR="${WORKSPACE_DIR:-${WORKSPACE:-$HOME/agent-workspace}}"
+# the agent's workspace: from the paths file (scripts that need it call need_path WORKSPACE_DIR)
+WORKSPACE_DIR="${WORKSPACE_DIR:-${WORKSPACE:-}}"
 TOOLBOX_PORT="${TOOLBOX_PORT:-8001}"
 FILES_PORT="${FILES_PORT:-3081}"   # download links for created files (home network only)
 # knowledge base of world news and market events since the model's training (news_kb.py)

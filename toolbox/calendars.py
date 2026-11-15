@@ -1,7 +1,7 @@
 """Calendars for the Assistant: one list of events from every calendar you connect.
 
 Sources (settings in config/calendar.env, see config/calendar.env.example):
-  - your private calendar on this computer (always on): ~/agent-workspace/calendar/calendar.ics,
+  - your private calendar on this computer (always on): $WORKSPACE/calendar/calendar.ics,
     a normal .ics file you can also import into Google Calendar or your phone;
   - read-only calendar links (CALENDAR_ICS_URLS), e.g. Google Calendar's "Secret address in
     iCal format" or a published Outlook calendar;
@@ -25,9 +25,12 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from places import workspace  # noqa: E402  (WORKSPACE from the paths file, no home default)
+
 KIT = Path(__file__).resolve().parents[1]
 ENV_FILE = Path(os.environ.get("CALENDAR_ENV_FILE", str(KIT / "config" / "calendar.env")))
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
+WORKSPACE = workspace()
 GOOGLE_CLIENT = Path(os.environ.get("GOOGLE_CLIENT_FILE", str(KIT / "config" / "google_oauth_client.json")))
 GOOGLE_TOKEN = Path(os.environ.get("GOOGLE_TOKEN_FILE", str(KIT / "runtime" / "google_token.json")))
 GOOGLE_API = os.environ.get("GOOGLE_CALENDAR_API", "https://www.googleapis.com/calendar/v3")

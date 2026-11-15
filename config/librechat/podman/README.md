@@ -2,7 +2,7 @@
 
 Replaces the Docker Compose stack. One pod, `librechat`, with the same container names as before
 (`LibreChat`, `admin-panel`, `chat-mongodb`, `chat-meilisearch`, `vectordb`, `rag_api`), so
-`scripts/backup.sh`, `backup_restic.sh` and `restore.sh` work with `DOCKER=podman`.
+`scripts/backup.sh` and `restore.sh` work with `DOCKER=podman`.
 
 - The containers share localhost inside the pod. The pod publishes 3080 (chat) and 3000 (admin panel).
 - `host.docker.internal` = this computer's own 127.0.0.1 (pasta `--map-host-loopback`), so the toolbox

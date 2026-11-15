@@ -6,6 +6,7 @@
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+need_path WORKSPACE_DIR
 QDIR="$HOME/.config/containers/systemd"
 UDIR="$HOME/.config/systemd/user"
 while [ $# -gt 0 ]; do

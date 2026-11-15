@@ -2,7 +2,7 @@
 # Remove the agent stack, in three levels:
 #
 #   bash scripts/uninstall.sh               stop and remove the services; KEEP chats, models, files
-#   bash scripts/uninstall.sh --everything  also DELETE chats, uploads, models, ~/agent-workspace
+#   bash scripts/uninstall.sh --everything  also DELETE chats, uploads, models, the workspace ($WORKSPACE)
 #   bash scripts/uninstall.sh --purge       --everything, plus UNINSTALL Ollama and Docker
 #                                           and undo every system change the install made
 #
@@ -81,7 +81,7 @@ fi
 step "Deleting chats, uploads, settings and the workspace"
 for d in "${LC_DIRS[@]}"; do run sudo rm -rf "$d"; done
 run sudo rm -rf "$RUNTIME" "$KIT/toolbox/venv"   # toolbox/venv: older kit layout
-run rm -rf "$WORKSPACE_DIR"
+[ -n "$WORKSPACE_DIR" ] && run rm -rf "$WORKSPACE_DIR"
 if command -v docker >/dev/null 2>&1; then
   run docker rmi "$SEARXNG_IMAGE"
   docker image inspect searxng/searxng:latest >/dev/null 2>&1 && run docker rmi searxng/searxng:latest   # older installs

@@ -12,7 +12,7 @@ This script fills the gap, on this computer:
      numbers are exact, not written by the AI.
   3. For the last week also searches recent world and market headlines through your SearXNG.
   4. Has your main model summarise each week into a short note:
-         ~/agent-workspace/knowledge/weeks/2025-W10.md
+         $WORKSPACE/knowledge/weeks/2025-W10.md
      then each finished month (knowledge/months/2025-03.md) and an overview of everything
      since KNOWLEDGE_START (knowledge/overview.md).
   5. Rates every item of a weekly note with a confidence from 1 to 10 by how many independent
@@ -49,9 +49,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import econ_calendar  # noqa: E402  (the shared calendar of economic events, refreshed weekly here)
 import heavy  # noqa: E402  (one heavy background job at a time, chats first)
 import sources  # noqa: E402  (one confidence scale for everything that counts sources)
+from places import workspace  # noqa: E402  (WORKSPACE, no home default)
 
 KIT = Path(__file__).resolve().parents[1]
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
+WORKSPACE = workspace()
 KB = Path(os.environ.get("KNOWLEDGE_DIR", str(WORKSPACE / "knowledge")))
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")

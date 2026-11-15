@@ -5,7 +5,7 @@ Assistant calls schedule_task. A systemd timer (ai-scheduler, every minute) runs
 `python3 toolbox/scheduler.py --run-due`, which does what is due:
   - reminder: e-mails you the text as it is (no AI needed);
   - task: the Assistant does the task with its tools, unattended, and e-mails you the answer.
-Every result is also saved in ~/agent-workspace/scheduled/. The list lives in
+Every result is also saved in $WORKSPACE/scheduled/. The list lives in
 runtime/schedule.json, outside the workspace, so nothing the agent reads or writes there can
 add tasks. Unattended runs can't send other e-mails, record investments, change calendars or
 schedule more tasks.
@@ -24,9 +24,12 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from places import workspace  # noqa: E402  (WORKSPACE from the paths file, no home default)
+
 KIT = Path(__file__).resolve().parents[1]
 SCHEDULE_FILE = Path(os.environ.get("SCHEDULE_FILE", str(KIT / "runtime" / "schedule.json")))
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace")))
+WORKSPACE = workspace()
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 MODEL = os.environ.get("SCHEDULER_MODEL") or os.environ.get("PLANNER_MODEL", "gemma4:26b")
 MAX_STEPS = int(os.environ.get("SCHEDULER_MAX_STEPS", "15"))

@@ -202,7 +202,7 @@ def test_restore_shows_download_progress():
 
 
 def test_linked_folder_is_backed_up_not_just_the_link(kit):
-    """~/agent-workspace/notes is a link to another disk: the backup holds the files, not the link."""
+    """$WORKSPACE/notes is a link to another disk: the backup holds the files, not the link."""
     home, env = kit["home"], kit["env"]
     other = kit["tmp"] / "other-disk" / "notes"
     other.mkdir(parents=True)

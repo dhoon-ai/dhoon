@@ -14,7 +14,8 @@ python3 -m venv "$RUNTIME/venv"
 "$RUNTIME/venv/bin/pip" install --upgrade pip
 "$RUNTIME/venv/bin/pip" install -r "$KIT/toolbox/requirements.txt"
 
-# 4c. the only folder the agent may read/write
+# 4c. the only folder the agent may read/write (from the paths file)
+need_path WORKSPACE_DIR
 mkdir -p "$WORKSPACE_DIR"
 # e-mail settings hold a password: readable only by you
 [ -f "$KIT/config/email.env" ] && chmod 600 "$KIT/config/email.env"

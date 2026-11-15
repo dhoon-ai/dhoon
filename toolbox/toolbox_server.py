@@ -35,8 +35,11 @@ import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from places import workspace  # noqa: E402  (WORKSPACE from the paths file, no home default)
+
 # ------------------------------------------------------------------ settings ---
-WORKSPACE = Path(os.environ.get("WORKSPACE", str(Path.home() / "agent-workspace"))).resolve()
+WORKSPACE = workspace().resolve()
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8888")
 BIND_HOST = os.environ.get("BIND_HOST", "172.17.0.1")  # Docker bridge: reachable by containers, not by your LAN
 PORT = int(os.environ.get("PORT", "8001"))

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The knowledge base of world news and market events since the AI model's training
-# (weekly notes in ~/agent-workspace/knowledge, written by toolbox/news_kb.py).
+# (weekly notes in $WORKSPACE/knowledge, written by toolbox/news_kb.py).
 #
 #   bash scripts/knowledge.sh                   what it has so far
 #   bash scripts/knowledge.sh --catch-up        write every missing week now (a few hours;
@@ -13,6 +13,7 @@
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/lib.sh"
+need_path WORKSPACE_DIR
 
 export WORKSPACE="$WORKSPACE_DIR" PLANNER_MODEL="$MODEL_PLANNER" KNOWLEDGE KNOWLEDGE_START KNOWLEDGE_MAX_MINUTES
 export OLLAMA_URL="http://127.0.0.1:11434" SEARXNG_URL="http://127.0.0.1:8888"

@@ -161,3 +161,17 @@ def test_plugins_can_add_checked_public_stories_to_the_knowledge_base(tmp_path, 
         {"date": "2025-04-01", "title": "Another week", "confidence": 9}, "not json"]))  # fmt: skip
     text = kb.inbox_items(dt.date(2025, 3, 3))
     assert text == "- [Wed 05 Mar] Rent caps announced: Caps at 2.5%. (Example News)"
+
+
+def test_no_workspace_is_a_clear_error(monkeypatch):
+    """No home-folder default: without WORKSPACE the toolbox says where to set it."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "toolbox"))
+    import places
+
+    monkeypatch.delenv("WORKSPACE", raising=False)
+    with pytest.raises(RuntimeError, match="10-paths.conf"):
+        places.workspace()
+    monkeypatch.setenv("WORKSPACE", "/srv/ws")
+    assert places.workspace() == Path("/srv/ws")
