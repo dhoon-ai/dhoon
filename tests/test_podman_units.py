@@ -38,3 +38,21 @@ def test_without_a_paths_file_install_stops_with_a_clear_error(tmp_path):
                         "--dest-units", str(tmp_path / "u")], env=env, capture_output=True, text=True)
     assert r.returncode == 1
     assert "WORKSPACE_DIR is not set" in r.stderr and f"{tmp_path}/cfg/environment.d/10-paths.conf" in r.stderr
+
+
+def test_only_some_units_into_the_xdg_folder(tmp_path):
+    """--only installs just those; the default place is $XDG_CONFIG_HOME, where systemd looks."""
+    conf = tmp_path / "cfg"
+    (conf / "environment.d").mkdir(parents=True)
+    (conf / "environment.d" / "10-paths.conf").write_text("WORKSPACE=/agent/workspace\n")
+    env = {**os.environ, "HOME": str(tmp_path), "XDG_CONFIG_HOME": str(conf), "RUNTIME_DIR": str(tmp_path / "rt")}
+    env.pop("WORKSPACE", None)
+    subprocess.run(["bash", str(KIT / "scripts" / "install_podman_units.sh"), "--only", "searxng,ai-toolbox"], env=env,
+                   check=True, capture_output=True, text=True)
+    q, u = conf / "containers" / "systemd", conf / "systemd" / "user"
+    assert sorted(p.name for p in q.iterdir()) == ["searxng.container"]
+    assert (u / "ai-toolbox.service").exists() and not (tmp_path / ".config").exists()
+    sx = (q / "searxng.container").read_text()
+    assert "Image=searxng/searxng@sha256:" in sx and "PublishPort=127.0.0.1:8888:8080" in sx and "@" not in sx.replace("@sha256", "")
+    settings = (tmp_path / "rt" / "searxng" / "settings.yml").read_text()
+    assert "CHANGE_ME" not in settings and "secret_key:" in settings

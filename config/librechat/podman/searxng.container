@@ -1,0 +1,14 @@
+[Unit]
+Description=SearXNG (private web search, 127.0.0.1 only)
+
+[Container]
+ContainerName=searxng
+Image=@SEARXNG_IMAGE@
+PublishPort=127.0.0.1:8888:8080
+Volume=@DHOON_HOME@/runtime/searxng:/etc/searxng
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
