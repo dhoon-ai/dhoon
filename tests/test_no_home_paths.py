@@ -7,7 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = r"(dhoon|dhoon-dev|blocks|blocks-dev|agent-workspace|beam-queue)"
-BAD = re.compile(r"(~|\$HOME|\$\{HOME\}|%h)/" + NAMES + r"(?![\w-])|home\(\)\s*/\s*[\"']" + NAMES + "|/home/" + "rahul")
+# any home folder written out (/home/<someone>/dhoon ...), without naming anyone
+BAD = re.compile(r"(~|\$HOME|\$\{HOME\}|%h|/home/[a-z][a-z0-9_-]*)/" + NAMES + r"(?![\w-])|home\(\)\s*/\s*[\"']" + NAMES)
 ALLOWED = {
     # the age backup (scripts/backup.sh, restore.sh) is left as it is until its owner decides
     "scripts/backup.sh",
