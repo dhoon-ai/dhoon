@@ -72,6 +72,16 @@ step() { printf '\n\033[1;34m=== %s ===\033[0m\n' "$*"; }
 ok()   { printf '  \033[1;32m[OK]\033[0m   %s\n' "$*"; }
 warn() { printf '  \033[1;33m[WARN]\033[0m %s\n' "$*"; }
 fail() { printf '  \033[1;31m[FAIL]\033[0m %s\n' "$*"; }
+# One OS: Dhoon is built and tested on Ubuntu 26.04 only. DHOON_ANY_OS=1 tries another (unsupported).
+DHOON_OS="${DHOON_OS:-ubuntu 26.04}"
+require_os() {
+  local have
+  # shellcheck source=/dev/null
+  have=$( . "${OS_RELEASE:-/etc/os-release}" 2>/dev/null && printf '%s %s' "${ID:-?}" "${VERSION_ID:-?}" ) || have=unknown
+  [ "$have" = "$DHOON_OS" ] && return 0
+  if [ "${DHOON_ANY_OS:-}" = 1 ]; then warn "This computer runs $have; Dhoon supports only $DHOON_OS (going on: DHOON_ANY_OS=1)"; return 0; fi
+  fail "This computer runs $have. Dhoon supports only $DHOON_OS. To try anyway: DHOON_ANY_OS=1"; exit 1
+}
 next() { printf '\n\033[1mNext:\033[0m  %s\n' "$*"; }
 
 # CPU temperature in C, from the CPU package sensor when available. Some boards expose a

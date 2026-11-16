@@ -37,6 +37,14 @@ main() {
   say()  { printf '\n\033[1;34m>>> %s\033[0m\n' "$*"; }
   die()  { printf '\n\033[1;31mInstall stopped: %s\033[0m\n' "$*" >&2; exit 1; }
   run()  { if [ -n "$dry" ]; then echo "  [dry-run] $*"; else "$@"; fi; }
+  # One OS: built and tested on Ubuntu 26.04 only (same check as scripts/lib.sh require_os)
+  local os
+  # shellcheck source=/dev/null
+  os=$( . "${OS_RELEASE:-/etc/os-release}" 2>/dev/null && printf '%s %s' "${ID:-?}" "${VERSION_ID:-?}" ) || os=unknown
+  if [ "$os" != "${DHOON_OS:-ubuntu 26.04}" ]; then
+    [ "${DHOON_ANY_OS:-}" = 1 ] || die "this computer runs $os; Dhoon supports only ${DHOON_OS:-ubuntu 26.04}. To try anyway: DHOON_ANY_OS=1"
+    printf '\n  Unsupported system (%s): going on because DHOON_ANY_OS=1\n' "$os"
+  fi
   # Run a script with the docker group active, without needing to log out and back in.
   as_docker() {
     if [ -n "$dry" ]; then echo "  [dry-run] (docker group) bash $*"; return; fi
