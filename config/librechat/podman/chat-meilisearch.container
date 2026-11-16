@@ -13,6 +13,8 @@ Environment=MEILI_HTTP_ADDR=127.0.0.1:7700
 Volume=@DHOON_HOME@/runtime/LibreChat/meili_data_v1.35.1:/meili_data
 
 [Service]
+# the first start pulls the image (LibreChat's is ~1 GB): give it time
+TimeoutStartSec=15min
 Restart=always
 
 [Install]

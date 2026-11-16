@@ -12,6 +12,8 @@ Environment=POSTGRES_PASSWORD=mypassword
 Volume=librechat-pgdata:/var/lib/postgresql/data
 
 [Service]
+# the first start pulls the image (LibreChat's is ~1 GB): give it time
+TimeoutStartSec=15min
 Restart=always
 
 [Install]

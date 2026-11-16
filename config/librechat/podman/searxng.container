@@ -8,6 +8,8 @@ PublishPort=127.0.0.1:8888:8080
 Volume=@DHOON_HOME@/runtime/searxng:/etc/searxng
 
 [Service]
+# the first start pulls the image (LibreChat's is ~1 GB): give it time
+TimeoutStartSec=15min
 Restart=always
 
 [Install]

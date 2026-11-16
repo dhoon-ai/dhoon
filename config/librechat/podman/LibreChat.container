@@ -33,6 +33,8 @@ Volume=@DHOON_HOME@/runtime/LibreChat/branding/maskable-icon.png:/app/client/dis
 Volume=@DHOON_HOME@/runtime/LibreChat/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
 
 [Service]
+# the first start pulls the image (LibreChat's is ~1 GB): give it time
+TimeoutStartSec=15min
 Restart=always
 
 [Install]

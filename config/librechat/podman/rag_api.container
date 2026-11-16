@@ -14,6 +14,8 @@ Environment=RAG_HOST=127.0.0.1
 Environment=RAG_PORT=8000
 
 [Service]
+# the first start pulls the image (LibreChat's is ~1 GB): give it time
+TimeoutStartSec=15min
 Restart=always
 
 [Install]

@@ -22,7 +22,7 @@ done
 if [ -n "$dump" ]; then
   mkdir -p "$dump"
   podman exec chat-mongodb mongodump --archive --gzip --quiet >"$dump/mongo.archive.gz"
-  podman exec vectordb pg_dump -U myuser mydatabase | gzip >"$dump/postgres.sql.gz"
+  podman exec vectordb pg_dump --clean --if-exists -U myuser mydatabase | gzip >"$dump/postgres.sql.gz"   # --clean: a restore replaces what rag_api made at start
   date -Is >"$dump/made-at.txt"
   ok "chats saved in $dump ($(du -sh "$dump" | cut -f1))"
   exit 0
