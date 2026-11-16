@@ -161,21 +161,36 @@ for svc in "$UNIT_DIR"/ai-*.service; do
   printf '[Unit]\nOnFailure=ai-notify-failure@%%n.service\n' >"$svc.d/onfailure.conf"
 done
 
-# what the health e-mail watches: written once, yours to edit after that
+# what the health e-mail watches (unit, hours since its last good run): new defaults are added,
+# lines already there (your edits) are kept
 health="${XDG_CONFIG_HOME:-$HOME/.config}/ai-alerts/health.env"
-if [ ! -f "$health" ]; then
-  mkdir -p "$(dirname "$health")"
-  {
-    echo "# ai-health-check: unit and maximum age (hours) since its last good run (written by install_user_units.sh)"
-    for u in ai-newsroom ai-newsroom-west ai-newsroom-australia ai-newsroom-india ai-newsroom-europe ai-newsroom-publish \
-             ai-studio-site ai-knowledge; do
-      [ -f "$UNIT_DIR/$u.service" ] && echo "user $u.service 26"
-    done
-    [ -f "$UNIT_DIR/ai-newsroom-push.service" ] && echo "user ai-newsroom-push.service 2"
-    [ -f "$UNIT_DIR/ai-mentor.service" ] && echo "user ai-mentor.service 50"
-  } >"$health"
-  ok "health check list: $health"
-fi
+mkdir -p "$(dirname "$health")"
+[ -f "$health" ] || echo "# ai-health-check: unit and maximum age (hours) since its last good run (written by install_user_units.sh)" >"$health"
+added=0
+while read -r u hours; do
+  [ -f "$UNIT_DIR/$u.service" ] || continue
+  grep -qE "^user $u\.service[[:space:]]" "$health" && continue
+  echo "user $u.service $hours" >>"$health"; added=$((added + 1))
+done <<'LIST'
+ai-newsroom 26
+ai-newsroom-west 26
+ai-newsroom-australia 26
+ai-newsroom-india 26
+ai-newsroom-europe 26
+ai-newsroom-europe-east 26
+ai-newsroom-recheck 26
+ai-newsroom-publish 26
+ai-newsroom-push 2
+ai-newsroom-world 170
+ai-newsroom-audit 170
+ai-studio-site 26
+ai-studio-guide 74
+ai-knowledge 26
+ai-mentor 50
+ai-mentor-india 74
+restore-backup 26
+LIST
+ok "health check list: $health ($added added)"
 
 if [ -z "${1:-}" ]; then
   systemctl --user daemon-reload
