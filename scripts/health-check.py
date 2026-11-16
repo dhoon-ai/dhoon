@@ -183,6 +183,25 @@ def last_success_age_hours(unit, user=False):
         return "never"
 
 
+def installed_hours(unit, user=False):
+    """Hours since the unit file was written, or None if it isn't found."""
+    if user:
+        base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+    else:
+        base = Path("/etc/systemd/system")
+    try:
+        return (datetime.now().timestamp() - (base / unit).stat().st_mtime) / 3600.0
+    except OSError:
+        return None
+
+
+def too_new_to_judge(unit, max_age, user=False):
+    """A unit that never ran but was installed less than max_age hours ago hasn't had its first
+    turn yet (a new or rebuilt machine): not a problem. A failed run is always reported."""
+    hours = installed_hours(unit, user=user)
+    return hours is not None and hours < max_age
+
+
 def disk_bad():
     total, used, free = shutil.disk_usage("/")
     percent_free = free / total * 100 if total else 100
@@ -213,7 +232,8 @@ def main():
             age = last_success_age_hours(unit, user=True) if scope == "user" else last_success_age_hours(unit)
             label = f"user {unit}" if scope == "user" else unit
             if age == "never":
-                problems.append(f"stale: {label} never succeeded")
+                if not too_new_to_judge(unit, max_age, user=(scope == "user")):
+                    problems.append(f"stale: {label} never succeeded")
             elif isinstance(age, tuple) and age and age[0] == "failed":
                 problems.append(f"stale: {label} last run failed (Result={age[1]})")
             elif age is not None and age > max_age:

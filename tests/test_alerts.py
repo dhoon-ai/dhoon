@@ -329,3 +329,20 @@ def test_health_check_command_result():
     m = load_health()
     assert m.run_check("exit 0") is None
     assert m.run_check("echo first; echo 'usb: failed, 50h ago'; exit 1") == "exit 1: usb: failed, 50h ago"
+
+
+def test_never_ran_but_just_installed_is_not_stale(tmp_path, monkeypatch):
+    import time
+    m = load_health()
+    units = tmp_path / "systemd" / "user"
+    units.mkdir(parents=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    (units / "ai-new.service").write_text("[Service]\n")
+    old = units / "ai-old.service"
+    old.write_text("[Service]\n")
+    t = time.time() - 30 * 3600
+    os.utime(old, (t, t))
+    assert m.too_new_to_judge("ai-new.service", 26, user=True)          # installed now, limit 26 h
+    assert not m.too_new_to_judge("ai-old.service", 26, user=True)      # 30 h and still never ran
+    assert not m.too_new_to_judge("ai-missing.service", 26, user=True)  # no unit file: report it
+    assert m.too_new_to_judge("ai-old.service", 170, user=True)         # weekly: still has time
