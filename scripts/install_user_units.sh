@@ -178,6 +178,9 @@ ai-newsroom-australia 26
 ai-newsroom-india 26
 ai-newsroom-europe 26
 ai-newsroom-europe-east 26
+ai-newsroom-east-asia 26
+ai-newsroom-latin-america 26
+ai-newsroom-middle-east-africa 26
 ai-newsroom-recheck 26
 ai-newsroom-publish 26
 ai-newsroom-push 2
