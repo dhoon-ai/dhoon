@@ -13,7 +13,7 @@ KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "toolbox"))
 import emailer
 
-DEFAULT_ENV = Path.home() / ".config" / "ai-alerts" / "health.env"
+DEFAULT_ENV = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "ai-alerts" / "health.env"
 
 
 def read_units(path, scope="system"):

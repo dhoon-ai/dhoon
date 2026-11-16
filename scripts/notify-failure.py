@@ -14,7 +14,7 @@ KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "toolbox"))
 import emailer
 
-STATE_DIR = Path.home() / ".cache" / "ai-alerts"
+STATE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "ai-alerts"
 
 
 def redact(text: str) -> str:
@@ -53,13 +53,15 @@ def load_state():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--unit", required=True)
+    ap.add_argument("--user", action="store_true", help="the unit is a systemd user unit (systemctl --user)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     unit = args.unit
     host = socket.gethostname()
-    status = run_cmd(["systemctl", "status", unit, "--no-pager"])
-    journal = run_cmd(["journalctl", "-u", unit, "-n", "30", "--no-pager", "--output=cat"])
+    scope = ["--user"] if args.user else []
+    status = run_cmd(["systemctl", *scope, "status", unit, "--no-pager"])
+    journal = run_cmd(["journalctl", *scope, "-u", unit, "-n", "30", "--no-pager", "--output=cat"])
     status_lines = redact(status).splitlines()[:10]
     journal_lines = redact(journal).splitlines()[-30:]
     status_block = "\n".join("    " + line for line in status_lines)
