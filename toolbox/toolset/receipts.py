@@ -24,7 +24,8 @@ def read_receipts(folder: str = "receipts", output: str = "receipts.csv", curren
     receipts per call; call again for the next ones. currency: the user's usual currency as a
     3-letter code (CAD, USD, EUR...) if they said it, for receipts that only print "$"."""
     try:
-        from receipt_reader import files, output as out, reader
+        from receipt_reader import files, reader
+        from receipt_reader import output as out
     except ImportError:
         return ("receipt-reader isn't installed. On the Dhoon computer run (the same command updates it): "
                 "$DHOON_HOME/runtime/venv/bin/pip install git+https://github.com/knowreva/receipt-reader "

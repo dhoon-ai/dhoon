@@ -31,3 +31,7 @@ plugins/*
 *.key
 config/*.txt
 nohup.out
+*.org
+*.bak
+*~
+*.swp

@@ -1,11 +1,10 @@
 import importlib.util
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-import sys
 sys.path.insert(0, str(REPO / "toolbox"))
 NOTIFY = REPO / "scripts" / "notify-failure.py"
 HEALTH = REPO / "scripts" / "health-check.py"
@@ -39,8 +38,12 @@ def test_redaction_hides_secrets():
 
 
 def test_notify_dry_run_does_not_send(tmp_path):
-    r = subprocess.run([sys.executable if False else "python3", str(NOTIFY), "--unit", "ai-backup.service", "--dry-run"],
-                       env=env(tmp_path), capture_output=True, text=True)
+    r = subprocess.run(
+        [sys.executable if False else "python3", str(NOTIFY), "--unit", "ai-backup.service", "--dry-run"],
+        env=env(tmp_path),
+        capture_output=True,
+        text=True,
+    )
     # dry-run prints "Subject:" and never claims an e-mail was sent
     assert "Subject:" in r.stdout
     assert "sent to" not in r.stdout
@@ -51,8 +54,12 @@ def test_install_alerts_list_skips_notify_unit(tmp_path):
     (root / "etc" / "systemd" / "system").mkdir(parents=True)
     (root / "etc" / "systemd" / "system" / "ai-backup.service").write_text("[Unit]\n")
     (root / "etc" / "systemd" / "system" / "ai-notify-failure@.service").write_text("[Unit]\n")
-    r = subprocess.run(["bash", str(INSTALL), "--list"], env={**os.environ, "INSTALL_ALERTS_ROOT": str(root)},
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        ["bash", str(INSTALL), "--list"],
+        env={**os.environ, "INSTALL_ALERTS_ROOT": str(root)},
+        capture_output=True,
+        text=True,
+    )
     assert "ai-backup.service" in r.stdout
     assert "ai-notify-failure@" not in r.stdout
 
@@ -72,7 +79,6 @@ def test_install_alerts_idempotent(tmp_path):
     # remove cleans up
     subprocess.run(["bash", str(INSTALL), "--remove"], env=e, check=True)
     assert not (sd / "ai-backup.service.d").exists() or not (sd / "ai-backup.service.d" / "onfailure.conf").exists()
-
 
 
 def load_health():
@@ -97,9 +103,9 @@ def test_disk_threshold_bad(monkeypatch):
     m = load_health()
 
     class Usage:
-        total = 100 * 1024 ** 3
-        used = 90 * 1024 ** 3
-        free = 10 * 1024 ** 3
+        total = 100 * 1024**3
+        used = 90 * 1024**3
+        free = 10 * 1024**3
 
     monkeypatch.setattr(shutil, "disk_usage", lambda p: (Usage.total, Usage.used, Usage.free))
     bad, pct, free_gb = m.disk_bad()
@@ -113,9 +119,9 @@ def test_disk_threshold_ok(monkeypatch):
     m = load_health()
 
     class Usage:
-        total = 100 * 1024 ** 3
-        used = 10 * 1024 ** 3
-        free = 90 * 1024 ** 3
+        total = 100 * 1024**3
+        used = 10 * 1024**3
+        free = 90 * 1024**3
 
     monkeypatch.setattr(shutil, "disk_usage", lambda p: (Usage.total, Usage.used, Usage.free))
     bad, pct, free_gb = m.disk_bad()
@@ -129,8 +135,11 @@ def test_notify_rate_limit_per_unit(tmp_path):
     state_dir = tmp_path / ".cache" / "ai-alerts"
     state_dir.mkdir(parents=True, exist_ok=True)
     state = state_dir / "notify-state.json"
-    data = {"day": __import__("datetime").date.today().isoformat(), "count": 1,
-            "units": {"ai-backup.service": __import__("time").time()}}
+    data = {
+        "day": __import__("datetime").date.today().isoformat(),
+        "count": 1,
+        "units": {"ai-backup.service": __import__("time").time()},
+    }
     state.write_text(__import__("json").dumps(data))
     r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-backup.service"], env=e, capture_output=True, text=True)
     assert "rate limited" in (r.stdout + r.stderr)
@@ -141,8 +150,9 @@ def test_notify_daily_limit(tmp_path):
     state_dir = tmp_path / ".cache" / "ai-alerts"
     state_dir.mkdir(parents=True, exist_ok=True)
     state = state_dir / "notify-state.json"
-    state.write_text(__import__("json").dumps({"day": __import__("datetime").date.today().isoformat(),
-                                             "count": 5, "units": {}}))
+    state.write_text(
+        __import__("json").dumps({"day": __import__("datetime").date.today().isoformat(), "count": 5, "units": {}})
+    )
     r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-x.service"], env=e, capture_output=True, text=True)
     assert "daily alert limit" in (r.stdout + r.stderr)
 
@@ -160,7 +170,7 @@ def test_notify_allowlist_only(tmp_path, monkeypatch):
     monkeypatch.setattr(m.emailer, "settings", lambda: {"allowed_list": ["me@gmail.com"]})
     monkeypatch.setattr(m.Path, "home", lambda: tmp_path)
     # bypass rate limits by fresh state dir
-    rc = m.main.__wrapped__() if hasattr(m.main, "__wrapped__") else None
+    _ = m.main.__wrapped__() if hasattr(m.main, "__wrapped__") else None
     # call main via argparse is heavy; instead invoke function pieces is not exposed.
     # Minimal assertion: allowlist constant shape already tested elsewhere.
     assert True
@@ -168,8 +178,9 @@ def test_notify_allowlist_only(tmp_path, monkeypatch):
 
 def test_notify_dry_run_30_lines_max(tmp_path):
     e = env(tmp_path)
-    r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-backup.service", "--dry-run"], env=e,
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        ["python3", str(NOTIFY), "--unit", "ai-backup.service", "--dry-run"], env=e, capture_output=True, text=True
+    )
     journal = r.stdout.split("=== last 30 journal lines ===", 1)[-1]
     assert len(journal.splitlines()) <= 33
 
@@ -191,8 +202,11 @@ def test_staleness_real_format(monkeypatch):
 
 
 def test_unit_files_no_literal_user_or_home():
-    for fn in ["scripts/systemd/ai-notify-failure@.service", "scripts/systemd/ai-health-check.service",
-               "scripts/systemd/ai-health-check.timer"]:
+    for fn in [
+        "scripts/systemd/ai-notify-failure@.service",
+        "scripts/systemd/ai-health-check.service",
+        "scripts/systemd/ai-health-check.timer",
+    ]:
         text = (REPO / fn).read_text()
         assert "/home/" not in text
         assert "User=@USER@" in text or "User=" not in text
@@ -214,11 +228,11 @@ def test_per_unit_limit_survives_midnight(tmp_path):
     state_dir.mkdir(parents=True, exist_ok=True)
     # yesterday's daily count, but a recent per-unit timestamp
     state = state_dir / "notify-state.json"
-    import time, json, datetime
-    state.write_text(json.dumps({"day": "2020-01-01", "count": 5,
-                                "units": {"ai-backup.service": time.time()}}))
-    r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-backup.service"], env=e,
-                       capture_output=True, text=True)
+    import json
+    import time
+
+    state.write_text(json.dumps({"day": "2020-01-01", "count": 5, "units": {"ai-backup.service": time.time()}}))
+    r = subprocess.run(["python3", str(NOTIFY), "--unit", "ai-backup.service"], env=e, capture_output=True, text=True)
     # daily counter reset to 0, but per-unit (recent) still blocks
     assert "rate limited" in (r.stdout + r.stderr)
 
@@ -233,11 +247,14 @@ def test_health_parses_real_show_format(monkeypatch):
 
 def test_parse_failed_handles_bullet():
     m = load_health()
-    assert m.parse_failed("● ai-backup.service loaded failed failed X\nother.service loaded failed failed Y\n") == ["ai-backup.service"]
+    assert m.parse_failed("● ai-backup.service loaded failed failed X\nother.service loaded failed failed Y\n") == [
+        "ai-backup.service"
+    ]
 
 
 def test_indented_notify_body_becomes_code_block():
     import emailer as _emailer
+
     body = "ai-backup.service failed.\n\n=== s ===\n\n    line one\n    line two\n"
     html = _emailer.markdown_to_html(body)
     assert "<pre><code>" in html
@@ -246,6 +263,7 @@ def test_indented_notify_body_becomes_code_block():
 
 def test_health_journal_systemd_finished_two_hours_ago(monkeypatch):
     import time
+
     m = load_health()
     now = time.time()
     ts = int(now - 7200)
@@ -258,6 +276,7 @@ def test_health_journal_systemd_finished_two_hours_ago(monkeypatch):
 
 def test_health_journal_only_failed_with_result_is_never(monkeypatch):
     import time
+
     m = load_health()
     now = time.time()
     ts = int(now - 300)
@@ -270,6 +289,7 @@ def test_health_journal_only_failed_with_result_is_never(monkeypatch):
 
 def test_health_journal_job_output_finished_story_is_never(monkeypatch):
     import time
+
     m = load_health()
     now = time.time()
     ts = int(now - 300)
@@ -282,6 +302,7 @@ def test_health_journal_job_output_finished_story_is_never(monkeypatch):
 
 def test_health_journal_empty_uses_systemctl_timestamp(monkeypatch):
     import time
+
     m = load_health()
     now = time.time()
     ts = int(now - 7200)
@@ -293,6 +314,7 @@ def test_health_journal_empty_uses_systemctl_timestamp(monkeypatch):
 
 def test_health_journal_systemd_finished_100_hours_ago(monkeypatch):
     import time
+
     m = load_health()
     now = time.time()
     ts = int(now - 100 * 3600)
@@ -305,8 +327,9 @@ def test_health_journal_systemd_finished_100_hours_ago(monkeypatch):
 
 def test_health_env_user_units_and_checks(tmp_path):
     env_file = tmp_path / "health.env"
-    env_file.write_text("ai-example.service 26\nuser ai-example-user.service 30\n"
-                        "check bash backup.sh --status\n# check not-this\n")
+    env_file.write_text(
+        "ai-example.service 26\nuser ai-example-user.service 30\ncheck bash backup.sh --status\n# check not-this\n"
+    )
     m = load_health()
     assert m.read_units(str(env_file)) == [("ai-example.service", 26.0)]
     assert m.read_units(str(env_file), scope="user") == [("ai-example-user.service", 30.0)]
@@ -315,6 +338,7 @@ def test_health_env_user_units_and_checks(tmp_path):
 
 def test_health_user_journal_manager_is_not_pid_1(monkeypatch):
     import time
+
     m = load_health()
     ts = int(time.time() - 7200)
     text = f"{ts} example-host systemd[2071]: Finished ai-example-user.service - x.\n"
@@ -333,6 +357,7 @@ def test_health_check_command_result():
 
 def test_never_ran_but_just_installed_is_not_stale(tmp_path, monkeypatch):
     import time
+
     m = load_health()
     units = tmp_path / "systemd" / "user"
     units.mkdir(parents=True)
@@ -342,7 +367,7 @@ def test_never_ran_but_just_installed_is_not_stale(tmp_path, monkeypatch):
     old.write_text("[Service]\n")
     t = time.time() - 30 * 3600
     os.utime(old, (t, t))
-    assert m.too_new_to_judge("ai-new.service", 26, user=True)          # installed now, limit 26 h
-    assert not m.too_new_to_judge("ai-old.service", 26, user=True)      # 30 h and still never ran
+    assert m.too_new_to_judge("ai-new.service", 26, user=True)  # installed now, limit 26 h
+    assert not m.too_new_to_judge("ai-old.service", 26, user=True)  # 30 h and still never ran
     assert not m.too_new_to_judge("ai-missing.service", 26, user=True)  # no unit file: report it
-    assert m.too_new_to_judge("ai-old.service", 170, user=True)         # weekly: still has time
+    assert m.too_new_to_judge("ai-old.service", 170, user=True)  # weekly: still has time

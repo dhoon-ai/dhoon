@@ -11,7 +11,7 @@ from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "toolbox"))
-import emailer
+import emailer  # noqa: E402
 
 DEFAULT_ENV = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "ai-alerts" / "health.env"
 
@@ -47,15 +47,17 @@ def read_checks(path):
     p = Path(path)
     if not p.is_file():
         return []
-    return [line.strip()[6:].strip() for line in p.read_text().splitlines()
-            if line.strip().startswith("check ") and line.strip()[6:].strip()]
+    return [
+        line.strip()[6:].strip()
+        for line in p.read_text().splitlines()
+        if line.strip().startswith("check ") and line.strip()[6:].strip()
+    ]
 
 
 def run_check(cmd, timeout=600):
     """None when the command exits 0, else a short reason."""
     try:
-        out = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=timeout,
-                             env=_user_env())
+        out = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=timeout, env=_user_env())
     except subprocess.TimeoutExpired:
         return f"timed out after {timeout}s"
     except OSError as e:
@@ -88,8 +90,11 @@ def parse_failed(text):
 
 
 def failed_ai_units(user=False):
-    cmd = ["systemctl"] + (["--user"] if user else []) + ["list-units", "--type=service", "--state=failed",
-                                                         "--no-legend", "--plain"]
+    cmd = (
+        ["systemctl"]
+        + (["--user"] if user else [])
+        + ["list-units", "--type=service", "--state=failed", "--no-legend", "--plain"]
+    )
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, env=_user_env() if user else None)
     except OSError:
@@ -132,9 +137,14 @@ def has_journal_entries(text):
 
 def run_journalctl(unit, user=False):
     try:
-        out = subprocess.run(["journalctl"] + (["--user"] if user else []) + ["-u", unit, "--since", "-7 days",
-                              "-o", "short-unix", "--no-pager"],
-                             capture_output=True, text=True, env=_user_env() if user else None)
+        out = subprocess.run(
+            ["journalctl"]
+            + (["--user"] if user else [])
+            + ["-u", unit, "--since", "-7 days", "-o", "short-unix", "--no-pager"],
+            capture_output=True,
+            text=True,
+            env=_user_env() if user else None,
+        )
     except Exception:
         return ""
     return out.stdout or ""
@@ -142,9 +152,14 @@ def run_journalctl(unit, user=False):
 
 def run_systemctl_show(unit, user=False):
     try:
-        out = subprocess.run(["systemctl"] + (["--user"] if user else []) + ["show", "--timestamp=unix", unit,
-                              "-p", "Result", "-p", "ExecMainExitTimestamp"], capture_output=True, text=True,
-                             env=_user_env() if user else None)
+        out = subprocess.run(
+            ["systemctl"]
+            + (["--user"] if user else [])
+            + ["show", "--timestamp=unix", unit, "-p", "Result", "-p", "ExecMainExitTimestamp"],
+            capture_output=True,
+            text=True,
+            env=_user_env() if user else None,
+        )
     except Exception:
         return ""
     return out.stdout or ""
@@ -205,7 +220,7 @@ def too_new_to_judge(unit, max_age, user=False):
 def disk_bad():
     total, used, free = shutil.disk_usage("/")
     percent_free = free / total * 100 if total else 100
-    free_gb = free / (1024 ** 3)
+    free_gb = free / (1024**3)
     return percent_free < 15 or free_gb < 20, percent_free, free_gb
 
 

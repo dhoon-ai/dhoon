@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Send one e-mail when an ai-* unit fails. Intended for systemd OnFailure=."""
+
 import argparse
 import json
 import os
@@ -7,12 +8,12 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(KIT / "toolbox"))
-import emailer
+import emailer  # noqa: E402
 
 STATE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "ai-alerts"
 

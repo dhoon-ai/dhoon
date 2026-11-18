@@ -11,8 +11,9 @@ def _run(tmp_path, text, script, extra=None):
     (conf / "environment.d").mkdir(parents=True, exist_ok=True)
     (conf / "environment.d" / "10-paths.conf").write_text(text)
     env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "XDG_CONFIG_HOME": str(conf), **(extra or {})}
-    return subprocess.run(["bash", "-c", f'. "{KIT}/scripts/paths.sh"; {script}'], env=env, capture_output=True,
-                          text=True)
+    return subprocess.run(
+        ["bash", "-c", f'. "{KIT}/scripts/paths.sh"; {script}'], env=env, capture_output=True, text=True
+    )
 
 
 def test_values_quotes_and_references(tmp_path):

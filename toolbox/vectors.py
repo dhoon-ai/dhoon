@@ -72,7 +72,12 @@ class Store:
                                    "WHERE i.source = ?", (source,)).fetchall()  # fmt: skip
             matrix = (np.stack([np.frombuffer(r[3], dtype=np.float32) for r in rows]) if rows
                       else np.zeros((0, 1), np.float32))  # fmt: skip
-            self._matrix[source] = ([r[0] for r in rows], [r[1] for r in rows], [json.loads(r[2]) for r in rows], matrix)
+            self._matrix[source] = (
+                [r[0] for r in rows],
+                [r[1] for r in rows],
+                [json.loads(r[2]) for r in rows],
+                matrix,
+            )
         return self._matrix[source]
 
     def search(self, vec: list[float], source: str, k: int = 5, least: float = 0.0) -> list[dict]:

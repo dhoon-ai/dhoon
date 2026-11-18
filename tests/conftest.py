@@ -14,9 +14,29 @@ def fresh_install(tmp_path, monkeypatch):
     # cache/state/data too (alert state, rate limits): tests that set HOME get their own
     for name in ("XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
         monkeypatch.delenv(name, raising=False)
-    for name in ("PROJECT_DIR", "AGENT_DIR", "MODELS_DIR", "BACKUP_USB", "DHOON_HOME", "DHOON_DEV", "BLOCKS_HOME",
-                 "BLOCKS_DEV", "SITE_DIR", "KNOWREVA_SITE", "PAIRDESK_DIR", "WORKSPACE", "WORKSPACE_DIR", "BEAM_QUEUE",
-                 "CONTAINER_DATA", "CONTAINER_STORAGE", "CONFIG_DIR", "VENV", "BACKUP_CONF", "RESTORE_DIR", "PATHS_ENV"):
+    for name in (
+        "PROJECT_DIR",
+        "AGENT_DIR",
+        "MODELS_DIR",
+        "BACKUP_USB",
+        "DHOON_HOME",
+        "DHOON_DEV",
+        "BLOCKS_HOME",
+        "BLOCKS_DEV",
+        "SITE_DIR",
+        "KNOWREVA_SITE",
+        "PAIRDESK_DIR",
+        "WORKSPACE",
+        "WORKSPACE_DIR",
+        "BEAM_QUEUE",
+        "CONTAINER_DATA",
+        "CONTAINER_STORAGE",
+        "CONFIG_DIR",
+        "VENV",
+        "BACKUP_CONF",
+        "RESTORE_DIR",
+        "PATHS_ENV",
+    ):
         monkeypatch.delenv(name, raising=False)
     # a fresh install has a paths file with its workspace (install.sh writes it)
     monkeypatch.setenv("WORKSPACE", str(tmp_path / "ws"))

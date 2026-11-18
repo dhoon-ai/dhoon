@@ -8,7 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = r"(dhoon|dhoon-dev|blocks|blocks-dev|agent-workspace|beam-queue)"
 # any home folder written out (/home/<someone>/dhoon ...), without naming anyone
-BAD = re.compile(r"(~|\$HOME|\$\{HOME\}|%h|/home/[a-z][a-z0-9_-]*)/" + NAMES + r"(?![\w-])|home\(\)\s*/\s*[\"']" + NAMES)
+BAD = re.compile(
+    r"(~|\$HOME|\$\{HOME\}|%h|/home/[a-z][a-z0-9_-]*)/" + NAMES + r"(?![\w-])|home\(\)\s*/\s*[\"']" + NAMES
+)
 ALLOWED = {
     # the age backup (scripts/backup.sh, restore.sh) is left as it is until its owner decides
     "scripts/backup.sh",
@@ -22,7 +24,9 @@ DOCS = {".md"}  # docs are checked in the docs pass
 def _files():
     """The repo's own files: what git tracks (caches, venvs and ignored files never count)."""
     try:
-        out = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"], capture_output=True, text=True, check=True).stdout
+        out = subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "-z"], capture_output=True, text=True, check=True
+        ).stdout
         return sorted(ROOT / x for x in out.split("\0") if x)
     except (OSError, subprocess.CalledProcessError):
         return sorted(ROOT.rglob("*"))

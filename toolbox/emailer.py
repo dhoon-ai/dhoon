@@ -70,7 +70,9 @@ try:
     EMAIL_RETRY_ATTEMPTS = max(1, int(os.environ.get("EMAIL_RETRY_ATTEMPTS", "1")))
 except (TypeError, ValueError):
     EMAIL_RETRY_ATTEMPTS = 1
-EMAIL_RETRY_DELAY = int(os.environ.get("EMAIL_RETRY_DELAY", "300"))  # seconds (~5 min); two waits make ~10 min over 3 tries
+EMAIL_RETRY_DELAY = int(
+    os.environ.get("EMAIL_RETRY_DELAY", "300")
+)  # seconds (~5 min); two waits make ~10 min over 3 tries
 
 
 class EmailError(Exception):
@@ -277,9 +279,18 @@ def _is_network_error(exc: BaseException) -> bool:
     msg = str(exc).lower()
     if "not allowed" in msg or "refused the login" in msg or "refused it (" in msg:
         return False
-    network_words = ("could not reach", "connection", "timeout", "name resolution",
-                      "temporary failure", "network", "socket", "reset by peer",
-                      "broken pipe", "server disconnected")
+    network_words = (
+        "could not reach",
+        "connection",
+        "timeout",
+        "name resolution",
+        "temporary failure",
+        "network",
+        "socket",
+        "reset by peer",
+        "broken pipe",
+        "server disconnected",
+    )
     return any(w in msg for w in network_words)
 
 

@@ -603,9 +603,18 @@ def test_read_receipts_into_a_spreadsheet_and_continue(tb, monkeypatch):
     folder.mkdir(parents=True)
     for name in ("a.jpg", "b.jpg"):
         Image.new("RGB", (400, 600), "white").save(folder / name)
-    good = {"vendor": "Maple Corner Grocery", "date": "2026-10-20", "currency": "CAD",
-            "items": [{"description": "Bread", "quantity": 1, "amount": 3.29}], "subtotal": 3.29,
-            "taxes": [], "tip": None, "total": 3.29, "payment_method": "cash", "category": "groceries"}
+    good = {
+        "vendor": "Maple Corner Grocery",
+        "date": "2026-10-20",
+        "currency": "CAD",
+        "items": [{"description": "Bread", "quantity": 1, "amount": 3.29}],
+        "subtotal": 3.29,
+        "taxes": [],
+        "tip": None,
+        "total": 3.29,
+        "payment_method": "cash",
+        "category": "groceries",
+    }
     asked = []
     monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: asked.append(kw) or dict(good))
     monkeypatch.setattr(sys.modules["toolset.receipts"], "MOST", 1)
@@ -631,11 +640,22 @@ def test_read_receipts_with_your_usual_currency(tb, monkeypatch):
 
     (tb.WORKSPACE / "receipts").mkdir(parents=True)
     Image.new("RGB", (400, 600), "white").save(tb.WORKSPACE / "receipts" / "a.jpg")
-    good = {"vendor": "Corner Shop", "date": "2026-10-20", "currency": "$",
-            "items": [{"description": "Milk", "quantity": 1, "amount": 5.00}], "subtotal": 5.00,
-            "taxes": [], "tip": None, "total": 5.00, "payment_method": "cash", "category": "groceries"}
+    good = {
+        "vendor": "Corner Shop",
+        "date": "2026-10-20",
+        "currency": "$",
+        "items": [{"description": "Milk", "quantity": 1, "amount": 5.00}],
+        "subtotal": 5.00,
+        "taxes": [],
+        "tip": None,
+        "total": 5.00,
+        "payment_method": "cash",
+        "category": "groceries",
+    }
     prompts = []
-    monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: prompts.append(messages[0]["content"]) or dict(good))
+    monkeypatch.setattr(
+        rr_model, "chat", lambda messages, schema, **kw: prompts.append(messages[0]["content"]) or dict(good)
+    )
     monkeypatch.setenv("RECEIPT_CURRENCY", "cad")
     out = tb.read_receipts("receipts", "r.csv")
     assert "5.0 CAD" in out and "it is CAD" in prompts[0]  # "$" became your usual currency
@@ -649,7 +669,9 @@ def test_search_all_documents_finds_the_right_file_and_keeps_up_with_changes(tb,
     d = docx.Document()
     d.add_paragraph("This lease renews automatically on March 1 unless either party gives sixty days notice.")
     d.save(tb.WORKSPACE / "contracts" / "lease.docx")
-    _make_pdf(tb.WORKSPACE / "contracts" / "phone.pdf", ["The phone plan costs forty dollars a month with no contract."])
+    _make_pdf(
+        tb.WORKSPACE / "contracts" / "phone.pdf", ["The phone plan costs forty dollars a month with no contract."]
+    )
     (tb.WORKSPACE / "recipes.txt").write_text("Bake the bread at two hundred degrees for forty minutes.\n" * 3)
     (tb.WORKSPACE / ".hidden.txt").write_text("lease renews secret notes that must not be searched" * 3)
     out = tb.search_all_documents("lease renews automatically", top_k=1)
@@ -712,7 +734,9 @@ def test_read_receipts_waits_its_turn_with_long_jobs(tb, monkeypatch):
     good = {"vendor": "Corner Shop", "date": "2026-10-20", "date_printed": "2026-10-20", "currency": "CAD",
             "items": [{"description": "Milk", "quantity": 1, "amount": 5.00}], "subtotal": 5.00, "taxes": [],
             "tip": None, "total": 5.00, "payment_method": "cash", "category": "groceries"}  # fmt: skip
-    monkeypatch.setattr(rr_model, "chat", lambda messages, schema, **kw: seen.append(heavy.running().get("name")) or dict(good))
+    monkeypatch.setattr(
+        rr_model, "chat", lambda messages, schema, **kw: seen.append(heavy.running().get("name")) or dict(good)
+    )
     real = heavy.running
     monkeypatch.setattr(heavy, "running", lambda: {"name": "nightly report", "since": "10:30", "pid": 1})
     assert tb.read_receipts("receipts", "r.csv").startswith("Not now: nightly report is running (since 10:30)")

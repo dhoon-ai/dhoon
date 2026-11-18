@@ -193,7 +193,6 @@ def test_chats_are_backed_up_and_put_back(kit):
     assert "Chats exported" not in r.stdout
 
 
-
 def test_restore_shows_download_progress():
     # 6 Nov: a ~450 MB clone with -q looked like a hang on a new machine
     text = Path(RESTORE).read_text()
