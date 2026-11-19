@@ -183,6 +183,7 @@ ai-newsroom-latin-america 26
 ai-newsroom-middle-east-africa 26
 ai-newsroom-recheck 26
 ai-newsroom-publish 26
+ai-newsroom-podcast 26
 ai-newsroom-push 2
 ai-newsroom-world 170
 ai-newsroom-audit 170
@@ -191,6 +192,7 @@ ai-studio-guide 74
 ai-knowledge 26
 ai-mentor 50
 ai-mentor-india 74
+ai-mentor-morning 26
 restore-backup 26
 LIST
 ok "health check list: $health ($added added)"
