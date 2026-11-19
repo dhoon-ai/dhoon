@@ -174,13 +174,17 @@ while read -r u hours; do
 done <<'LIST'
 ai-newsroom 26
 ai-newsroom-west 26
+ai-newsroom-usa 26
+ai-newsroom-usa-west 26
 ai-newsroom-australia 26
 ai-newsroom-india 26
 ai-newsroom-europe 26
 ai-newsroom-europe-east 26
 ai-newsroom-east-asia 26
+ai-newsroom-southeast-asia 26
 ai-newsroom-latin-america 26
 ai-newsroom-middle-east-africa 26
+ai-newsroom-middle-east-africa-gulf 26
 ai-newsroom-recheck 26
 ai-newsroom-publish 26
 ai-newsroom-podcast 26
