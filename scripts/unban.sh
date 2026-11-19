@@ -10,8 +10,13 @@ source "$(dirname "$0")/lib.sh"
 IF_NEEDED=false
 [ "${1:-}" = "--if-needed" ] && IF_NEEDED=true
 
-DOCKER=(docker)
-docker info >/dev/null 2>&1 || DOCKER=(sudo docker)
+if command -v podman >/dev/null 2>&1; then
+  DOCKER=(podman)
+elif docker info >/dev/null 2>&1; then
+  DOCKER=(docker)
+else
+  DOCKER=(sudo docker)
+fi
 mongo() { "${DOCKER[@]}" exec chat-mongodb mongosh LibreChat --quiet --eval "$1" 2>/dev/null | tail -1; }
 
 if ! "${DOCKER[@]}" ps --format '{{.Names}}' 2>/dev/null | grep -qx chat-mongodb; then
