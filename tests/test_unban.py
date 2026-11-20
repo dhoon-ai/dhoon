@@ -1,4 +1,4 @@
-"""scripts/unban.sh with a fake docker/mongosh (no real LibreChat needed)."""
+"""scripts/unban.sh with a fake podman/mongosh (no real LibreChat needed)."""
 
 import os
 import subprocess
@@ -13,20 +13,19 @@ REPO = Path(__file__).resolve().parents[1]
 def env(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    log = tmp_path / "docker.log"
-    # fake docker: logs every call; `exec ... countDocuments` prints $BANS
-    (bin_dir / "docker").write_text(
+    log = tmp_path / "podman.log"
+    # fake podman: logs every call; `exec ... countDocuments` prints $BANS
+    (bin_dir / "podman").write_text(
         "#!/bin/bash\n"
         f'echo "$*" >> {log}\n'
         'case "$*" in\n'
-        "  info*) exit 0;;\n"
-        "  ps*) echo chat-mongodb;;\n"
+                "  ps*) echo chat-mongodb;;\n"
         '  *countDocuments*) echo "${BANS:-0}";;\n'
         '  *deleteMany*) echo "${BANS:-0}";;\n'
         "esac\n"
     )
     (bin_dir / "curl").write_text("#!/bin/bash\nexit 0\n")
-    for f in ("docker", "curl"):
+    for f in ("podman", "curl"):
         (bin_dir / f).chmod(0o755)
     lc = tmp_path / "LibreChat"
     lc.mkdir()

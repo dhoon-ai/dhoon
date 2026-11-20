@@ -10,16 +10,11 @@ source "$(dirname "$0")/lib.sh"
 IF_NEEDED=false
 [ "${1:-}" = "--if-needed" ] && IF_NEEDED=true
 
-if command -v podman >/dev/null 2>&1; then
-  DOCKER=(podman)
-elif docker info >/dev/null 2>&1; then
-  DOCKER=(docker)
-else
-  DOCKER=(sudo docker)
-fi
-mongo() { "${DOCKER[@]}" exec chat-mongodb mongosh LibreChat --quiet --eval "$1" 2>/dev/null | tail -1; }
+# Rootless Podman only (no docker, no sudo).
+command -v podman >/dev/null 2>&1 || { fail "podman is not installed"; exit 1; }
+mongo() { podman exec chat-mongodb mongosh LibreChat --quiet --eval "$1" 2>/dev/null | tail -1; }
 
-if ! "${DOCKER[@]}" ps --format '{{.Names}}' 2>/dev/null | grep -qx chat-mongodb; then
+if ! podman ps --format '{{.Names}}' 2>/dev/null | grep -qx chat-mongodb; then
   $IF_NEEDED && exit 0
   fail "LibreChat's database (chat-mongodb) is not running. Start LibreChat: bash scripts/05_librechat.sh"
   exit 1
@@ -34,10 +29,10 @@ fi
 step "Removing LibreChat bans"
 n=$(mongo 'print(db.logs.deleteMany({ key: /^BANS:/ }).deletedCount)')
 ok "Removed ${n:-0} ban(s)"
-(cd "$LIBRECHAT_DIR" && "${DOCKER[@]}" compose restart api >/dev/null)
+(cd "$LIBRECHAT_DIR" && podman compose restart api >/dev/null)
 echo "  Restarting LibreChat..."
 for _ in $(seq 1 60); do
   curl -fs http://localhost:3080 >/dev/null 2>&1 && { ok "LibreChat is back - you can sign in again"; exit 0; }
   sleep 2
 done
-warn "LibreChat is taking long to restart; check: cd $LIBRECHAT_DIR && docker compose logs api --tail 30"
+warn "LibreChat is taking long to restart; check: cd $LIBRECHAT_DIR && podman compose logs api --tail 30"
