@@ -1,8 +1,8 @@
 [Unit]
-Description=Daily AI health check at 08:30
+Description=Daily AI health check at 08:35
 
 [Timer]
-OnCalendar=*-*-* 08:30:00
+OnCalendar=*-*-* 08:35:00
 Persistent=true
 
 [Install]

@@ -57,7 +57,7 @@ sudo tee /etc/systemd/system/ai-warmup.timer >/dev/null <<UNIT
 Description=Have the model read the Assistant's instructions in advance (new date)
 
 [Timer]
-OnCalendar=*-*-* 00:05
+OnCalendar=*-*-* 00:35
 Unit=ai-model-preload.service
 
 [Install]

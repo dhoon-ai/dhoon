@@ -152,7 +152,7 @@ sudo tee /etc/systemd/system/ai-knowledge.timer >/dev/null <<EOF
 Description=Every night: add the missing weeks to the world news and markets knowledge base
 
 [Timer]
-OnCalendar=*-*-* 22:30:00
+OnCalendar=*-*-* 23:15:00
 
 [Install]
 WantedBy=timers.target

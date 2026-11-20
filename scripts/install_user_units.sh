@@ -90,7 +90,7 @@ unit ai-knowledge.timer <<EOF
 Description=Every night: add the missing weeks to the world news and markets knowledge base
 
 [Timer]
-OnCalendar=*-*-* 22:30:00
+OnCalendar=*-*-* 23:15:00
 
 [Install]
 WantedBy=timers.target
@@ -116,14 +116,14 @@ unit ai-warmup.timer <<EOF
 Description=Have the model read the Assistant's instructions in advance (new date)
 
 [Timer]
-OnCalendar=*-*-* 00:05
+OnCalendar=*-*-* 00:35
 Unit=ai-model-preload.service
 
 [Install]
 WantedBy=timers.target
 EOF
 
-# daily health e-mail (08:30) and one e-mail when an ai-* service fails
+# daily health e-mail (08:35) and one e-mail when an ai-* service fails
 unit ai-health-check.service <<EOF
 [Unit]
 Description=Daily AI health check
@@ -136,10 +136,10 @@ ExecStart=$PY $KIT/scripts/health-check.py
 EOF
 unit ai-health-check.timer <<EOF
 [Unit]
-Description=Daily AI health check at 08:30
+Description=Daily AI health check at 08:35
 
 [Timer]
-OnCalendar=*-*-* 08:30:00
+OnCalendar=*-*-* 08:35:00
 Persistent=true
 
 [Install]

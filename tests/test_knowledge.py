@@ -222,7 +222,7 @@ def test_search_knowledge_tool(tb, monkeypatch):
 def test_timer_and_settings_are_wired_up():
     repo = Path(__file__).resolve().parents[1]
     s04 = (repo / "scripts" / "04_toolbox.sh").read_text()
-    assert "ai-knowledge.timer" in s04 and "news_kb.py --update" in s04 and "OnCalendar=*-*-* 22:30:00" in s04
+    assert "ai-knowledge.timer" in s04 and "news_kb.py --update" in s04 and "OnCalendar=*-*-* 23:15:00" in s04
     assert "ai-knowledge.timer" in (repo / "scripts" / "update.sh").read_text()
     assert "KNOWLEDGE=on" in (repo / "config" / "models.env.example").read_text()
     instructions = (repo / "config" / "agent-instructions.md").read_text()
